@@ -1,189 +1,474 @@
 # Style guide
 
-Started 2026-10-14 from the portable guide (vault `0-notes/ai-instructions/paper-writing-style.md`, dated 2026-10-01),
-which every section of this paper follows. This paper's own terms and standing decisions are at the end; general
-lessons learned here go back to the portable guide. Reference papers: FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`,
-IEEE, the template for this paper) and FPGA'27 (`~/docs/FPGA27__Control_Packet_Reconfiguration.pdf`, the FCPR paper).
 
-## Stages
-1. **First draft.** Self-contained and complete: all information is present, so only refinement follows. Numbers can
-   be finalized later, but the current ones must be satisfactory. Bold run-in headings give at-a-glance structure.
-2. **Restructuring.** Move topics to suit the narrative; trim details that hold little value or confuse, figures and
-   tables included, without being dishonest.
-3. **Compacting.** Every sentence earns its place; each piece of information is conveyed once, except to highlight key
-   points and takeaways. Merge what the run-ins separated.
-4. **Final refinements.**
+## Before any text pass
+- **Read every rule first**, Wording lessons and the paper's Per-paper decisions in full, not only the section for
+  the current stage; then check the diff mechanically for every banned word and phrase (a script that scans each
+  change).
+- **Rework in context.** A sentence is fixed together with its paragraph (for the abstract or conclusion, the whole
+  section), so that emphasis, repetition, and flow stay right; a local patch can turn a qualifier into the frame or
+  repeat what the neighbor says.
+- **Restructure, don't drop.** A sentence that reads badly is restructured so every fact stays. List the old
+  sentence's facts and check each is in the new one or say where it moved; a cut is offered only as a separate,
+  labelled option.
+- **Fix the substance, not the wording around it.** For each finding, state in one line what is actually wrong (a
+  claim outside the data, a model that disagrees with a measurement) before editing. Prefer wording that every source
+  supports, or new data, over a caveat or a narrowed scope; a caveat is never presented as a fix.
+- **A caveat needs a wrong claim.** Before adding a caveat, qualifier, or condition, quote the stated sentence the
+  finding makes wrong and check that its subject and scope cover the finding. Verifying a number is not showing that
+  the text is wrong; a definition is not contradicted by a regime the paper never evaluates.
+- **Re-check a reworded claim's scope.** A number can stay correct while the words around it overclaim. Re-derive
+  what the number counts from its source, and check every other place the paper states the same result.
+- **The paper describes the current implementation.** Check a source-backed claim against the implementation's
+  current head, and describe that state only, with no wording that straddles old and new behavior.
+- **Value means supporting a main claim.** Before proposing a cut, write the claim the line supports (or "none").
+  Lines that support a headline result, the key insight, the model's accuracy, a correctness argument, or a
+  contribution are high value: they may be compressed with their meaning kept, never cut. Only "none" lines go.
+- **Standard before our own rule.** Where a question is about convention, find the field's practice first (peer
+  papers, counted where possible); a rule of our own is offered after it, labelled as a suggestion. Never justify a
+  choice by consistency with a default we set ourselves.
 
 ## The evaluation interprets; it does not report
-The single most important lesson (author, 2026-10-01, "the big breakthrough in perspective").
-- The point of evaluation prose is to **distill trends, patterns, and insights**, i.e., to interpret the results. Look
-  across **every applicable run**, not only the latest, and ask what holds in all of them: what sets the cost, which
-  regimes exist and where the boundary lies, which lever moves which term, where crossovers fall, what generalizes, and
-  what is more or less repeatable.
-- Write those patterns down first (in the paper's `STYLE.md`) as the evaluation's message. Each evaluation subsection
-  opens with the pattern it supports and ends with it as the takeaway; numbers appear only as support, rounded.
+The single most important lesson (author, 2026-10-01: "the big breakthrough in perspective").
+- The evaluation's prose distills **trends, patterns, and insights** that hold across **every applicable run**, not
+  only the latest: what determines the cost, which regimes exist and where the boundary lies, which lever moves which
+  term, where crossovers fall, what generalizes, and what is more or less repeatable.
+- Write those patterns down first, in the paper's `STYLE.md`, as the evaluation's message. Look for **one unifying
+  insight** that every method and every step is read through (ctrl-pkt: reconfiguration time is the command
+  processor's critical path), with the patterns as its consequences: what each method pays for; why the kinds of
+  method are limited by different things; what each step removes; which regime decides which lever matters; where a
+  crossover falls by size.
+- Each evaluation subsection supports one pattern; numbers appear only as support, rounded.
 - **Results vary between runs; prose does not churn with them.** A value that moves is a matter for finalizing the
-  numbers, never a reason to rewrite a sentence. Per-run values, provenance, and replication status live in `%` comments
+  numbers, never a reason to rewrite a sentence. Per-run values and replication status live in `% SOURCE:` comments
   and the vault.
-- The patterns also **explain the limits**: state where and why the method misses (e.g., short times where the
-  measurement resolution is a large share; quantities that move between runs) rather than defending individual errors.
-  This buys room against critique.
-- Do not chase effects near the measurement's resolution; state the resolution once, against the scale of the results.
+- The patterns also **explain the limits**: state where and why the method misses (short times where the
+  measurement's resolution is a large share; quantities that move between runs) rather than defending individual
+  errors. A model's claim is its structure (the right ordering and regime, errors small against the scale of the
+  results), not any one constant.
+- Do not chase effects near the measurement's resolution; state the resolution once, against the scale of the
+  results. An effect that changes no claim and stays within the resolution is left out of the text; the record keeps
+  it. Platform timing the method cannot attribute is disclosed generally (size and scope, no invented cause).
+- **Relative numbers from the start** (below, § Numbers): they keep the prose on patterns rather than on a benchmark
+  dump.
 
-## Presenting results
-- **Final state only.** No development history: no "campaign", "registered", "frozen", "post hoc", versions, "we
-  predicted", "we expected". State each result directly with its reason where known.
-- **Most important results only:** each result is a claim plus the numbers that prove it.
-- **Every term the reader meets is defined in the paper, once, in plain words.** No internal jargon (arm, rung, probe
-  or flag names, coined labels).
-- **Defaults stated once** in the setup; named elsewhere only where they vary.
-- **Existing vs added, for every mechanism:** the full requirement, what existing tools or hardware provide, then what
-  this work adds.
-- **Tables list only what the text introduces**, every entry traceable to a record; no "not tested" placeholders.
-- Only claims that reproduce across runs are stated as results; single-run ones are marked in comments.
-- One measurement per quantity in any figure or comparison.
-- Report both relative and absolute error; avoid thresholds a reviewer could read as convenient.
+## Conveying information
+How a passage conveys its information, not its word choice. The measure is information density, reached losslessly
+while keeping flow and clarity.
 
-## Paper structure (FCCM26 shape)
-- **Abstract:** high information density; ground in two sentences (setting; the problem), then the thesis, one sentence
-  per mechanism with its enabling condition, the key results, and the closing insight. Product names live in the intro.
-- **Introduction**, five paragraphs: (1) context, cited platform and workload, the gap ("However, while prior work ...,
-  ... has received far less attention."); (2) existing approaches and why they fall short, pointing to Figure 1; (3)
-  "In this work, we ...", one sentence per mechanism (what it is, not how) with its headline number; (4) the insight in
-  one sentence and the model as "a model that takes X and returns Y"; (5) then "In summary, the primary contributions of
-  this work are as follows:" with 3-4 one-sentence noun-phrase items ("A systematic quantification of ...", "The design
-  and implementation of ..."), no numbers or section references inside items; engineering contributions as one plain
-  sentence after the list. The introduction never reuses an abstract sentence, states takeaways not derivations, and
-  has at most one or two section references.
-- **Background:** bold run-in paragraphs per component; each term defined in the prose where first used; states only
-  what later sections use; Related Work as its own subsection.
-- **Design:** opens with one paragraph of the overall scheme; subsections per component.
-- **Evaluation:** one setup paragraph (tools, versions, board, how measured), then one subsection per topic, titled by a
-  noun; every subsection ends with a takeaway.
-- **Conclusion:** one paragraph, 6-8 sentences: what was characterized, what the design recovers, what remains, what
-  future hardware should add.
+Every section:
+- **Lossless, judged by job.** A phrase goes only when the rest of the text truly implies it. Before cutting a
+  sentence as a repeat, name its job: a contrast with existing work, a motivation, the emphasis of a key insight or
+  claim, or the other side of a trade-off. If it has one, it stays.
+- **Cause, then response.** A mechanism comes with the property or problem that requires it. The reason must be the
+  real cause, not a consequence of the mechanism.
+- **The verb claims exactly what holds.** A step that shortens waiting does not "cut the count" of waits if every one
+  still happens; name the actor that actually does it. A name for a mechanism is not its reason.
+- **One causal unit per sentence, by default.** An argument and its evidence get two sentences; a clause that answers
+  a different property does not hang off a "so" it does not follow from. It is a default, not a cap: two closely
+  linked units may share a sentence that reads in one breath. Split a sentence that stacks several turns ("…, so …,
+  and …, so …"); a short sentence is fine, a run of choppy ones is not. Vary the form ("Because X, Y", "X, so Y",
+  subject first, "where …"); no device three times in a row unless the content is parallel.
+- **Core terms fixed, structure varied.** A core term keeps one name across sections; up to two semantically adjacent
+  words are acceptable case by case where clarity is not lost. No new undefined term. Where context makes the
+  meaning obvious, the short form gives variety ("configuration" for "configuration data").
+- **Ownership explicit.** The reader can tell what exists from what this work adds ("the existing path", "our
+  teardown protocol"), with strong active verbs for our actions ("we time-share", not "we let").
+- **Scope and referents.** Evidence states its scope ("every evaluated dispatch, on both paths"). A claim that holds
+  only in a regime puts the general claim first and the bounded exception last ("…, except at large payloads").
+  "This", "it", and "that" refer within the same or the previous sentence.
+- **Sources scoped.** Say only what the cited works show, scoped to them ("the CGRAs in §2.3"), never a field-wide
+  claim from a few papers or one paper's detail as the group's; an inference of ours is not their guarantee.
+- **Model wording once per context** (papers with a model). Say "by the model" (or "estimated", "predicted") where the
+  text turns from measurements to the model, and again only once that context has worn off.
+- **A setup choice gets one plain reason**, in one clause, that holds everywhere it claims and invites no weakness;
+  the mechanism behind it lives in the section that owns it.
 
-## Paragraphs and intent comments
-- A paragraph makes one point: the first sentence states it, the rest support it, the last draws the consequence.
-  Body paragraphs run 4-8 sentences.
-- Evaluation paragraphs: purpose ("To quantify ..., we ..."), what is shown ("Figure~X shows ..."), the result with
-  numbers, the interpretation ("This demonstrates that ..."), and at a subsection's end the takeaway.
-- **Intent comments:** every paragraph opens with `% VALUE: ...`, a terse statement of what it must convey. After
-  editing, re-read each paragraph against its comment; change a comment only deliberately. Figures, tables, and lists
-  carry one too.
-- **Review loop:** the author leaves `% COMMENT:` lines in the source; each is answered in the text and the line removed.
+Abstract:
+- High level. A reason stays only where a core concept is not understandable without it and nothing later in the
+  abstract supplies it. Its core concepts stay together in one sentence.
+- *Guideline:* one link from a finding back to our work, on the key insight, with the finding's own "why".
+
+Introduction:
+- The only place that sells the work, in a measured way, through contrasts and reasons: why the work matters and why
+  it is hard. Each mechanism says what is ours and why.
+- A discovery is stated plainly with its reason, not as "we find"; the contribution leads its sentence and its reason
+  follows.
+- Link findings back to our work sparingly; once shown, it is not repeated.
+- *Guideline (systems and hardware papers):* name the capabilities the existing approach leaves unused and this work
+  uses; it shows nothing is left on the table and lets adjacent work recognize the same problem.
+
+Background:
+- A sequence of facts, each once, in the order later sections need them, with a brief contrast with our work where it
+  matters ("…, whereas we … (§3.3)").
+
+## Deduplication and compression
+The goal is no redundancy and no verbosity, with nothing lost (the pass itself: [[paper-writing-process]]).
+- **Deduplicate meaning, not words.** A meaning is conveyed once, however it is worded. A repeat is placed only on
+  purpose, for a high-value meaning (a key concept, insight, or result); any other repeat becomes a reference
+  ("(§4.2)"). Statements of one meaning form a family; within it, a repeat becomes a reference only where its home's
+  scope, condition, and evidence cover it. A repeat is removed without a reference only with the author's approval,
+  where a pointer would add nothing and its scope matches its home's. Where a repeat is the premise of a local
+  argument, the shortest phrase that carries it stays.
+- *Guideline:* a key meaning is stated once where it is argued, once where each new kind of evidence is shown, and in
+  the summaries; a further statement that adds no support is repetitive.
+- **Summaries by design.** The abstract, the introduction, and the conclusion recap the paper; a recap there is not a
+  repeat to remove. Each is judged by its purpose, and within each a meaning is stated once (the contribution list may
+  restate the introduction's paragraphs).
+  - The **abstract** is a self-contained, high-level overview that states the problem and sells the work through its
+    high-impact facts, without overclaiming. It names no toolchain repository and no benchmark labels.
+  - The **introduction** grounds the context, motivates the problem and names the gap in prior work, covers our
+    contributions as its solutions, and highlights the key results and insights, concretely where that serves it.
+  - The **conclusion** summarizes the insights and takeaways at a high level and states what remains and what it
+    implies. It stands alone: no benchmark or design-point labels, only the headline numbers and what justifies each
+    key claim ("a dispatch of our full-array microbenchmark"); a workload is named only where its headline needs it.
+- **Captions** stay self-contained: no pointers.
+- **Compress losslessly, in intent, meaning, and clarity.** Value every sentence at four scopes: its neighbors (what
+  it takes and hands on), its paragraph (topic, support, evidence, consequence, handoff), its section (which claim it
+  carries), and the paper (which key claim, insight, definition, or headline number it carries). Then consolidate
+  sentences of similar meaning and merge paragraphs that continue one topic. Merge rather than drop; never drop a
+  condition, a scope, a cause, or the evidence a claim rests on ("nearly", "in our evaluation").
+- **Numbers are not redundant by default.** A number goes only if another number states the same measure; a
+  conventional metric and our qualified version of it are different measures, and so are a size and its reason.
+- **Check every change both ways.** Before the change, list the passage's meanings (claims, numbers with what they
+  compare against, definitions, conditions, causes, links between sentences). After it, extract the meanings from the
+  new text alone and compare both ways: each old meaning is kept with the same strength and scope (or is implied by
+  the new text, written out and confirmed by an independent check), each link survives, each defined term names the
+  same thing, and nothing new is added. Restore anything lost before the change stands. Numbers, references, and
+  citations are diffed mechanically. A merged sentence still has one structure.
+- **Comments are part of every pass.** Each `% VALUE:` is rewritten to the paragraph as it now stands, `% SOURCE:`
+  comments move with their numbers, and stale comments go (§ Intent comments).
+
+## Paper structure
+*Guideline:* the FCCM26 shape, below; the paper's content may change it, with the reason recorded in its `STYLE.md`.
+- **Abstract:** high information density. The setting and the problem, the existing approach, the mechanisms, the
+  insight, the model and its accuracy, the key results against the best prior or shipped approach, and the closing
+  insight. Keep the mechanism terms; product names live in the introduction.
+- **Introduction**, five paragraphs:
+  1. *Context.* Cited platform and workload; why the problem arises (keep the cause, e.g. "because the array is
+     small"); cited evidence that it costs; end on the gap: "However, while prior work …, … has received far less
+     attention."
+  2. *Existing approaches* and why they fall short, pointing to Figure 1.
+  3. *This work.* "In this work, we …"; one sentence per mechanism ("First, …", "Second, …"), what it is and why it
+     is needed, not how, with its headline number in the same or the next sentence; the combined result last
+     ("Together, these make …").
+  4. *Insight and model.* What bounds the cost, at a high level; the model as "a model that takes X and returns Y",
+     and its accuracy.
+  5. *Contributions:* "In summary, the primary contributions of this work are as follows:", then 3-4 one-sentence
+     noun-phrase items ("A systematic quantification of …", "The design and implementation of …", "A … model that
+     …", "An architectural analysis of …"), naming constraints plainly. No numbers, section references, or
+     sub-clauses beyond one "that …" or "by …" inside an item. Engineering contributions (toolchain integration,
+     availability) follow as one plain sentence.
+
+  Rules within this shape: the introduction never reuses an abstract sentence, covering the same points in new words
+  and more depth; it states takeaways, not their derivation; it mentions a result in retrospect at most once; it has
+  no bold run-ins and at most one or two section references; labels defined only in the evaluation appear neither in
+  it nor in its figures.
+- **Background:** platform subsection with run-ins per component; each term defined in the prose where first used,
+  no glossary; states only what later sections use; Related Work as its last subsection.
+- **Design:** opens with one paragraph of the overall scheme, then one subsection per component. *Guideline:* build
+  the opening as the system's properties, each followed by the mechanism that answers it, with one subsection per
+  property; steps that answer one property together are run-ins within it.
+- **Model** (if any): "In this section, we present …"; the processes, the form, the constants.
+- **Evaluation:** one setup paragraph (tools, versions, board, how measured, the defaults), then one subsection per
+  topic, titled by a noun.
+- **Discussion** (optional): implications beyond this platform and a conditional outlook, transferable insights only,
+  each tied to a measured result and every sentence serving one. It does not recap the work. Each insight is a
+  possibility under its condition ("where …", "may", "could"), never an absolute ("any", "wherever … would"). Each
+  limit still sits in the section that owns its topic, and the conclusion then keeps no outlook.
+- **Conclusion:** one paragraph: the insights and takeaways at a high level, what remains, and (hardware papers) what
+  future hardware should add. *Guideline:* 6-8 sentences.
+
+## Paragraphs
+- A paragraph makes one point: the first sentence states it, the rest support it, the last draws the consequence or
+  hands off. *Guideline:* 4-8 sentences.
+- **Takeaways.** An evaluation subsection states its insight in its opening sentence, and only where the insight is
+  high-impact. A closing paragraph that only restates is a repeat. *Guideline:* where no insight opens it, an
+  evaluation paragraph runs purpose ("To quantify …, we …"), what is shown ("Figure~X shows …"), the result with
+  its supporting numbers, and the interpretation.
+- **Run-ins** mark one item of a complete set of parallel items that the reader looks up, compares, or reaches from a
+  table (paths, groups of related work, a table's steps or process groups). Every item of the set is labelled, and no
+  unlabelled paragraph sits among them. A step too small for its own paragraph joins the step it enables under one
+  label naming both. Paragraphs that are steps of one argument get no label: a subsection or the first sentence
+  carries the shift, with the defined term in italics where introduced. A label names a thing or concept, as a Title
+  Case noun phrase (`\textbf{CGRA Configuration.}`), never a situation; no "Takeaway" run-ins. *Guideline:* none in
+  the introduction, setup, or evaluation. Calibration (2026-10-05, arXiv LaTeX, live labels, paragraphs of 25+
+  words): FCCM26 15 of ~61 paragraphs, six peer papers 4-25%, mostly in related work and component lists. Count live
+  labels only; commented-out ones once inflated a count to "21 of 21".
+
+## Intent comments
+Every paragraph opens with `% VALUE: …`, a terse line (fragments fine) stating what it must convey, not how; e.g.
+`% VALUE: CP path = out of band, reset + serial; in band fits (local, parallel); existing = delivery demo only`.
+After editing, re-read each paragraph against its comment; a paragraph that no longer matches is rewritten, or its
+comment is changed deliberately and the commit says so. Figures, tables, and lists carry one on their first line, plus
+at most one per section or subsection. It describes the current paragraph only: no session or author tags, no
+history.
+
+The source keeps five kinds of comment:
+- `% VALUE:` as above.
+- `% SOURCE:` where a number or checked fact comes from (a run's results, a file and line, a PR or commit, a count or
+  derivation, a cited page, the raw value behind a relative number), after the sentence, inside the figure or table,
+  or once per paragraph. It is updated with its number, goes when the number leaves the text, and a wrong value is
+  corrected against its run. It may name reproducer scripts and labels; the text may not.
+- `% DECISION:` a choice the text must keep or a claim it must not make, present tense, on the paragraph it governs,
+  no session tag. A decision the current text contradicts goes to the author.
+- `% COMMENT:` the author's review lines, until answered in the text and removed.
+- Build lines: `%%` template comments, `%TC:` TeXCount directives, a commented-out build switch, and macro or
+  hyphenation notes, without history.
+
+Everything else is removed from the source and copied verbatim to the vault: dropped or replaced text (commented-out
+prose included), earlier methods, review notes, session or author tags. A line that mixes kinds is split by kind;
+removing commented-out prose also removes any `refs.bib` entry only it cited. An open check in a comment
+("[inference …; verify]") is listed for the author, never removed silently.
 
 ## Sentences
-- One sentence per source line. Mostly 15-30 words, declarative, subject (the actor) first. No fragments or one-clause
-  punchlines.
-- Vary openers ("This ...", "To ...", "By ...", "While ...", signposts); never the same device twice in a row.
-  "i.e.," / "e.g.," about once per subsection, never in adjacent sentences.
+- One sentence per source line.
+- Declarative, the actor first; no fragments and no one-clause punchlines. *Guideline:* mostly 15-30 words, varied.
+- **Calculated phrasing.** Vary openers (FCCM26 mixes "This …", "To …", "By …", "While …", and signposts); never the
+  same device twice in close succession, and a signpost repeats only after a few paragraphs.
+- "i.e.," and "e.g.," are never in adjacent sentences. *Guideline:* about once per subsection, inside parentheses
+  (an AMD internal review's house style; "That is," and "For example," may open a sentence instead).
 - First person plural: "we", "our", "this work".
 - Signposts: *However*, *In particular*, *To mitigate this*, *By leveraging*, *Furthermore*, *Additionally*,
-  *Consequently*, *Lastly*, *In summary*. Verbs: *identify*, *quantify*, *characterize*, *demonstrate*, *reveal*,
-  *establish*, *leverage*, *mitigate*. Hedge an inference with *suggests* / *indicates*, never a measurement.
-- At most one semicolon per paragraph; no appositive chains; no colon "reveals"; no em-dash asides; parentheses only for
-  abbreviations, short examples, and figure panels. Oxford comma always.
-- Properties referenced across sections get short names in words, italicized where defined, never coded labels.
-- A named concept is introduced once, capitalized, in quotes on first use, and unquoted afterwards.
+  *Despite this gain*, *Consequently*, *Lastly*, *In summary*. Verbs: *identify*, *quantify*, *characterize*,
+  *demonstrate*, *reveal*, *establish*, *leverage*, *offload*, *mitigate*. Mark an inference with *suggests* or
+  *indicates*, never a measurement.
+- Punctuation: no appositive chains; no colon "reveals"; no em-dash asides; parentheses only for abbreviations,
+  "(i.e., …)" and "(e.g., …)" asides, figure panels, and section references; Oxford comma always. *Guideline:* at
+  most one semicolon per paragraph.
+- Properties referenced across sections get short names in words, italicized where defined (a *clean state*, a
+  *global order*), never coded labels (G1-G3).
+- A named concept is introduced once, capitalized, in quotes on first use (FCCM26: the "Systolic Tax"), defined in
+  Background, and unquoted afterwards.
 - Abbreviations are expanded on first use in the abstract and again in the body.
 
 ## Wording lessons
-- **Density over brevity:** shorten by merging sentences, never by dropping facts or causes.
-- **One structure per sentence:** split a sentence with several turns into two clean ones.
-- **Say exactly what holds:** no extreme or universal phrasing, right modality ("can be", not "is", when optional), no
-  trend words without evidence. Keep claims that differ apart.
-- **Observed properties, not intent:** state what the system does, never what it was or was not designed for.
-- **Term variants:** the defined form where defined and where a section first uses it; close variants that keep the
-  head noun are fine elsewhere; a variant that changes the head noun is a new term.
-- **Clear referents:** no ambiguous "its"/"this"; no stacked relative clauses.
-- **Phrase limitations as limitations** ("it can hold only").
-- **No superlatives**, not even once.
-- **Plain titles:** nouns naming the topic, never a claim, question, or phrase. Prefer a bold run-in paragraph to a
-  thin subsection.
-- No unnamed "the toolchain": name the cited tool or say nothing.
+- **Density over brevity.** Shorten by merging sentences, never by dropping facts; a sentence that loses its cause or
+  its mechanism terms is worse.
+- **One structure per sentence.** Split a sentence with several commas and turns into two clean ones. Avoid abstract
+  subjects ("every change of design reconfigures the array"); put the actor first.
+- **Say exactly what holds.** No extreme or universal phrasing, the right modality ("can be shared", not "is shared",
+  when optional), no trend words without evidence ("increasingly"). Keep claims that differ apart.
+- **Observed properties, not intent.** State what the system does, never what it was or was not designed for.
+- **Term variants.** The defined form where defined and where a section first uses it, one form per object within a
+  paragraph. Elsewhere, close variants that keep the head noun read less mechanically; a variant that changes the
+  head noun or could name another mechanism is a new term.
+- **Mirrored structure is a judgment call.** Parallel openers suit parallel content; vary the opener where a sentence
+  does a different job. Actor first outranks a varied opener.
+- **No bare appositives.** Never set off a noun phrase with commas without a connecting word ("designs, each a single
+  configuration"). Connect it (", where each …", ", which is …", "namely", "which we call"), give it its own clause,
+  or attach a symbol or short name directly ("the \emph{in-band cost} $\delta$"). The same holds for absolute
+  phrases and trailing participle clauses (", keeping …"): give them a finite verb or their own sentence, unless the
+  clause reads smoothly ("…in one transfer, shrinking the payload that the host holds").
+- **Clear referents.** No ambiguous "its" or "this way"; no stacked relative clauses ("whose … and whose …").
+- **Phrase limitations as limitations** ("it can hold only", "must be partitioned").
+- **No superlatives** ("fastest", "best"), not even once; let the results speak.
+- **Plain titles.** Every section and subsection title is a noun naming its topic ("Related Work", "Model
+  Accuracy"), never a claim, question, or phrase. Prefer a new paragraph to a thin subsection.
+- **Who does what.** The existing toolchain ("the compiler", "the toolchain" referring back to a named, cited tool)
+  names the existing state only; what this work adds is attributed to us. The paper presents an approach, so vary
+  the subject: "we" for key steps, "our passes" for an automatic check or transformation, or the mechanism itself.
+  Never "our compiler passes [verb]" (a garden path). No unnamed "the toolchain": name the cited tool or say nothing.
+- **Current state only, also for open work.** Planned work changes the wording only once it is done.
+- **Name what the result enables, not an agent we imagine** ("the model can estimate, before a program runs, …", not
+  "a partitioner can …").
+- **Banned words**, in text and comments: "provenance", "held-out" / "hold-out" / "held out", "hedge" (internal or
+  AI-sounding; say "where a number comes from", "configurations not used to build the model"); "set the time" (vary:
+  "govern", "determine", "account for little of", "become the limiting factor") and "dominate" except in the author's
+  own text; "knee" (AI-coded). Also avoid a term that means something else in a neighboring field (ctrl-pkt: "epoch",
+  from AI training).
 
 ## Numbers
-- The introduction carries 2-4 headline numbers, rounded; the evaluation gives exact values with CIs.
-- Ratios as `$1.28\times$`; percentages to one decimal where measured; units with a thin space.
+- **Relative numbers, from the first draft** (author, 2026-10-14: reads better than a raw benchmark dump). Choose the
+  reference units when the setup is fixed and draft every time in them: the baseline's time on the headline
+  configuration ($\tau$) for microbenchmarks, the baseline's time per output unit (per token) for a real workload, a
+  model's base constant for its tables. Figures plot normalized time, which keeps shape, additivity, and slopes, and
+  are labelled as normalized time, not speedup. The text gives ratios and shares, and the unit itself only for a
+  magnitude with no partner. Raw values live only in `% SOURCE:` comments and the record; flag them before any
+  release of the reproducer. A draft that already carries raw values gets a conversion pass before the evaluation's
+  prose is refined (ctrl-pkt converted on 2026-10-06, for a co-author's employer, and the conversion meant rewriting
+  §3-§5).
 - A number always names what it compares against.
-- Outside the evaluation, prefer relative numbers to raw values.
+- Ratios as `$1.28\times$`; percentages to one decimal where measured; units with a thin space (`312~MHz`); one
+  convention for significant figures, chosen by the field's practice.
+- **Which numbers the text carries.** A number appears only as a headline, a comparison that supports a claim, a
+  reference (a unit, the resolution), an attribution (why a result happens: "272 commands against 2,304"), a
+  boundary (where a regime or winner changes), or a bound that shows a cost is negligible. Values the figure already
+  shows stay in the figure. An outlook beyond the device is a suggestion or open question ("may", "would"), never a
+  result.
+- Rounded everywhere; an interval only where a claim reads it. *Guideline:* the introduction carries 2-4 headline
+  numbers.
+
+## Presenting results
+- **Final state only.** No development history: no "campaign", "registered", "frozen", "fresh test", "post hoc",
+  "miss", model or method versions (software versions in the setup are facts), "we predicted", "we expected", "would
+  have refuted". State each result directly, with its reason where known; history lives in the vault.
+- **Most important results only.** Each result is a claim plus the numbers that prove it (a model: correct ordering
+  and its median error on data it was not fitted on, against the measurement's uncertainty). Limitations and unknown
+  causes are stated concisely where their topic lives, each with its size and scope.
+- **Every term the reader meets is defined in the paper, once, in plain words.** No internal jargon (arm, campaign,
+  rung, probe or flag names, coined labels). Prefer showing the measurement directly; a needed derived quantity is
+  defined in one sentence and then used by its plain name.
+- **Defaults stated once** in the setup and named elsewhere only where they vary.
+- **Existing vs added, for every mechanism:** the full requirement, what existing tools or hardware provide, then
+  what this work adds.
+- **Tables list only what the text introduces**, every entry traceable to a record; no "not tested" placeholders.
+- Only claims that reproduce across runs are stated as results; single-run ones are marked in comments.
+- One measurement per quantity in any figure or comparison; report both relative and absolute error; avoid
+  thresholds a reviewer could read as convenient.
+- **No reproducer details in the text.** Script names, folder paths, and run labels belong in the reproducer's docs;
+  the paper states every method itself and never defers content to the artifact.
 
 ## Figures and tables
-- Figures use the paper's own font via matplotlib usetex (IEEEtran sets Times: `\usepackage{newtxtext}\usepackage{newtxmath}`,
-  as in `figs/make_figs.py`); labels are LaTeX. No font files in the repo.
+- Figures use the paper's own font via matplotlib usetex (for ACM: `\usepackage[tt=false]{libertine}
+  \usepackage[libertine]{newtxmath}`), set once in the figure script; labels are LaTeX (`\textmu s`, no bare `%`,
+  `&`, `_`). No font files in the repo.
+- Every figure is generated by a script from result files, never typed in.
 - Classic print style: thin closed frame, short inward ticks on all four sides, no grid, thin lines, small markers,
-  frameless legends. Each series keeps one line style, marker, and color in every figure, so a figure reads in grayscale.
-- A color-blind-safe palette (e.g., IBM's, shifted and softened), medium step for lines, pastel step for areas; close
-  pairs never share a figure; check new pairings with a CVD validator.
+  frameless legends. Each series keeps one line style, marker (open or filled), and color in every figure, defined
+  once in the figure script, so a figure reads in grayscale.
+- Color: a color-blind-safe palette with no stock Office or matplotlib hues and no colors outside the set; the
+  medium step for lines and markers, the pastel step of the same hue for areas; close pairs never share a figure,
+  and any new pairing is checked with a CVD validator. *Guideline:* baselines near-black, our variants in IBM's
+  palette shifted and softened in OKLCH, neutral grays for non-method segments.
 - Figure text in sentence case; codes keep their form.
-- Captions state what is shown, panels as "(a) ...; (b) ..."; they state what the error bars are, not the claim.
-  Table captions in Title Case or a short noun phrase.
-- Tables span the column width (`tabular*` with `\extracolsep{\fill}`), notes wrap at the table width.
-- Prefer one figure serving two sections over a second figure; two or three numbers go in a sentence.
-- Render candidates in the real medium before choosing a figure's form.
+- Refer to them as `Figure~\ref{}`, `Table~\ref{}`, `\S\ref{}` (ACM).
+- *Guideline:* Figure 1 shows the existing approaches with ours beside them, labelled "(ours)" there only; one figure
+  serving two sections beats a second figure; two or three numbers go in a sentence.
+- Render candidates in the real medium before choosing a figure's form, in a scratch copy while the author is still
+  choosing; render and ask before dropping a meaningful element.
+
+Refining figures (each bracket says how the rule applies to tables):
+- **Every caption phrase earns its place.** Self-contained (no pointers), opening with what is shown ("Median time per
+  dispatch for (a) … and (b) …"), panels named first, plain grammar. State only what the reader cannot decode from
+  the figure: never repeat an axis title, legend entry, tick-visible value, or drawn label. A reference mark gets its
+  "so what", not just its definition. Never the claim. [Tables: a short noun phrase or Title Case caption; headers
+  carry names and units; a note states only what a header or label cannot.]
+- **Statistics live on the plot.** The caption names the estimator ("Median"); a key in empty space explains the
+  error bars ("95% CI"). Show bars only where visible and meaningful. A key's glyph matches its marks and is
+  recognizable alone. Nothing floats over data. [Tables: one estimator stated once; intervals only where a claim
+  reads them.]
+- **Labels are unambiguous and consistent across the paper.** Panel letters only when the text cites a panel; a
+  label never names two things; one counting convention; axis titles say what is measured; a subplot title replaces
+  a repeated axis word. [Tables: same conventions as figures and text.]
+- **Order by the reader's intuition.** Existing approaches in a fixed order; legends row by row in stacking order;
+  groups in the order the text discusses them. [Tables: rows likewise.]
+- **Show the quantity that isolates the claim, measured, from one stated configuration.** Measure a missing baseline
+  instead of labelling it; a label stays true under the paper's own definitions; a workload has one size, stated
+  once; an ordering a schematic claims is backed by current data. [Tables: every entry traceable to one record at the
+  configuration the caption names.]
+- **Account for every outlier where the figure is introduced**, each named where its topic lives. [Tables: an entry
+  that departs from the stated pattern is explained beside it or in the note.]
+- **Legible at print size.** Solid fills, not hatches, for thin segments; white separators on slivers; adjacent fills
+  CVD-checked; no crowded tick labels at panel boundaries.
+- **Consistent across figures and checked against the text.** A convention applied to one figure applies to all;
+  every change re-checks the text, the alt text, and the source comments about it.
+- **Alt text (`\Description`) gives the content, not the encoding:** what happens, key values, the outcome, in caption
+  voice and plain words ("percent", "microseconds"); never "colored blocks are", "Top:"; no repeat of the caption.
+  Re-check its values whenever the figure changes.
+- **Decide on the merits for the reader**, not on consistency with a default we set; consistency decides only where
+  the paper states a convention for a reason.
+- **Re-QA every change.** After a figure passes QA, every later change goes back through a reviewer that measures (a
+  vector trace, e.g. `mutool draw -F trace`, and a 1200 dpi render) before it is called done; the author's choices
+  are marked as decisions so the reviewer checks their execution.
+
+Tables:
+- Span the column width (`tabular*` with `\extracolsep{\fill}`); notes wrap at the table width.
+- **A label names the quantity; the text states the condition.** A condition in a label reads as per-unit or invites
+  a contradiction with a footnote. An index the value ranges over is named ("Reset, *W* columns").
+- **Labels are concise and exact:** cut words the reader does not need, one word per meaning in a table, spell out a
+  term the text no longer defines.
+- **A who-column is exact:** name every member in the table's order, not a description the reader must resolve.
+- **A count states its scope** ("3 per column" against "3 in total"); a column holds one quantity.
+- **Units in a header row**, not in cells or notes.
+- **Notes short and exact**, ideally one line each, the general note first; a note says where a value comes from when
+  a header cannot, explains a departing entry, and drops what another table already says. Watch "and" vs "or".
+- **Symbols intuitive and unambiguous:** upper-case subscripts name a kind, lower-case a per-unit cost matching the
+  equation's variables; one letter never names two things.
+- **Investigate a surprising entry before wording around it**; the table then states the general rule, and a
+  toolchain finding goes to the backlog, not the paper.
 
 ## Citations
-- Place a citation right after what it references: after a work's name when the sentence names it, otherwise after the
-  claim. Every citation supports exactly its sentence: read the cited PDF, not a summary, and use the source's own terms.
-- Cite only what the text uses; no uncited bib entries, no `note` fields. Prefer the official published version.
-- Architecture facts cite vendor sources; a fact no manual states may cite the defining source code, file and value in
-  a `%` comment. Software as `@software` with the repository's name and description; living docs as `@misc` with
-  `lastaccessed`.
+- Place a citation right after what it references: after a work's or tool's name when the sentence names it,
+  otherwise after the claim. Name works where the sentence refers to them.
+- Every citation supports exactly its sentence: read the cited PDF, not a summary, use the source's own terms, and
+  reword to what it says or drop the claim.
+- Cite only what the text uses; no uncited `refs.bib` entries, no `note` fields. Prefer the official published
+  version; a longer preprint only for content found only there.
+- Re-citing follows the field's convention: re-cite a tool in the evaluation setup, re-cite per section for a new
+  claim, never twice within a paragraph.
+- Architecture facts cite vendor sources (manuals, register references, the vendor's kernel docs); a fact no manual
+  states may cite the defining source code, with file and value in a `% SOURCE:` comment.
+- Software as `@software` with the repository's own name and description as the title; living docs as `@misc` with
+  `lastaccessed`; proceedings carry `publisher` and `address`.
 - Cite research works; cite the toolchain once as software. PR numbers, flags, commits, and code identifiers stay in
-  `%` comments.
-- Each cited work gets a vault source note (`5-sources/`) with the passages the paper relies on.
+  `% SOURCE:` comments.
 - Double-blind: the authors' prior work is cited in the third person.
+- *Guideline:* each cited work gets a vault source note (`5-sources/`) with the passages the paper relies on.
 
 ## Related work
-- One bold run-in paragraph per group of works; each work or group gets one sentence with its takeaway; do not explain
-  how they operate. Each paragraph ends with one sentence contrasting the group with this setting (how the setting
-  differs, not a finding). No separate "what is new" paragraph.
+- Lives in its own Background subsection; the design refers to it rather than citing inline.
+- One run-in paragraph per group of works; each work or group gets one sentence with its high-level takeaway (a
+  second must be justified); do not explain how they operate.
+- Each paragraph ends with one sentence contrasting the group with this setting: how the setting differs, never a
+  finding or design consequence a later section derives. No separate "what is new" paragraph.
 
 ## Mechanics
 - Self-contained for Overleaf: `main.tex` at the root, no `../`, one `refs.bib`, `build/` the only ignored path.
-- The agent never runs the LaTeX build; the author's watcher does. Read `build/main.log` for errors.
-- Dropped content is commented out with a `% DROPPED (<date>): <why>` line, not deleted.
+- The author's LaTeX watcher owns `paper/build`; an agent builds only into a scratch directory of its workspace (to
+  check fit, layout, or a figure) and reads the log there.
+- Once co-authors edit in Overleaf, Overleaf is the official copy and the local repo its commented mirror; the
+  editing loop is in [[paper-writing-process]] § *The Overleaf loop*.
+- Dropped text leaves the source (§ Intent comments) and goes verbatim to the vault, with the pass's sheet.
 - No AI trailers in paper commits.
 
+## Per-paper decisions
+Copied from the portable guide (vault `0-notes/ai-instructions/paper-writing-style.md`, regenerated 2026-10-14) on
+2026-10-14; how the paper is written phase by phase is the vault note `paper-writing-process`. Reference papers:
+FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`, the IEEE template) and FPGA'27
+(`~/docs/FPGA27__Control_Packet_Reconfiguration.pdf`, FCPR). Entries marked *proposal* wait for the author.
 
-## This paper
+- **Stage** (2026-10-14): phase 3 (first draft) of the scope-independent parts: background, the command-processor
+  model and formulation, the method, and the setup. Title, abstract, introduction, results, and conclusion are `\E{}`
+  placeholders until the decode-half and agent-step results land and the headline numbers pass an independent audit
+  (author's brief, 2026-10-14).
+- **The evaluation's message** (*proposal*, from the vault's `paper-ch3-outline`; decided after the results): on a
+  spatial array, concurrency is free in the hardware but rationed by one in-order command processor, whose instruction
+  order is the schedule. Patterns to test across every run: (1) queued commands never overlap, so concurrency lives
+  inside a command; (2) the gain grows with attention's share, i.e. with prompt length; (3) the instruction order
+  matters as much as co-residence; (4) host-boundary handling (queue depth, packing) trades overlap against readiness,
+  and its best setting moves with length; (5) the event model ranks and prices schedules, with its error growing
+  where attention is extrapolated.
+- **Reference units** (*proposal*): prefill time normalized to the existing prefill's TTFT at the same model and prompt
+  length; per-command model constants in units of the dispatch floor $F$; decode in the existing time per token.
+  Table `params` still carries raw units (`% DECISION:` on it).
+- **Names and labels:** the existing approach is "the existing prefill" or "the existing host program" (MLIR-AIR's
+  fused prefill, cited); ours is "the composer" and its schedules "composed schedules". No method-family name or
+  design-space labels yet (*proposal*: none until the evaluation needs them).
+- **Core terms:** command, hardware context, instruction stream, issue instruction, synchronization, address patch,
+  argument slot, dispatch floor $F$ (§2); column group, segment, boundary cost $\epsilon$ (§3); arenas, predicted
+  completion order, buffer rings, commands in flight $D$ (§4). Avoid: arm names (edf, naive, Ar, q2, g4, b4), composer
+  versions, "lag" (say "commands in flight"), "planner", "projection" for the model (it is a layer operator here),
+  "the ladder".
+- **Framing** (author's brief, 2026-10-14): method-first; never "N× over AMD's code". Packing several operators per
+  command (batching) is cited as standard practice. FCPR is cited in the third person, for the command-processor
+  primitive only, in one background sentence; no text or figures are reused from it. The essential decisions
+  (spatial assignment, CP instruction order) are reported apart from the host-boundary handling (queue depth,
+  packing).
+- **The baseline:** each design's own host program on the same configuration, kernels, and weights. FastFlowLM and a
+  hand-optimal reference appear only where comparable (vault `paper-ch3-outline`, Evaluation).
+- **Figure palette** (`figs/make_figs.py`): GEMMs blue, LM head purple, attention orange, host and dispatch gray
+  (busy); the existing schedules near-black (open square queued, filled triangle in sequence), ours magenta circles
+  (pairs); reference lines black dashed (sum) and dotted (longer alone).
+- **Defaults** (setup): median of 3 timed runs after one warm run; bit-identical logits; one batch per comparison.
+- **Not mentioned:** speedups framed against AMD's code; NP-hardness (until a reduction exists); the exactness of
+  the predicted-completion order as a theorem (it is a remark until proven); FCPR-scoped partitions (deferred);
+  internal labels and history.
+- **Deliberate differences from the guide:** IEEEtran instead of ACM, so software entries are `@misc` (IEEEtran.bst
+  has no `@software`), `lastaccessed` is not printed, and there is no `\Description`; figure fonts are Times through
+  `newtxtext`/`newtxmath`; `main.tex` sits in `paper/` because the repository root holds the artifact.
+- **Open for the author:** how to cite FCPR while it is under review (`refs.bib`, `fcpr2027`); bib entries marked
+  VERIFY need their sources read and a vault source note each.
 
-**Venue.** IEEEtran conference, double-blind: FCCM'27 (~early Jan 2027, inferred) or ISPASS'27 (~mid-Dec 2026,
-inferred). Preamble follows the author's FCCM'26 paper. `main.tex` lives in `paper/`, and a public release of the repo
-excludes `paper/`.
-
-**Stage.** Stage 1 (first draft) of the scope-independent parts: background, the command-processor model and
-formulation, the method, and the experimental setup. The title, abstract, introduction, evaluation results, and
-conclusion are placeholders (`\E{...}`) until the decode-half and agent-step results land and the headline numbers
-pass an independent audit.
-
-**Framing (standing decisions, 2026-10-14).**
-- Method-first. The contribution is the model, the formulation, legality, and the automatic composition. Never phrase
-  a result as "N× over AMD's code"; the existing design is "the existing prefill" or "the baseline", described
-  neutrally, and a later hand fix by its authors becomes a hand-optimal reference, not a refutation.
-- Packing several operators into one command (batching) is standard practice and is cited as such (CUDA Graphs, XRT
-  run lists, MLIR-AIR's stitched programs). Our part is the joint choice of what shares a command and the CP's order.
-- FCPR (the author's FPGA'27 submission) is cited in the third person, for the command-processor primitive only, in
-  one background sentence. No text or figures are reused from it.
-- Report the essential decisions (spatial assignment, CP instruction order) separately from the host-boundary
-  handling (queue depth, packing), which would vanish if host work moved onto the array.
-
-**Terms (defined once in the paper; use these words).**
-- *command*: one submission to a hardware context, carrying one instruction stream.
-- *issue* instruction, *synchronization*, *address patch*, *argument slot*, *dispatch floor*, *hardware context*
-  (Section 2).
-- *column group*: the columns one operator drives (GEMMs: columns 1-6; attention: columns 0 and 7, one group each).
-- *segment*: synchronizations followed by the issue instructions they gate.
-- *predicted completion* order (Section 4.4); *arenas* (Section 4.3); *boundary cost* epsilon (Section 3.2).
-- Not in the paper: arm names (edf, naive, Ar, q2, g4, b4), "composer v1/v1.1", "pre-registered", "frozen",
-  "projection", "planner", "lag" (say "commands in flight" / "D positions earlier").
-
-**Numbers.** Every number has a `%` comment with its source (`repo@hash:path` or the lab entry). Figure data is copied
-into `figs/data/` with provenance in `figs/README.md`; table rows that come from data are generated
-(`paper/fig/params-rows.tex`).
-
-**Open items for the author.**
-- How to cite FCPR while it is under review (`refs.bib`, `fcpr2027`).
-- Entries marked VERIFY in `refs.bib` need their sources read and a vault source note each.
-- NP-hardness of the formulation is not claimed until a reduction is written (`3-model.tex`, TODO(hardness)).
+## Links
+paper-writing-process · repo-workflow · ai-instructions · pref-documentation-and-record

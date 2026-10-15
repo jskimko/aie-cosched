@@ -4,7 +4,7 @@ Co-scheduling concurrent work on an AMD AI Engine array (XDNA 2 NPU) through its
 
 | Directory | Contents |
 |---|---|
-| `figs/` | The measurements the paper plots (copied with their provenance) and the script that plots them |
+| `figs/` | The measurements the paper plots (copied with where each comes from) and the script that plots them |
 | `paper/` | The paper's LaTeX source (excluded from a public release) |
 
 The composer and its measurement harness currently live in the measurement repository (`amd-npu`, tags

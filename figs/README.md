@@ -8,7 +8,7 @@ python3 -m venv .venv && .venv/bin/pip install -r figs/requirements.txt
 sh paper/figs.sh
 ```
 
-## Provenance
+## Where the data comes from
 
 Every file in `data/` is a byte copy from the measurement repository `amd-npu` at
 `a0ee2edf44e04455695f11b2d597ca930d7ce35a` (tag `composer-v1.1`). Each is unchanged from the commit that first added it:
