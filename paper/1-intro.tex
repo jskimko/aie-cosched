@@ -31,14 +31,15 @@ In this work, we treat the CP's instruction stream as the schedule of the spatia
 First, our composer issues every group's work before the CP waits on any group and places each synchronization at its predicted completion, so that disjoint column groups run concurrently (Figure~\ref{fig:order}c).
 This instruction order lowers TTFT by 1.4--1.8$\times$ on two model families with bit-identical outputs, and by a steady 1.5--1.6$\times$ on prompts appended to a cached context.
 Second, the composer chooses the split of columns between attention and the GEMMs for each regime, which favors two attention columns for prompts computed from scratch and four for appends to a long context.
+On an append of 4{,}096 tokens to a 16{,}384-token context, the four-column split lowers the time of the composed schedule by a further 1.9$\times$ on both models.
 Because the chosen splits stay resident, switching between them costs under 1\% of an append.
 Third, the composer derives which operators may share a command from the instructions themselves, and it lifts the one-GEMM-per-command limit of the existing argument binding by placing many operators' buffers in shared arenas.
-Together, the instruction order and the split lower the time of appending 4{,}096 tokens to a 16{,}384-token context by 3.0$\times$ and 4.3$\times$ on the two models.
+Together, the instruction order and the split lower the time of such an append by 3.0$\times$ on Qwen3-4B.
 % SOURCE: from scratch, composed vs the existing host program on the default split: Llama-3.2-1B 1.41x at 2,048 and 1.70x at 4,096 tokens; Qwen3-4B 1.43x and 1.76x (vault lab-prefill-overlap (18)-(26)).
 % SOURCE: append, steady band 1.51-1.61x: Llama-3.2-1B at L = 28,672 (1.51x, 1.57x) and Qwen3-4B at L = 16,384 and 28,672 (1.52-1.61x); the 1B's 1.8-2.3x at L = 16,384 includes a slowdown of the existing order at positions ~8k-20k (vault lab-agent-step (2), (4)).
 % SOURCE: warm switch S2 <-> S4 7.1 ms (1B) and 7.7 ms (Qwen3-4B), 0.2% of a Qwen3-4B 4k + 4k append on S4 (5,238 ms) (vault lab-split-sweep (5)).
-% SOURCE: 16k + 4k append, composer on S4 vs the existing host program on S2: Qwen3-4B 31,141 -> 10,343 ms (3.01x), Llama-3.2-1B 12,589 -> 2,951 ms (4.27x) (vault lab-split-sweep (4)-(5)).
-% DECISION: the headline numbers are re-checked against the audit's verdicts at the results freeze (2026-10-21); the 1B's 4.3x includes the existing order's mid-range slowdown, and the author decides whether the introduction quotes 3.0x alone.
+% SOURCE: 16k + 4k append, composed on S4 vs composed on S2: Llama-3.2-1B 5,493.0 -> 2,950.8 ms (1.86x), Qwen3-4B 19,332.6 -> 10,342.7 ms (1.87x); composed on S4 vs the existing host program on S2: Qwen3-4B 31,141.0 -> 10,342.7 ms (3.01x) (vault lab-split-sweep (4)-(5)).
+% DECISION: the headline numbers are re-checked against the audit's verdicts at the results freeze (2026-10-21). The Llama-3.2-1B counterpart of the 3.0x (4.27x) appears only in the evaluation, with the existing order's slowdown at positions ~8k-20k named; revisit once that slowdown is isolated (ruling of 2026-10-15).
 % DECISION: turn-level speedups (an append plus its decode) are inferred until measured, and the introduction does not state them.
 
 % VALUE: (4) insight: concurrency is free in the hardware but rationed by one in-order CP whose instruction order is the schedule; the model takes per-operator times and a schedule and returns its TTFT, with its accuracy and its split choices

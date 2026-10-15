@@ -430,10 +430,11 @@ FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`, the IEEE templa
 
 - **Venue** (author, 2026-10-15): **MLSys'27** research track; FCCM'27 is the fallback only if the audit kills a
   headline. Call (mlsys.org/Conferences/2027/CallForResearchPapers, read 2026-10-15): OpenReview, submissions open Oct
-  19, deadline **Oct 30, 2026** (the call says 20:00 UTC, the home page 12:00 PM PDT, which is 19:00 UTC; plan for the
-  earlier), no separate abstract deadline; the MLSys 2025 style files; two columns, at most 10 pages before the
-  references, appendix uploaded separately and unlimited; double-blind (self-references in the third person; an
-  unpublished manuscript may be cited anonymously, with an anonymized copy in the supplementary material); every
+  19, deadline **Oct 30, 2026, 19:00 UTC** (12:00 PM PDT on the home page; the call says 20:00 UTC; plan for the
+  earlier, planner's ruling), no separate abstract deadline; the MLSys 2025 style files; two columns, at most 10 pages before the
+  references, appendix uploaded separately and unlimited; double-blind (no explicit or implicit self-identification, e.g. through
+  self-references; the template's own instructions, not the call, add that an unpublished manuscript may be cited
+  anonymously with an anonymized copy as supplementary material); every
   reference lists all of its authors; a mandatory "AI Usage Disclosure" section after the references (outside the
   page limit); an authorship quota per author.
 - **Stage** (2026-10-15): full draft toward the milestones of the vault's `paper-ch3-outline` (§ Decision: MLSys'27):
@@ -485,9 +486,12 @@ FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`, the IEEE templa
   template sets text in Times and math in Computer Modern; `main.tex` sits in `paper/` because the repository root
   holds the artifact. The template itself logs duplicate `figure.N` anchors and an empty anchor from
   `\printAffiliationsAndNotice`; its own example does the same, so they are not fixed.
-- **Open for the author:** whether the introduction quotes the 16k + 4k append as 3.0x (Qwen3-4B) alone, since the
-  1B's 4.3x includes the existing order's mid-range slowdown; the anonymized FCPR copy for the supplementary material;
-  the AI usage disclosure; the working title; bib entries marked VERIFY need their sources read and a vault source
+- **Headline** (planner's ruling, 2026-10-15): the introduction quotes Qwen3-4B's 3.0x and the split's own 1.9x under
+  the composer; the 1B's 4.3x appears only in the evaluation, with the existing order's mid-range slowdown named.
+- **Scope:** contexts up to the 32k window (edge models), not the frontier agents' ~120k prefixes; the NPU's prefill
+  share of a turn answers the GPU result that prefill is under 10% of agent LLM time.
+- **Open for the author:** whether to cite FCPR at all; the AI usage disclosure; the working title; the authorship
+  quota; bib entries marked VERIFY need their sources read and a vault source
   note each; the reference units (Table `params` is still raw).
 
 ## Links
