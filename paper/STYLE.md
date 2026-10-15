@@ -437,15 +437,19 @@ FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`, the IEEE templa
   anonymously with an anonymized copy as supplementary material); every
   reference lists all of its authors; a mandatory "AI Usage Disclosure" section after the references (outside the
   page limit); an authorship quota per author.
-- **Stage** (2026-10-15): full draft toward the milestones of the vault's `paper-ch3-outline` (§ Decision: MLSys'27):
-  results freeze Oct 21, full draft Oct 27 (then the audit's second round on the results text), final pass Oct 29.
-  Written: introduction, background, §3 characterization (prefill and decode), §4 model and formulation, §5 method
-  (with the split), setup. Still `\E{}`: abstract, results subsections, conclusion, Figure 1 (schematic), the AI
-  usage disclosure (the author's), and the third model.
-- **Structure** (differs from the FCCM26 shape for the contributions): §3 *Composition Losses* carries the
-  characterization contribution (prefill and decode) apart from the background; the event model sits in §4 with the
-  formulation, because it is part of the model contribution; Figure 1 is the instruction-order schematic, shared by
-  the introduction and §5.
+- **Stage** (2026-10-15): full draft toward the vault's `paper-cosched-plan` (author-directed, converged over three
+  independent review rounds). Restructured to the MLSys order with the thesis re-cut around false dependences. Written:
+  introduction, background and motivation, design (model, composition, reordering, renaming, partitioning,
+  implementation), setup, discussion, related work. Still `\E{}`: abstract, results subsections, conclusion, Figure 1
+  (schematic plus the composer's inputs and outputs), the decode double buffer's result, the cache move between splits,
+  the three further models, the AI usage disclosure (the author's).
+- **Structure** (2026-10-15, the author asked for the MLSys convention): 1 Introduction; 2 Background and Motivation
+  (platform; LLM inference and agent turns; *Where the Array Idles*, the characterization; *Concurrency Through One
+  Command Processor*, the measured semantics and why not separate partitions); 3 Design (formulation with the lower
+  bound, event model with decode's two-term model, then one subsection per property: composing streams, reordering
+  issue, renaming buffers, partitioning per regime, and a short implementation subsection); 4 Evaluation; 5 Discussion
+  (transferable insights only, FCPR's voice); 6 Related Work; 7 Conclusion (no outlook). Figure 1 holds the
+  instruction-order schematic (a-c) and the composer's inputs and outputs (d).
 - **The evaluation's message** (*proposal*, from the vault's `paper-ch3-outline`; decided after the results): on a
   spatial array, concurrency is free in the hardware but rationed by one in-order command processor, whose instruction
   order is the schedule. Patterns to test across every run: (1) queued commands never overlap, so concurrency lives
@@ -460,26 +464,34 @@ FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`, the IEEE templa
   fused prefill, cited); ours is "the composer" and its schedules "composed schedules". No method-family name or
   design-space labels yet (*proposal*: none until the evaluation needs them).
 - **Core terms:** command, hardware context, instruction stream, issue instruction, synchronization, address patch,
-  argument slot, dispatch floor $F$, append (§2); column group, segment, boundary cost $\epsilon$, commands in flight $D$,
-  event model (§4); arenas, predicted completion order, buffer rings, split (§5). Avoid: arm names (edf, naive, Ar, q2, g4, b4), composer
-  versions, "lag" (say "commands in flight"), "planner", "projection" for the model (it is a layer operator here),
-  "the ladder".
-- **Framing** (author's brief, 2026-10-14): method-first; never "N× over AMD's code". Packing several operators per
+  argument slot, dispatch floor $F$, append (§2.1-2.2); false dependence (§2.3); column group, segment, boundary cost
+  $\epsilon$, commands in flight $D$, event model (§3.1-3.2); predicted completion order, buffer rings, renaming, split,
+  arenas (§3.3-3.7). Avoid: arm names (edf, naive, Ar, q2, g4, b4), composer versions, "lag" (say "commands in
+  flight"), "planner", "projection" for the model (it is a layer operator here), "the ladder", workstream labels (W1-W7).
+- **Framing** (author's brief, 2026-10-14; thesis re-cut 2026-10-15): method-first; the composer works on unchanged
+  kernels, and the one change inside a design (decode attention's double buffer) is the same rule applied by hand and
+  stated as such; never "N× over AMD's code". Packing several operators per
   command (batching) is cited as standard practice. FCPR is cited in the third person, for the command-processor
   primitive only, in one background sentence; no text or figures are reused from it. The essential decisions
   (spatial assignment, CP instruction order) are reported apart from the host-boundary handling (queue depth,
   packing).
 - **The baseline:** each design's own host program on its default split (attention on columns 0 and 7), with the same
-  configuration, kernels, and weights. FastFlowLM and a
-  hand-optimal reference appear only where comparable (vault `paper-ch3-outline`, Evaluation).
+  configuration, kernels, and weights; the stronger baseline is the same program with its attention columns
+  alternated, and the honest headline compares each side on its own faster split. FastFlowLM appears only as an
+  absolute reference on the same weights.
 - **Figure palette** (`figs/make_figs.py`): GEMMs blue, LM head purple, attention orange, host and dispatch gray
   (busy); the existing schedules near-black (open square queued, filled triangle in sequence), ours magenta circles
   (pairs); reference lines black dashed (sum) and dotted (longer alone).
 - **Defaults** (setup): median of timed runs after one warm run (3 today, 2 in the split and Qwen3-4B append
   comparisons; fixed at the freeze); bit-identical logits, appends also against a full prefill; one batch per comparison.
-- **Not mentioned:** speedups framed against AMD's code; turn-level speedups until measured (inferred until then); decode as a gain (characterization only); NP-hardness (until a reduction exists); the exactness of
-  the predicted-completion order as a theorem (it is a remark until proven); FCPR-scoped partitions (deferred);
-  internal labels and history.
+- **Not mentioned:** speedups framed against AMD's code; turn-level numbers until the results freeze (then stated
+  plainly, the median step's small gain included); decode placement as a gain (it is a cap-bounded estimate);
+  NP-hardness (until a reduction exists); the exactness of the predicted-completion order as a theorem (a remark until
+  proven); out-of-order issue as a claim (an analogy at most; the CP stays in order); FCPR-scoped partitions
+  (deferred); internal labels and history.
+- **Deliberate differences from the guide (structure):** Related Work is its own section after the Discussion, as
+  MLSys papers place it, instead of the Background's last subsection, because it carries the GPU phase-partitioning
+  contrast the plan asks for.
 - **Deliberate differences from the guide:** the MLSys template (natbib author-year through `mlsys2025.bst`) instead
   of ACM, so software entries are `@misc` (no `@software`), `lastaccessed` is not printed, and there is no
   `\Description`; figures are 3.25 in wide (the MLSys column) with Times through `newtxtext`/`newtxmath`, while the

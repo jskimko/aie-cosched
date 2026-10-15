@@ -1,0 +1,12 @@
+\section{Discussion}
+\label{sec:discussion}
+
+% VALUE: transferable insights only, each a possibility under its condition and tied to a measured result: an in-order issuer rations concurrency so its order is the schedule and packing yields little of it; the faster partition may change with the regime, so evaluations of prompts from scratch only may choose the wrong one; probes may rank configurations reliably before they run; once ordered, the bound may move from the issuer to the groups; a false dependence inside an operator is out of reach of reordering but not of renaming; on agent turns, gains measured from scratch may misstate end-to-end gains
+Although we evaluate one NPU, our findings rest on properties that other spatial accelerators may share.
+Where an in-order issuer mediates the concurrency of an array, its instruction order may act as the schedule, so packing work into fewer dispatches may yield little concurrency, and a second queue or a completion signal per group of columns could remove the rationing in hardware (Sections~\ref{subsec:semantics} and~\ref{subsec:ablation}).
+Where operators are partitioned spatially, the faster partition may change between computing a prompt from scratch and appending to a cached context, so an evaluation of prompts computed from scratch alone could choose the partition that is slower for agents (Section~\ref{subsec:ablation}).
+Where issue returns at once and waits block, probes of each operator alone may rank configurations reliably even where they misprice them, so a configuration can be chosen before it runs (Section~\ref{subsec:accuracy}).
+Once the issue order is right, the binding term may move from the issuer to the groups' own busy time, so further gains could come from kernels and from the balance of work between groups rather than from scheduling (Section~\ref{subsec:bound-eval}).
+Where an operator reuses one buffer across the iterations of a loop, reordering issue across operators cannot reach the resulting wait, whereas renaming the buffer inside the operator, as rings do across operators, could (Section~\ref{subsec:decode-eval}).
+Finally, where agents append to long contexts, prefill becomes bound by attention and decode by the KV cache, so gains measured on prompts computed from scratch may misstate what an agent's turn gains (Section~\ref{subsec:turns}).
+% DECISION: each sentence is re-checked against its section's result at the results freeze; a sentence whose result does not hold is dropped (vault paper-cosched-plan, section 6).

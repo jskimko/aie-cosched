@@ -1,0 +1,231 @@
+\section{Design}
+\label{sec:method}
+
+% VALUE: the semantics of Section 2.4 define a scheduling problem with three decisions, which the formulation states with a lower bound and the event model prices from probes of each operator alone; the composer then answers each property it must give with one mechanism: unchanged work by composing segments under a legality check, no false wait at the CP by reordering issue, no false wait on a shared buffer by renaming, a partition that fits the regime by choosing the split; the event model makes each choice before anything runs
+We first state the scheduling problem that the semantics of Section~\ref{subsec:semantics} define, with a lower bound on any schedule (Section~\ref{subsec:formulation}), and an event model that prices a schedule from probes of each operator alone (Section~\ref{subsec:pricing}).
+We then build a composer that takes an existing design's per-operator instruction streams, its map of operators to columns, the dependency graph of its host program, and the probes, and emits a sequence of composed commands (Figure~\ref{fig:order}d).
+The composed commands must do the same work as the existing ones, which the composer guarantees by keeping every instruction and checking legality from the instructions themselves (Section~\ref{subsec:compose}).
+No group may wait at the CP for work it does not consume, so the composer reorders issue across operators (Section~\ref{subsec:order}).
+No use of a buffer may wait for another use it does not depend on, so the composer renames buffers into rings, and the same rule applied by hand double-buffers decode attention's KV loop (Section~\ref{subsec:rings}).
+The partition of the array must fit the regime, so the composer chooses the split of columns for each regime (Section~\ref{subsec:split}).
+The event model prices every candidate, so each choice is made before anything runs.
+% SOURCE: amd-npu a0ee2edf44e0 (tag composer-v1.1), prefill-overlap/txn.py, merged.py, component_model.py; Python, on the engine's hardware context.
+
+\subsection{Problem Formulation}
+\label{subsec:formulation}
+
+\textbf{Resources.}
+% VALUE: three kinds of resources: column groups (one operator at a time, data-driven), the CP (one in-order server that issues and blocks), and the host (work between commands)
+The array offers a set $\mathcal{G}$ of disjoint column groups, each running one operator at a time and sharing only DRAM bandwidth with the others.
+The CP is a single in-order server that executes issue instructions, each at a small cost, and blocks at each synchronization until the transfer it names completes.
+The host CPU runs the work between operators that the array does not perform, such as normalizations, and it submits and collects commands.
+
+\textbf{Operators.}
+% VALUE: each operator is defined by its group, its device time, its host work, and its instruction stream split into segments; dependencies pass through DRAM and need a synchronization
+Each operator $o \in \mathcal{O}$ runs on group $g(o)$ for a device-busy time $p_o$, and may need host work of duration $h_o$ after it completes.
+Its instruction stream is a sequence of \emph{segments} $s_{o,1}, \dots, s_{o,n_o}$, where each segment consists of synchronizations followed by the issue instructions they gate, and the first segment has no synchronizations.
+A dependency graph $E \subseteq \mathcal{O} \times \mathcal{O}$ orders the operators.
+Since operators hand data over through DRAM, with no lock on the device between them, a consumer's first issue must follow the producer's final synchronization.
+When host work lies between producer and consumer, the consumer must also wait for that host work, and the two cannot share a command.
+
+\textbf{Decisions.}
+% VALUE: the essential decisions are the spatial assignment, the CP's instruction order, and the assignment of buffers, which together decide which waits are false; the command partition and the queue depth manage host boundaries and are reported apart
+A schedule makes three essential decisions.
+The first is the spatial assignment $g(\cdot)$ of operators to column groups, which determines what can run concurrently.
+The second is the CP's instruction order, namely a partition of $\mathcal{O}$ into a sequence of commands $C_1, \dots, C_K$ and, for each command, an interleaving $\sigma_k$ of its operators' segments that keeps each operator's segments in their own order.
+The third assigns each use of a buffer to a slot in memory, since two uses that share a slot must run one after the other even when neither consumes the other's data.
+Two further decisions manage the boundaries with the host: the number $D$ of commands the host keeps in flight, and how operators that do not overlap are packed into commands.
+Both would disappear if the host work moved onto the array, so we report their effect separately from that of the essential decisions.
+
+\textbf{Timing.}
+% VALUE: the semantics of Section 2.4 as rules: commands in sequence with a boundary cost; within a command, a segment's work starts once issued and its predecessor has finished; a synchronization completes when its work has
+A command starts on the device after its predecessor completes, plus a \emph{boundary cost} $\epsilon$ when it was already queued, or the dispatch floor $F$ when it arrives at an idle device.
+Within a command, the CP walks $\sigma_k$ in order.
+The work of segment $s_{o,j}$ starts on $g(o)$ once the CP has issued it and the work of $s_{o,j-1}$ has finished, and a synchronization completes once the CP reaches it and the work it names has finished.
+Operators that run at the same time on different groups take longer than alone by an overlap cost that grows with their combined DRAM traffic.
+
+\textbf{Objective.}
+% VALUE: minimize the makespan, which for prefill is TTFT less a fixed head and tail
+The objective is the makespan, i.e., the completion time of the last command, which for prefill is the TTFT less a fixed head and tail of work outside the layers.
+
+\textbf{Lower Bound.}
+\label{subsec:bound}
+% VALUE: each of the three resources bounds the makespan, so their maximum bounds the gap of any schedule on a given assignment
+Each resource bounds the makespan from below:
+\begin{equation}
+\label{eq:lb}
+T \;\ge\; \max\Bigl(\max_{g \in \mathcal{G}} \sum_{o:\,g(o)=g} p_o,\;\; L_E,\;\; \sum_{k} c_k\Bigr),
+\end{equation}
+where $L_E$ is the longest path through $E$ weighted by $p_o$ plus, on host-crossing edges, $h_o$, and $c_k$ is the CP's own work in command $k$.
+The first term is the busiest group's work, which no schedule on a fixed assignment can beat.
+The bound therefore measures how far a schedule lies from what a given spatial assignment allows.
+% DECISION: the bound's value for the studied instances, from the measured per-operator times, is stated with the evaluation's gap.
+% DECISION: no NP-hardness claim until a reduction is written; with negligible issue cost and one layer's fixed per-chunk pattern the problem has the structure of a two-machine chain-reentrant shop (wang1997reentrant), and with non-negligible issue cost the CP acts as a shared server (glass2000dedicated, hall2000common) (vault ch3-formulation, Relation to classical scheduling).
+
+\subsection{Event Model}
+\label{subsec:pricing}
+
+\begin{table}[t]
+    \centering
+    \caption{Parameters of the Event Model, Llama-3.2-1B, 2{,}048 Tokens}
+    \label{tab:params}
+    % VALUE: every term of the model is measured, on the device or from the host's timestamps, and none is a free scale factor
+    % DECISION: values are in raw units until the author chooses the reference units (STYLE.md, Per-paper decisions); then they are converted.
+    \begin{threeparttable}
+    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}>{\raggedright\arraybackslash}p{0.36\linewidth}r}
+        \toprule
+        Term & Value \\
+        \midrule
+        \input{fig/params-rows}
+    \end{tabular*}
+    \begin{tablenotes}\footnotesize
+    \item Device terms from each command dispatched alone; host terms from per-command timestamps of three schedules.
+    \end{tablenotes}
+    \end{threeparttable}
+\end{table}
+
+% VALUE: to choose among schedules without running each, an event simulation of the device, the CP, and the host prices a schedule from measured terms only, and reports device time, host exposure, and the fixed head and tail separately
+To choose among schedules without running each on the device, we price a schedule with an event simulation of the device, the CP, and the host, whose every term is measured (Table~\ref{tab:params}).
+On the device, command $k$ ends at
+\begin{equation}
+\label{eq:cmd}
+e_k = \max\bigl(e_{k-1} + \epsilon,\; q_k + F\bigr) + b_k,
+\end{equation}
+where $q_k$ is the time the host queues it, so a queued command pays the boundary cost $\epsilon$ and a command that arrives at an idle device pays the dispatch floor $F$.
+A command's busy time $b_k$ is the sum of its GEMMs' busy times plus a gap $\gamma$ per additional GEMM, and a command that also carries attention takes $\max(a, g) + \beta \min(a, g)$ for attention work $a$ and GEMM work $g$.
+Attention's busy time grows linearly with the chunk index, as the number of earlier key blocks does.
+The host pays an issue cost per command and a post-processing cost per operator, and it waits on the oldest command once $D$ are in flight.
+The TTFT is the simulated span plus a fixed head and tail, namely the embedding, the first normalization, and the LM head.
+Because each term is measured separately, an error in one term cannot hide behind another, and the model reports the device time, the host's exposed time, and the head and tail separately.
+% SOURCE: component_model.py (amd-npu a0ee2ed prefill-overlap/component_model.py); parameters prefill-overlap/v1/component_model.json (first committed 6735c61); host terms fitted on the 2,048-token schedules with depth 2, 4, and 16 and no packing.
+
+% VALUE: the model's inputs for a new configuration or model are one probe of each operator alone; the structural terms carry over unchanged
+Only the per-operator busy times depend on the configuration and the model.
+For a new split or model, we dispatch each operator alone once, at one prompt length, and take attention's busy time per chunk from a line fitted over the probed chunks, because single readings of attention can depart from its trend.
+For an append, the line is evaluated at each chunk's absolute index.
+The structural terms, namely $\gamma$, $\beta$, $\epsilon$, and the host's costs, are measured once on Llama-3.2-1B and carried over to other models and splits unchanged, with the head and tail scaled by the model's hidden size.
+% SOURCE: per-split probes at n = 2,048, attention line over chunks 0-15, structural terms from the 1B 2,048-token schedules; head and tail = probe LM + head_1B(2048) x N / 2048 x hidden / 2048 (vault lab-split-sweep (6); ch3-formulation, Generality and 4k model fixes).
+% DECISION: the split choice on the first two models used a least-squares line (16 of 16 faster splits, 45 of 46 pairs with a gap of 5% or more in the right order, the exception named); the median of pairwise slopes (Theil-Sen) is the rule fixed in advance for the third model, and the evaluation names each fit where it reports its result (vault ch3-formulation, G1).
+
+% VALUE: decode's time per token follows a two-term model from measured terms: a fixed part and a per-position cost that is the transfer and the compute in series when the KV loop is single-buffered, and the larger of the two when it is double-buffered; the same model bounds what placement can add
+Decode needs a simpler model, because it runs one command per token whose CP order already issues the next weights before it waits on the KV cache (Section~\ref{subsec:losses}).
+Its time per token is $T_0 + c\,L$ for a context of $L$ positions, where the fixed part $T_0$ covers the weight reads and the per-position cost $c$ covers attention.
+With a single-buffered KV loop, $c = B + C$ for a transfer time $B$ and a compute time $C$ per position, whereas a double-buffered loop gives $c = \max(B, C)$.
+Both $B$ and $C$ are measured, $B$ by streaming further positions with no further compute and $C$ as the remainder, and $B$ can fall no lower than the DRAM read cap allows.
+% SOURCE: T0 = 15.94 ms, c = 1.156 us (Llama-3.2-1B); B = 0.677 us at the two-shim rate, C = 0.478 us; the cap gives B >= 0.596 us (vault lab-decode-long-context (5), (7)).
+% DECISION: the per-model terms for the other models come from the same two probes per model (vault paper-cosched-plan).
+
+\subsection{Composing Instruction Streams}
+\label{subsec:compose}
+
+% VALUE: a composed command is an interleaving of operators' segments that keeps each operator's own order and every instruction once, so only the timing of issue and waits changes
+The composer splits each operator's instruction stream, already reduced to its own columns, into the segments of Section~\ref{subsec:formulation}.
+A composed command concatenates segments of several operators in a chosen order, keeping each operator's segments in their own order and every instruction exactly once.
+Under these rules, an interleaving changes only when each operator's work is issued and awaited, never what the work is.
+% SOURCE: txn.segments and txn.compose (amd-npu a0ee2ed prefill-overlap/txn.py); compose asserts each stream's segment order, every op kept once, and equal headers.
+
+% VALUE: two operators may interleave only if they cannot disturb each other's device state, which the composer checks statically from the instructions themselves; operators on one group stay in sequence
+Two operators may interleave in one command only if they cannot disturb each other's state on the device, which the composer checks from the instructions themselves.
+Every register write of an operator must address a column of its own group and touch only shim BDs and DMA queues, the operator's own cores' locks, and runtime parameters in its own cores' memory.
+Interleaved operators must patch disjoint argument slots or disjoint byte ranges of one slot's buffer, and no operator may write a buffer that another operator in the same command reads or writes.
+Operators on the same group, such as several GEMMs, are composed in sequence rather than interleaved, so their writes to that group's registers keep the order of separate commands.
+% SOURCE: each check turns red on a defeated input (swapped groups, an unstripped stream, a synchronization before an issue op, a patch onto another group's argument, a duplicated column, a reordered or dropped segment) (lab-prefill-overlap (3), (4)).
+
+\subsection{Reordering Issue}
+\label{subsec:order}
+
+% VALUE: the composer list-schedules the dependency graph chunk by chunk rather than stage by stage, so each attention operator meets independent GEMMs of earlier chunks, and it sizes each command so its GEMM work matches the attention work
+The existing host program runs each layer stage by stage, so every output projection waits behind the layer's entire attention, and no GEMM is ready to run beside attention.
+The composer instead list-schedules the dependency graph chunk by chunk.
+At each step, it takes the ready attention operator of the lowest layer and chunk and adds ready GEMMs, in the same order, until their estimated work reaches that of the attention operator.
+The GEMMs then run in sequence on columns 1--6 while attention runs on columns 0 and 7.
+For an append to a cached context, the composer plans only the new chunks, and their attention estimates use each chunk's absolute index.
+% SOURCE: merged.plan (a0ee2ed): qkv(L, c) after down(L-1, c); attn(L, c) after qkv(L, 0..c); o after attn; gate and up after o; down after gate and up; an optional cap on the GEMMs per attention command.
+% SOURCE: append = Merged.prefill(ids, start=L) on the same plan rules; attention estimates linear in the absolute chunk index (vault lab-agent-step (1)).
+
+% VALUE: within a command, the CP opens every group's work first and then places each synchronization at its predicted completion, followed by the issue it gates, so no synchronization holds back another group's work; the order is fixed before dispatch from the estimates
+Within a command, the order of synchronizations decides how long each group waits for its next issue (Figure~\ref{fig:order}).
+In turn, the CP would issue the first GEMM, then walk the attention stream to its end, and only then issue the second GEMM, so the GEMM group idles behind attention's synchronizations.
+The composer instead issues the opening segments of both attention columns and of the first GEMM, and then places every synchronization in order of its \emph{predicted completion}, each followed by the issue it gates.
+A GEMM's synchronizations are predicted to complete after the sum of the estimates of the GEMMs before it, and attention's mid-stream synchronizations at fixed fractions of its estimate.
+Attention's two columns are treated as two groups, so their segments alternate, which removes the false dependence inside the attention operator (Section~\ref{subsec:losses}).
+The order is static: the estimates fix it when the command is built, and the device executes it without host involvement.
+When issue costs are negligible, the estimates are exact, and the host work is hidden, the CP never blocks on a later-completing operator while an earlier one's successor waits, so the order matches the list schedule of the groups without a CP.
+% SOURCE: merged.cp_order (a0ee2ed); mid-stream fractions (0.25, 0.5) of attention's estimate, the lowest of five placements tried; the in-turn order takes 1.26x as long on the same 38 commands (lab-prefill-overlap (16)).
+% DECISION: the exactness statement in the last sentence is argued, not proven; it stays a remark until a proof is written (vault ch3-formulation, Lower bound and heuristic).
+
+\subsection{Renaming Buffers}
+\label{subsec:rings}
+
+% VALUE: with commands in flight and chunks interleaved, two uses of one buffer would wait on each other although neither consumes the other's data; the composer gives each overlapping use its own slot, with ring depths derived from the plan's live intervals and a check that no slot is reused before its reader is done
+Once operators of several chunks are in flight, a GEMM's input and output buffers cannot be reused per stage as in the existing host program, because two uses of one buffer would then wait on each other.
+For each buffer role, the composer derives a ring of slots from the plan: each use of a buffer lives from its producer's write to its last reader's completion, and interval colouring assigns slots so that no two overlapping uses share one.
+A separate check asserts, over the whole plan, that no slot is reused before its previous reader has completed.
+The depths follow from the plan and are not set by hand; for example, every QKV input of a layer is written before the layer's first QKV command completes, so that ring needs one slot per chunk.
+% SOURCE: merged.colour, assert_no_hazard, and Layout (a0ee2ed); the hazard check turns red on an overlapping slot; ring depths at 4,096 tokens: shared 2048-wide input 32, 8192-wide input 4, outputs 4-18 (lab-prefill-overlap (9)).
+
+% VALUE: decode attention's KV loop has the same false dependence inside one operator: one buffer makes each block's transfer wait for the previous block's compute; giving the loop two KV buffers, with the softmax state still carried across blocks, removes it; this is the one change inside a design, made by hand, with unchanged kernels and the same arithmetic order
+Decode attention holds the same false dependence inside one operator, where a single KV buffer makes each block's transfer wait for the compute on the previous block (Section~\ref{subsec:losses}).
+Only the running maximum and the accumulator must carry across blocks, whereas each block's keys and values are read once, so we give the loop two KV buffers that alternate between transfer and compute.
+The compiler's double-buffering transformation declines the loop because of the carried state, so we apply the rule by hand in the design's source, with unchanged kernels and the same arithmetic order.
+\E{The local memory each attention core needs for the second buffer, and the resulting time per token by context length.}
+% DECISION: the decode double buffer is a hand edit to the design's dataflow, not an output of the composer (vault paper-cosched-plan, section 7, and paper-ch3-outline, 2026-10-15); automating it is left to future work.
+% DECISION: the result enters after the static local-memory check and the bit-identical gate on Llama-3.2-1B (vault paper-cosched-plan; go/no-go 2026-10-21).
+
+\subsection{Partitioning per Regime}
+\label{subsec:split}
+
+% VALUE: the split of columns between attention and GEMMs is a build-time parameter of the existing design, fixed by hand; the legal splits follow from the heads, each split is a separate configuration built in seconds, and the composer needs only more argument slots to serve it
+The existing design fixes the split of columns between attention and the GEMMs by hand: attention groups are listed per column, and the GEMMs take a contiguous block of the remaining columns.
+Since each attention group serves an equal share of the KV heads, a model with 8 KV heads admits attention on 1, 2, or 4 columns, with the GEMMs on the other 7, 6, or 4.
+We build each split as its own configuration from the unchanged design source, which takes seconds, and each split's outputs are bit-identical to those of the default split.
+The composer serves every split with three argument slots per attention group instead of a fixed six, and it checks every GEMM's encoded iteration count and stride against the shim BD's field limits before it uses a split.
+% SOURCE: mlir-air a3e26261 fused_prefill/device.py: Attn(col=...) per group in Config.attn, GCOL0, GNC = 1, 6 as module constants; spec() splits kv_heads evenly, so 1, 2, or 4 attention columns with 8 KV heads (vault lab-split-sweep (1)).
+% SOURCE: out-of-tree split modules, builds of 13-14 s; logits bit-identical to the default split in every configuration on both models (vault lab-split-sweep (2), (4), (5)).
+% SOURCE: BD iteration wrap 6 bits (at most 64 rounds), stride 20 bits (words); the four-column split's LM-head GEMM runs 48 rounds; decoded from aie-rt xaie2pgbl_params.h fields with a round-trip check (vault lab-split-sweep (5)).
+
+% VALUE: the composer picks the split per regime with the event model from one probe per split; more attention columns shorten attention, whose time grows with the context, but lengthen every GEMM, so the choice depends on the prompt and the cached context
+For each split, the composer probes every operator alone once and predicts the TTFT of each regime with the event model (Section~\ref{subsec:pricing}), and it picks the split with the lower prediction.
+More attention columns shorten attention, whose time grows with the context, but lengthen every GEMM, so the choice depends on the prompt length and on the cached context.
+% SOURCE: per-split probes at n = 2,048, prediction with component_model.simulate (amd-npu 0f61651 prefill-overlap/g1_split_model.py, vault lab-split-sweep (6)-(7)).
+% SOURCE: the four-column split's GEMMs are 27% (1B) and 35% (Qwen3-4B) slower than on six columns, and its attention slope per chunk 3.0-3.1x lower than the default split's existing stream (vault lab-split-sweep (4)-(5)).
+
+% VALUE: the chosen splits stay resident, so a conversation switches between them at a turn boundary by a suspend and resume; its cached context, laid out by the attention groups of the split that computed it, moves with it
+A deployment keeps each chosen split resident in its own hardware context, with its own copy of the weights, and switches between them at a turn boundary by suspending one context and resuming the other.
+The KV cache of a cached context is laid out by the attention groups of the split that computed it, so a conversation that changes split also moves its cache to the new layout.
+\E{How the cache is moved, and the rule that decides between moving it and staying on one split.}
+% SOURCE: switch = suspend + resume + first prefill in one process, both splits' weights resident (vault lab-split-sweep (5)).
+% DECISION: the relayout and its decision rule enter once measured (vault paper-cosched-plan, regime switching); until then this sentence stays a placeholder.
+
+% VALUE: what a platform must offer for the method to apply: an in-order issuer whose issue returns at once and whose waits block, disjoint groups that share only DRAM, per-operator streams, and buffers named by slot and offset
+The composer relies on four properties of the platform rather than on MLIR-AIR: a single in-order issuer whose issue instructions return at once and whose synchronizations block, column groups that share only DRAM bandwidth, a design whose operators expose their own instruction streams, and buffers that commands name by an argument slot and a byte offset.
+% SOURCE: Sections 2.1 and 2.4; the five q4nx models of the evaluation all run on AIR's shared fused prefill and fused decode (mlir-air a3e26261 programming_examples/llms/*_q4nx).
+
+\subsection{Implementation}
+\label{subsec:impl}
+
+% VALUE: the composer is a small Python layer that replaces the host program's dispatch loop on the engine's own hardware context; it changes no kernel, compiler, driver, or firmware
+The composer is about 900 lines of Python that replace the dispatch loop of the design's host program and submit to the engine's own hardware context, with no change to a kernel, the compiler, the driver, or the firmware.
+% SOURCE: amd-npu a0ee2edf44e0 (tag composer-v1.1), prefill-overlap/txn.py (111 lines), merged.py (616), component_model.py (180).
+
+\textbf{Argument Arenas.}
+% VALUE: the existing design binds one buffer per argument slot, so a command holds only one GEMM; we retarget only a patch's byte offset, never its slot, so any number of GEMMs share the GEMM slots through arenas, under an offset bound the composer respects
+The existing design gives each operator kind its own argument slots, so a command that carries attention can hold only one GEMM.
+Since retargeting a patch to another slot faults in the IOMMU whereas changing its byte offset is safe, we allocate the GEMM inputs, weights, and outputs as sub-buffers of three parent buffers, which we call \emph{arenas}, and rewrite only each GEMM's patch offsets, so any number of GEMMs share three slots.
+The offset field bounds an arena to $2^{31}$ bytes, so the weights are split into arenas of whole layers, and the GEMMs of one command share a weight arena.
+% SOURCE: nine slots, nargs = 3 + 3 x len(cfg.attn) (mlir-air a3e26261 engine.py:107); address patch = opcode 0x81, argument index at word 8, byte offset at word 10.
+% SOURCE: slot moves complete with wrong output and AMD-Vi IO_PAGE_FAULT lines; offset moves inside a parent buffer are bit-identical; two GEMMs at distinct offsets in shared arenas are bit-identical (amd-npu 61c64f9 prefill-overlap/retarget/, lab-prefill-overlap (8)).
+% SOURCE: merged.Weights (a0ee2ed); Llama-3.2-1B uses one weight arena, Qwen3-4B two (2145 + 195 MB) (lab-prefill-overlap (24), (26)).
+
+\textbf{Host Boundaries.}
+% VALUE: host work between commands forces boundaries; keeping D commands in flight hides the host work and the boundary cost but delays which operators are ready, so the depth and the packing of GEMMs without attention are chosen per prompt length with the event model
+Since the host computes normalizations, rotary embeddings, and residuals between commands, a dependence that crosses the host forces a command boundary.
+The composer keeps $D$ commands in flight and processes a command's outputs while later commands run, so a command can carry only operators whose inputs come from commands at least $D$ positions earlier.
+A step without a ready attention operator packs a fixed number of ready GEMMs into one command, following standard practice for amortizing dispatch cost (Section~\ref{subsec:semantics}).
+The event model chooses the depth and the packing for each prompt length, and we report their effect apart from that of the essential decisions (Section~\ref{subsec:formulation}).
+% SOURCE: merged.plan with lag = D; Layout claims an output slot when its command is queued, D - 1.6 commands before it runs (a0ee2ed).
+
+\textbf{Decode Double Buffer.}
+% VALUE: what the hand edit to the decode design changes, in its source and in local memory, and that it keeps kernels and arithmetic order
+\E{The change to the fused decode's attention source: the second KV buffer per core, the un-shared score buffer, and the local memory it uses.}
+% DECISION: written once the edit passes its bit-identical gate (vault paper-cosched-plan, decode double buffer).

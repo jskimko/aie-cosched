@@ -1,0 +1,64 @@
+\section{Evaluation}
+\label{sec:eval}
+
+\subsection{Experimental Setup}
+\label{subsec:setup}
+
+% VALUE: one setup paragraph: the platform and its power state, the software, the models (one per edge class), the workloads and prompt lengths, the baselines, how TTFT, decode, and turns are measured, the correctness gate, and how the machine state is controlled; defaults stated once
+We measure on a GMKtec NucBox EVO-X2 with an AMD Ryzen\texttrademark{} AI Max+ 395 processor, whose XDNA~2 NPU has 8 columns of 4 compute tiles, and 64\,GB of shared system memory.
+The host runs Linux~7.0 with the amdxdna driver and XRT~2.25.0~\citep{xdna-driver,xrt-repo}, NPU firmware 1.1.2.65 in its performance power mode, and the CPU's frequency governor and energy preference set to performance.
+We evaluate one model per class of edge model: Llama-3.2-1B~\citep{meta2024llama32} and Qwen3-4B~\citep{yang2025qwen3} as dense models of two sizes, \E{Llama-3.1-8B as a dense 8B model, Gemma3-4B for attention within a sliding window, and LFM2-1.2B for layers that mix convolution and attention}, all with 4-bit quantized weights.
+Prompts computed from scratch have 2{,}048 or 4{,}096 tokens, and appends add 512, 1{,}024, or 4{,}096 tokens to a cached context of 4{,}096, 16{,}384, or 28{,}672 tokens, followed by 250 generated tokens in an agent's turn.
+These appends range from below the median to beyond the 90th percentile of the new tokens per step in coding-agent traces~\citep{zhu2026tracelab}, whereas the contexts stop at the 32{,}768-token window we build, below the traces' median prefix of 119K tokens, so our results cover agents whose context fits an edge model's window.
+The designs are MLIR-AIR's fused prefill and fused decode~\citep{wang2026mlirair}, compiled with MLIR-AIE~\citep{mlir-aie-repo}.
+The baselines are each design's own host program on its default split and, as a stronger baseline, the same program with its attention columns alternated, both with the same configuration, kernels, and weights as our schedules; \E{FastFlowLM~\citep{fastflowlm-repo} on the same weights gives an absolute reference.}
+Every run's logits must be bit-identical to the baseline's, every append's logits bit-identical to those of a full prefill of the whole prompt, and the kernel log must show no driver or IOMMU message during the run.
+TTFT is the wall time of the prefill call, from token identifiers to logits, decode time per token is measured over 64 generated tokens, and a turn's time is its append, its 250 decoded tokens, and the handoff of the KV cache from the prefill design to the decode design.
+We report the median of \E{5} timed runs after one warm run, with the order of schedules rotated between rounds.
+Each batch of runs holds the device exclusively, checks that no other process has it open, and brackets the runs with a DRAM bandwidth probe and an empty-command dispatch.
+Because the aggregate DRAM read cap varies by up to 12\% between batches, every ratio compares runs within one batch.
+% SOURCE: machine files read 2026-10-14/15: uname -r 7.0.0-34-generic; amdxdna 2.25.0_20260922 (DKMS, 31c01f2019e7); XRT 2.25.0 (3923b2b5be55); NPU firmware 1.1.2.65 (sysfs fw_version); BIOS EVO-X2 1.12; NPU power mode performance, CPU EPP and governor performance (lab-prefill-overlap (11), lab-split-sweep (9)).
+% SOURCE: mlir-air a3e26261 (llms/shared/fused_prefill, fused_decode); mlir_aie wheel 1.4.5.dev22+g35fa6b1; weights FastFlowLM/Qwen3-4B-NPU2 rev 07651f11cac7, the Llama-3.2-1B q4nx bundle, FastFlowLM/Llama-3.1-8B-NPU2 rev 52700648, all sha256-verified (lab-prefill-overlap (23), lab-split-sweep (10)).
+% SOURCE: TraceLab Table 8: append tokens P25 / P50 / P90 = 384 / 857 / 5,342 (Claude) and 406 / 886 / 8,310 (Codex); output P50 252 / 184; Section 1: median prefix 119K, append 875, output 214 (PDF read 2026-10-15).
+% SOURCE: turn cells excluded before running: 28,672 + 4,096 (L + N + 250 > 32,768, the 1B decode window); Qwen3-4B at 28,672 (its decode KV buffer passes the 4 GiB shim-offset bound) (vault lab-agent-step (5)).
+% SOURCE: lock = flock ~/.local/state/npu.lock; brackets = 1x1 and 8x2 DRAM reads of 256 MiB, the dispatch floor, load, NPU mode, EPP, governor; 8x2 cap 49.9-55.7 GB/s over the batches, 55.7 / 49.9 = 1.116 (lab-prefill-device (1), lab-prefill-overlap (2), (11), lab-split-sweep (4)-(5), lab-agent-step (2)).
+% DECISION: the run count is fixed at the results freeze; a count that differs by comparison is stated where it applies.
+% DECISION: the BIOS power mode cannot be read from the OS; add it once the author records it.
+% DECISION: the handoff counts in the turn, at each schedule's steady (minimum) value, a change made after the turns' protocol was written; a footnote states it (ruling of 2026-10-15, vault paper-ch3-outline).
+
+\subsection{End-to-End Latency}
+\label{subsec:e2e}
+% VALUE: per model (T1), absolute TTFT from scratch, the time from a tool result to the first new token on appends, decode per token, and whole turns, for the existing design and ours, with the gap to the lower bound; the gain from appends ranges 1.1-2.6x by (L, N), and the combined split and order reach 3.0x on Qwen3-4B at 16k + 4k against the default configuration
+% DECISION: results stay \E until the results freeze and the audit's verdicts.
+\E{Table~1: per model, TTFT from scratch and on appends, decode per token, and turn time, existing and composed, with the gap to the lower bound.}
+
+\subsection{Removing Each Dependence}
+\label{subsec:ablation}
+% VALUE: a factorial of order and split on every model: packing alone gives nothing, the order's gain splits into its part inside the attention operator and its part across groups, and on the four-column split, where the existing stream has nothing to alternate, reordering alone gives 1.33x at 16k + 4k on both models; each side on its own faster split
+\E{Figure: TTFT by schedule (existing, packed in turn, attention columns alternated, composed) and split, per model and regime.}
+
+\subsection{Decode}
+\label{subsec:decode-eval}
+% VALUE: the double-buffered KV loop lowers decode's time per token by a factor that grows with the context and with the KV share of a token, small on Gemma3 whose most layers attend within a window, as the two-term model predicts; placement would add at most a few percent under the read cap
+\E{Figure: decode time per token by context length, existing and double-buffered, per model, with the model's prediction and the cap-bounded estimate for placement.}
+
+\subsection{Agent Turns}
+\label{subsec:turns}
+% VALUE: measured whole turns over (L, N) on every model, decomposed into the prefill order, the prefill split, and the decode double buffer, placed on the traces' step distribution: a median step gains little because decode is most of the turn, long tool outputs at long context gain more; stated plainly
+% DECISION: turn-level numbers are stated once fixed at the results freeze; today 1.02-1.19x at N = 512-1,024 and 1.25-1.65x at N = 4,096 before the decode double buffer (vault ch3-formulation, G2/G2b and Qwen3-4B measured turns).
+\E{Figure: turn speedup over the cached context and the append, with the traces' 25th, 50th, and 90th percentiles of the append marked.}
+
+\subsection{Model Accuracy}
+\label{subsec:accuracy}
+% VALUE: the event model prices schedules and models it was not fitted on within a few percent, picks the faster split in every configuration measured (on the new models with its rule fixed before the runs), and states where its error grows (attention read off its trend, the existing order's mid-range slowdown) with the size of each
+\E{Figure: predicted against measured TTFT, and the split chosen against the faster split measured, per model and regime.}
+
+\subsection{Distance to the Bound}
+\label{subsec:bound-eval}
+% VALUE: at each configuration's faster split the composer lies within 1.09-1.30x of the lower bound, whose binding term is a group's busy time rather than the CP; the bound is not strict where attention is extrapolated (16k + 4k)
+\E{The gap to the lower bound per configuration, with its binding term.}
+
+\subsection{Overheads}
+\label{subsec:overheads}
+% VALUE: the composer's own costs: planning time per prompt, build time per split, resident memory of the kept splits, the switch between splits and the move of a cached context; and FastFlowLM on the same weights as an absolute reference
+\E{Table~2: planning time, build time, resident memory, switch and cache-move cost, and the reference.}

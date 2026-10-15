@@ -1,5 +1,5 @@
 \begin{abstract}
-% VALUE: one paragraph of 4-6 sentences (MLSys): the setting and problem (a spatial NPU runs LLM inference as per-operator designs, and one in-order command processor issues their work, so the array idles), the existing approach (a hand-fixed split, one operator per command), the two decisions the composer makes and the insight, the model and its accuracy, the key results, the closing insight
+% VALUE: one paragraph of 4-6 sentences (MLSys): the setting and problem (a spatial NPU runs an agent's LLM turns as per-operator designs issued by one in-order command processor, and false dependences leave the array idle), the existing approach (a hand-fixed split, one operator per command, single-buffered loops), what the composer does (reorder issue, rename buffers, partition per regime) and the insight, the model and its accuracy, the key results (time to the first new token, decode, turns, five edge models), the closing insight
 % DECISION: written with the full draft, from the numbers that pass the results freeze and the audit.
 \E{Abstract: written with the full draft, after the results freeze.}
 \end{abstract}

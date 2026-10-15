@@ -1,4 +1,4 @@
-\section{Background}
+\section{Background and Motivation}
 \label{sec:background}
 
 \subsection{AMD XDNA~2 NPU}
@@ -43,55 +43,121 @@ The host can queue further commands before it waits on the first, which hides pa
 % VALUE: the existing expert prefill places GEMMs and attention on disjoint columns in one configuration, so its operators differ only in their instruction streams; it runs a layer stage by stage with host work between commands
 Prefill processes a prompt to produce the first output token, and its latency is the time-to-first-token (TTFT).
 Each decoder layer applies a QKV projection, attention, an output projection, and a gated feed-forward network of gate, up, and down projections.
-The open expert prefill of MLIR-AIR~\citep{wang2026mlirair}, laid out like that of FastFlowLM~\citep{fastflowlm-repo}, places every operator of a layer in one configuration, with the GEMMs on columns 1--6 (24 cores) and attention on columns 0 and 7 (one group of 4 cores per column).
+The open expert prefill of MLIR-AIR~\citep{wang2026mlirair}, which reimplements designs of FastFlowLM~\citep{fastflowlm-repo}, places every operator of a layer in one configuration, with the GEMMs on columns 1--6 (24 cores) and attention on columns 0 and 7 (one group of 4 cores per column).
 Its cores loop indefinitely and take their work from runtime parameters, so its operators differ only in their instruction streams, and each command keeps only the instructions for its own operator's columns.
 The prompt is processed in chunks of 128 tokens, and the host runs a layer stage by stage: the QKV projections of all chunks, then each chunk's attention, then each chunk's remaining projections.
 The host CPU computes the normalizations, the rotary position embedding, and the residual additions between commands.
-% SOURCE: mlir-air a3e26261 programming_examples/llms/shared/fused_prefill/: device.py (column map cols(cfg); "one PDI serves every op and shape and the ops differ only in their insts"), engine.py (strip_columns), dense.py (_mix_all, stage-major order), hostops.py.
+% SOURCE: mlir-air a3e26261 programming_examples/llms/shared/fused_prefill/: device.py (column map cols(cfg); "one PDI serves every op and shape and the ops differ only in their insts"), engine.py (strip_columns), dense.py (_mix_all, stage-major order), hostops.py; README.md: "Some of the LLM implementations in this directory reimplement AMD NPU LLM designs originally developed by the FastFlowLM team".
 
 % VALUE: an agent's turn appends new tokens to a cached context and then decodes; the prefill design serves appends because positions are absolute; decode is a separate design that reads the whole KV cache per token
-An agent's turn typically appends a few thousand new tokens to a long context whose KV cache is already computed, and then decodes a few hundred output tokens.
+An agent's turn appends a few hundred to a few thousand new tokens, such as a tool's output, to a long context whose KV cache is already computed, and then decodes a few hundred output tokens.
 The prefill design serves such an \emph{append} unchanged, because its rotary embedding, KV append, and attention take absolute token positions, so chunk $c$ of an append to an $L$-token context attends to $L/128 + c + 1$ chunks of keys.
 Decode generates one token per step with a separate design, MLIR-AIR's fused decode, in which every layer's attention reads the KV cache of the whole context.
 % SOURCE: the engine's RoPE, KV append, and attention take absolute positions, and only prefill() starts at 0 (vault lab-decode-long-context (2), lab-agent-step (1)); appends are bit-identical to a full prefill of L + N tokens (lab-agent-step (2)).
 
-% VALUE: agent steps are short appends to long cached contexts with short outputs; on GPU servers with prefix caching, prefill is a small share of agent LLM time, so the NPU's share of prefill in a turn must be measured, not assumed
+% VALUE: agent steps are short appends to long cached contexts with short outputs; on GPU servers with prefix caching, prefill is a small share of agent LLM time, whereas on the NPU it is a large share of a turn, which is why prefill matters here
 Traces of coding agents show that a median step appends 875 new tokens to a cached prefix of 119K tokens and generates 214 tokens~\citep{zhu2026tracelab}.
 On GPU servers that keep the prefix cached, prefill accounts for only 1.4--9.0\% of an agent's LLM time~\citep{yuan2026agentic}.
-On the NPU, prefill accounts for \E{the measured share} of an agent's turn at the same shape (Section~\ref{subsec:turns}).
+On the NPU, prefill accounts for \E{6--54\%} of an agent's turn, depending on the cached context and the append, so the time from a tool's output to the first new token is a large part of what a user waits for (Section~\ref{subsec:turns}).
 % SOURCE: TraceLab Section 1 (medians over ~4,300 Claude Code and Codex sessions, ~350,000 steps) and Table 8; Yuan et al. Section on prefill versus decode time and Fig. 9 (Qwen3.6-27B and Gemma4-31B on two H100 NVL GPUs with vLLM, no context thrashing); both PDFs read 2026-10-15.
-% SOURCE: today's NPU share from measured parts (append measured, decode from the measured per-token fit): prefill 22-56% of a Llama-3.2-1B turn at N = 2,048-4,096 (vault lab-agent-step (2)); the median-N cells (N = 512, 1,024) are queued.
-% DECISION: the NPU prefill share stays \E until whole turns are measured on both models, including N near the traces' median.
+% SOURCE: measured whole turns (append + 250 decode tokens), prefill share of the existing turn: Llama-3.2-1B 6-54% with the KV handoff, Qwen3-4B 7-48% before its handoff rerun, over L in {4k, 16k, 28k} and N in {512, 1k, 4k} (vault ch3-formulation, G2/G2b and Qwen3-4B measured turns).
+% DECISION: the share stays \E until the results freeze (ruling of 2026-10-15, vault paper-ch3-outline); the Qwen3-4B values change once the handoff rerun is in.
 
-% VALUE: packing operators into one dispatch is standard practice for amortizing host overhead; on an in-order CP it does not by itself create concurrency
-Placing several operators in one dispatch to amortize per-dispatch overhead is standard practice, as in CUDA Graphs~\citep{nvidia-cudagraphs}, XRT's run lists~\citep{xrt-repo}, and the multi-launch programs that MLIR-AIR stitches together~\citep{wang2026mlirair}.
-On the NPU, operators in one command still execute in the CP's instruction order.
-Packing therefore removes dispatch cost but creates no overlap unless the operators occupy disjoint columns and the CP issues each one's work before it waits on another's (Section~\ref{subsec:semantics}).
+\subsection{Where the Array Idles}
+\label{subsec:losses}
+
+% VALUE: the expert designs lose end-to-end time to false dependences, where work waits on other work it does not consume: between column groups and inside one operator in prefill, and between a transfer and its own compute in decode
+The expert designs lose end-to-end time on the NPU because work waits on other work that it does not consume.
+We call such a wait a \emph{false dependence}, and we find one between column groups and one inside an operator in prefill, and one between a transfer and its compute in decode.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{fig/busy.pdf}
+    % VALUE: in the existing prefill, attention's share grows with prompt length, and each column group idles while the other computes
+    \caption{Share of TTFT of the existing Llama-3.2-1B prefill by prompt length. Device-busy parts are each operator's time when dispatched alone, less the dispatch floor, summed over the prefill.}
+    \label{fig:busy}
+\end{figure}
+
+\textbf{Column Groups in Prefill.}
+% VALUE: the existing prefill issues one operator per command, so its column groups take turns; the device is busy almost all the time, but on one group at a time, and attention's growing share is time the GEMM columns sit idle
+The existing prefill issues one operator per command, which amounts to about 1{,}500 commands for a 2{,}048-token prompt.
+Figure~\ref{fig:busy} shows the resulting split of TTFT: device-busy time accounts for 92--97\% of it, and attention's share grows from 12\% to 49\% between 512 and 4{,}096 tokens.
+Because the commands run in submission order, columns 1--6 idle while attention runs, and columns 0 and 7 idle while the GEMMs run, although neither group consumes the other's current work.
+The device is thus busy almost all of the time, but on only one column group at a time.
+% SOURCE: commands = 16 layers x chunks x 6 + 11 LM-head commands = 1,547 at 2,048 tokens (vault lab-prefill-census (1)).
+% SOURCE: amd-npu e3acc8a prefill-e2/decomp.txt via figs/make_figs.py: busy = isolated time - dispatch floor = 92/95/97% of TTFT at 512/2k/4k; of TTFT, attention 12.2/32.9/49.1%, GEMMs 70.1/60.3/47.6%, LM head 9.7/2.1/0.8%.
+% SOURCE: serial execution, the isolated busy times sum to at most TTFT (vault lab-prefill-device (4)); queued commands do not overlap (Section 2.4).
+
+\textbf{Columns of One Operator.}
+% VALUE: the same loss occurs inside one operator: the existing attention stream starts column 7 only after waiting on column 0, which costs a third of attention's device time
+The existing attention stream issues column~7's inputs only after two synchronizations on column~0's key and value transfers, which complete when column~0 is about half done.
+Alternating the two columns' segments, so that both columns start before the CP waits on either, reduces attention's device-busy time to $0.67\times$ that of the existing order at every chunk measured, with bit-identical outputs.
+Each column's half alone takes the same time within 1\%, so the difference comes from the CP's instruction order rather than from an imbalance of work.
+Since attention's share grows with the prompt, this loss grows with it.
+% SOURCE: decoded from the shipped a_32_4_0_0 stream, mid-stream synchronizations at ops 70, 75 (column 0) and 92, 97 (column 7); column 7's issue (ops 81-91) follows column 0's two mid-stream synchronizations (vault lab-prefill-overlap (4)).
+% SOURCE: (alternated - F) / (existing - F) = 0.666-0.668 on 7 pairs, chunks 2-14 at 2,048 tokens; column 7 alone / column 0 alone = 0.994-1.010 (amd-npu 17f7ec3 ovl4/, vault lab-prefill-overlap (5)c); 0.66-0.68 at absolute chunks 16-255 on both models (vault lab-agent-step (4)).
+
+\textbf{Transfers in Decode.}
+% VALUE: decode's per-token time grows linearly with context and attention becomes most of it; attention reads the KV cache at half the platform's read rate because the single-buffered KV loop serializes each block's transfer behind the previous block's compute, not because of the transfer or its placement
+The existing decode design places attention's cores on columns 3 and 4 and reads the KV cache through those columns' two shim tiles.
+Its time per token grows linearly with the context, within 0.2\% between 2{,}048 and 32{,}704 tokens, and attention's share of that time grows from 13\% to 70\% over the same range.
+During attention, the design reads the KV cache at 51\% of the DRAM read cap measured in the same batch.
+The transfer is not the limit: a build that streams 30{,}720 further positions with no further compute reads them at the two shim tiles' full rate, 88\% of the cap.
+Nor is the CP's order the limit, since each layer issues the next projection's weights before it waits on the KV cache.
+Instead, the design's KV loop is single-buffered, because its running maximum and accumulator live across blocks and MLIR-AIR's double-buffering transformation declines such loops, so each block's transfer waits for the compute on the previous block, which adds 41\% of the time per position.
+Spreading attention over more columns would therefore gain little, since the transfer alone already reads near the cap.
+% SOURCE: per-token time = 15.94 ms + 1.156 us x L, max residual 0.2% over L = 2,048-32,704 (Llama-3.2-1B, one 32k-window build, median of 3); 32 KiB per position / 1.156 us = 28.4 GB/s against a same-batch 8x2 cap of 55.2 GB/s; attention 13/23/37/54/70% of per-token time at 2k/4k/8k/16k/32k (vault lab-decode-long-context (5)).
+% SOURCE: footprint from the build's npu.air.mlir: KV readback on shims 3 and 4, attention cores on columns 3 and 4 (vault lab-decode-long-context (6)).
+% SOURCE: bytes-only discriminator: ELF window 32,768 vs 2,048 at the same small L, 20.81 ms / 30,720 positions = 0.677 us = 48.4 GB/s = 88% of the 55.2 GB/s cap and 104% of the two-shim probe; serialized compute 1.156 - 0.677 = 0.478 us = 41% of the per-position time (vault lab-decode-long-context (7)).
+% SOURCE: per layer, the QKV weight streams are awaited, then the KV readbacks start, and the next projection's weight streams are issued before any KV await; weight progress during attention is bounded by buffering and back-pressure (vault lab-decode-long-context (2), amended in (4)).
+% SOURCE: single buffering, the build's own comment ("air-label-scf-for-to-ping-pong declines it, because the running max and accumulator are live across blocks") (vault lab-decode-long-context (5)).
+% SOURCE: placement bounded by the cap: with the transfer at the cap (0.596 us per position) instead of the two-shim rate (0.677 us), double buffering plus placement gives at most 1.36x / 1.52x per token at 16k / 32k against 1.29x / 1.41x for double buffering alone (derived from lab-decode-long-context (5)-(7); paper plan review, 2026-10-15).
+
+\subsection{Concurrency Through One Command Processor}
+\label{subsec:semantics}
+
+% VALUE: the CP semantics, measured on the existing prefill's own operators, say where concurrency can come from: not from queued commands, but from one command that issues both groups' work before it waits on either
+To find where concurrency can come from, we measure how the CP turns instruction streams into overlap on the existing prefill's own operators, pairing one attention operator on columns 0 and 7 with one GEMM operator on columns 1--6.
+Every composed command here produces outputs bit-identical to those of the operators run alone.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{fig/pairs.pdf}
+    % VALUE: queued commands take the sum of the two operators, one command that issues both before waiting takes the longer one
+    \caption{Median time of one attention and one GEMM operator on disjoint column groups, normalized to the longer operator alone, over 20 runs per pair. Holding both streams in one command saves one dispatch floor against the sum.}
+    \label{fig:pairs}
+\end{figure}
+
+\textbf{Queued Commands.}
+% VALUE: the runtime gives no overlap across commands, and placing two operators in one command is itself neutral, so overlap must come from within a command
+Two commands queued on one hardware context, with no wait between them, take as long as one command that holds both streams in sequence, within 3\% on every pair (Figure~\ref{fig:pairs}).
+Holding both streams in sequence in one command takes the sum of the two operators' times minus one dispatch floor, within 2\%, so placing two operators in one command is itself neutral.
+This is why packing several operators into one dispatch, which is standard practice for amortizing launch cost, as in CUDA Graphs~\citep{nvidia-cudagraphs}, XRT's run lists~\citep{xrt-repo}, and MLIR-AIR's multi-launch programs~\citep{wang2026mlirair}, removes dispatch cost on the NPU but creates no overlap.
+% SOURCE: queued / in-sequence = 1.007-1.029 on 7 pairs (amd-npu 17f7ec3 prefill-overlap/ovl4/, lab-prefill-overlap (5)b); in-sequence / (A + G - F) = 0.996-1.021 over 17 pair runs (ovl/, ovl2/ at 8f13e05 and ovl4/; report.txt H1 column).
 % SOURCE: XRT run list, /opt/xilinx/xrt/include/xrt/experimental/xrt_kernel.h:21 (XRT 2.25.0); MLIR-AIR stitch_elf (vault src-mlir-air-llms).
 
-\subsection{Related Work}
-\label{subsec:related}
+\textbf{Concurrent Issue.}
+% VALUE: one command that issues both groups' work before it waits on either runs them concurrently at nearly the longer one's time; the small cost appears when both read DRAM near the cap
+When one command issues all of the GEMM's work, then the attention operator's stream, and only then the GEMM's synchronizations, the two operators run concurrently.
+Such a command takes 1.00--1.06 times the longer operator's time on 9 pairs that cover three GEMM shapes and attention over chunks 0 to 15 (Figure~\ref{fig:pairs}).
+On six further pairs with other shapes and chunks, the overlap hides 90--96\% of the shorter operator's work, after excluding the dispatch floor that the merge already saves.
+The overlap costs most when the pair's combined DRAM read rate approaches the read cap, at about 95\% of the cap measured in the same batch.
+The serial execution of the existing prefill is therefore a property of how its commands are composed, not of the array or its configuration.
+% SOURCE: interleaved / max(A, G) = 0.998-1.058 over 10 pair runs = 9 pairs (c8 + lm measured twice, 1.054 and 1.058; the figure keeps each pair's first measurement); GEMM shapes up, LM head chunk, down; attention chunks 0, 4, 8, 12, 15 (lab-prefill-overlap (3)).
+% SOURCE: hidden fraction of the shorter operator's work, (in-sequence - interleaved) / (min(A, G) - F) = 0.90-0.96 on 2+qkv, 6+o, 11+gate, 14+qkv, 6+gate, 11+o (lab-prefill-overlap (5)a).
+% SOURCE: DRAM rate during the interleaved command 52.2 GB/s against a same-batch 8x2 cap of 53.9-55.3 GB/s for c8 + lm, the costliest overlap (1.054-1.058) (lab-prefill-overlap (3)).
 
-\textbf{Mapping and Fusion on Spatial Accelerators.}
-% VALUE: mapping frameworks choose fused groups and their placement; the designs are separately issued, and their concurrency is not addressed
-Stream explores layer-fused mappings on multi-core dataflow accelerators with memory- and communication-aware cost models, and its AIE backend emits one design per fused group~\citep{symons2025stream}.
-MLIR-AIR and IRON compile operators and fused multi-operator designs onto the AIE array~\citep{wang2026mlirair,hunhoff2025iron}.
-These works decide what a design computes and where, whereas our setting takes the designs as given and concerns how one CP issues them.
-% SOURCE: Stream describes no switching cost and no concurrency across fused groups (vault src-stream-dse, arXiv v2 read 2026-10-14).
+\textbf{Synchronization Order.}
+% VALUE: because the CP is in order, a wait on one group delays the issue of every other group's work; the attention measurement of Section 2.3 isolates this effect, so the instruction order is a scheduling decision of its own
+Since the CP executes in order, a synchronization on one group delays every later issue, including the issue of another group's work.
+The existing attention operator isolates this effect (Section~\ref{subsec:losses}): its two columns carry equal work, yet alternating their segments lowers its device time to $0.67\times$ with the same instructions.
+The CP's instruction order, and not only the assignment of operators to commands, is therefore a scheduling decision.
+% SOURCE: vault lab-prefill-overlap (4)-(5)c; Section 2.3 carries the numbers.
 
-\textbf{Concurrent Operators on GPUs.}
-% VALUE: GPU serving overlaps heterogeneous operators within one device, where the hardware schedules concurrent kernels
-NanoFlow splits a batch into nano-batches so that compute-, memory-, and network-bound operations overlap within one GPU~\citep{zhu2025nanoflow}.
-On a GPU, kernels on separate streams are scheduled concurrently by the hardware, whereas on the NPU, concurrency must be written into one in-order instruction stream.
-% DECISION: the NanoFlow sentence states only what its paper shows; read the PDF and add a vault source note before submission.
-
-\textbf{LLM Inference on AMD NPUs.}
-% VALUE: existing NPU LLM runtimes compose hand-tuned designs per model, with the composition fixed by hand
-FastFlowLM runs many model families on XDNA~2 NPUs with hand-tuned designs~\citep{fastflowlm-repo}, and MLIR-AIR builds end-to-end decoder models from fused operator designs~\citep{wang2026mlirair}.
-In both, the composition of operators into commands is fixed by hand for each model, whereas our setting derives it from the designs' instruction streams.
-
-\textbf{Scheduling with a Shared Server.}
-% VALUE: classical scheduling covers machines that share one server and reentrant shops; the CP is a server that also blocks on completions
-Scheduling theory studies parallel machines whose jobs each need a common server for setup~\citep{hall2000common,glass2000dedicated}, and reentrant shops in which jobs return to a machine several times~\citep{wang1997reentrant}.
-The CP resembles such a server, with the difference that it also blocks on synchronizations until a machine's work completes.
-% DECISION: these three works are cited from their metadata only; read each PDF and add a vault source note before submission.
+\textbf{Separate Partitions.}
+% VALUE: two hardware contexts on disjoint partitions are the obvious alternative; they need partitions of contiguous columns, so separate rebuilds of each group, and a host round trip at every dependence between the groups, so concurrency is taken from within one command instead
+Two hardware contexts on disjoint partitions could also run the groups side by side, and the driver allows them.
+A partition, however, spans contiguous columns, whereas the existing attention sits on columns 0 and 7, so each group would need its own rebuilt design.
+Every dependence between attention and a GEMM would then cross the host, which waits on one context before it submits to the other.
+One command that carries both groups' streams needs neither a rebuild nor a change to the driver or firmware, so we take concurrency from within a command.
+% SOURCE: aie2_solver.c gives each hw_context ncols contiguous columns at an allowed start column, and disjoint ranges become separate partitions; path A needs the GEMM and attention groups built as separate 6- and 2-column designs with attention moved onto adjacent columns; path B needs no rebuild, driver change, or firmware change (vault lab-prefill-overlap (1)).

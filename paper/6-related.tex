@@ -1,0 +1,28 @@
+\section{Related Work}
+\label{sec:related}
+
+\textbf{Mapping and Fusion on Spatial Accelerators.}
+% VALUE: mapping frameworks choose fused groups and their placement; the designs are separately issued, and their concurrency is not addressed
+Stream explores layer-fused mappings on multi-core dataflow accelerators with memory- and communication-aware cost models, and its AIE backend emits one design per fused group~\citep{symons2025stream}.
+MLIR-AIR and IRON compile operators and fused multi-operator designs onto the AIE array~\citep{wang2026mlirair,hunhoff2025iron}.
+These works decide what a design computes and where, whereas our setting takes the designs as given and concerns how one CP issues them.
+% SOURCE: Stream describes no switching cost and no concurrency across fused groups (vault src-stream-dse, arXiv v2 read 2026-10-14).
+
+\textbf{LLM Inference on AMD NPUs.}
+% VALUE: existing NPU LLM runtimes compose hand-tuned designs per model, with the composition fixed by hand
+FastFlowLM runs many model families on XDNA~2 NPUs with hand-tuned designs~\citep{fastflowlm-repo}, and MLIR-AIR builds end-to-end decoder models from fused operator designs~\citep{wang2026mlirair}.
+In both, the composition of operators into commands and the split of the array are fixed by hand for each model, whereas our setting derives them from the designs' instruction streams and from probes.
+
+\textbf{Overlap and Phase Partitioning on GPUs.}
+% VALUE: GPU serving overlaps heterogeneous operators within one device, where the hardware schedules concurrent kernels, and partitions prefill and decode across devices, batches, or a GPU's units; our partition is spatial within one array and chosen per regime of one request
+NanoFlow splits a batch into nano-batches so that compute-, memory-, and network-bound operations overlap within one GPU~\citep{zhu2025nanoflow}.
+DistServe and Splitwise run prefill and decode on separate GPUs~\citep{zhong2024distserve,patel2024splitwise}, Sarathi-Serve mixes chunks of prefill into batches of decode~\citep{agrawal2024sarathi}, and POD-Attention runs prefill and decode attention concurrently within one GPU kernel~\citep{kamath2025pod}.
+On a GPU, kernels on separate streams are scheduled concurrently by the hardware, whereas on the NPU, concurrency must be written into one in-order instruction stream, and one request's regimes take turns on one array rather than many requests sharing a device.
+% DECISION: the NanoFlow, DistServe, Splitwise, Sarathi-Serve, and POD-Attention sentences state only what their papers show; read each PDF and add a vault source note before submission.
+
+\textbf{Scheduling and Renaming.}
+% VALUE: classical scheduling covers machines that share one server and reentrant shops; software pipelining and register renaming remove false dependences in processors; the CP is an in-order server that also blocks on completions, and our renaming acts on buffers in DRAM and local memory of compiled designs
+Scheduling theory studies parallel machines whose jobs each need a common server for setup~\citep{hall2000common,glass2000dedicated}, and reentrant shops in which jobs return to a machine several times~\citep{wang1997reentrant}.
+Processors remove false dependences by renaming registers~\citep{tomasulo1967} and by software pipelining, which overlaps the iterations of a loop~\citep{lam1988software}.
+The CP resembles a shared server that also blocks on synchronizations until a machine's work completes, and it issues strictly in order, so our composer applies these ideas statically, to compiled designs, by ordering issue and renaming buffers before the commands run.
+% DECISION: the scheduling, renaming, and pipelining works are cited from their metadata only; read each and add a vault source note before submission.
