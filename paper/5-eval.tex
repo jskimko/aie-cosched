@@ -1,0 +1,51 @@
+\section{Evaluation}
+\label{sec:eval}
+
+\subsection{Experimental Setup}
+\label{subsec:setup}
+
+% VALUE: one setup paragraph: platform, software and versions, workloads, the baseline, how TTFT is measured, the correctness gate, and how the machine state is controlled; defaults stated once.
+\textbf{Platform.}
+We measure on a GMKtec NucBox EVO-X2 with an AMD Ryzen\texttrademark{} AI Max+ 395 processor, whose XDNA~2 NPU has 8 columns of 4 compute tiles, and 64\,GB of shared system memory.
+The host runs Linux~7.0 with the amdxdna driver and XRT~2.25.0, the NPU in its performance power mode, and the CPU's frequency governor and energy preference set to performance.
+% uname -r 7.0.0-34-generic; amdxdna 2.25.0_20260922 (DKMS, 31c01f2019e7); XRT 2.25.0 (3923b2b5be55); BIOS EVO-X2 1.12; NPU firmware version: \E{record}; read 2026-10-14. No OS platform-profile interface exists on this machine (lab-prefill-overlap (11)); the BIOS power mode is \E{record}.
+
+\textbf{Workloads.}
+We evaluate prefill of Llama-3.2-1B~\cite{meta2024llama32} and Qwen3-4B~\cite{yang2025qwen3} with 4-bit quantized weights in FastFlowLM's format~\cite{fastflowlm-repo}, at prompts of 512, 2{,}048, and 4{,}096 tokens.
+\E{Further models and the decode and agent-step workloads, once measured.}
+The designs are MLIR-AIR's fused prefill~\cite{wang2026mlirair}, compiled with the MLIR-AIE compiler~\cite{mlir-aie-repo}, and are used unchanged.
+% mlir-air a3e26261 (llms/shared/fused_prefill); mlir_aie wheel 1.4.5.dev22+g35fa6b1. Weights: FastFlowLM/Qwen3-4B-NPU2 rev 07651f11cac7 (model.q4nx sha256-verified); Llama-3.2-1B q4nx sha256 80a05efc... (lab-prefill-overlap (23)).
+
+\textbf{Baseline and Correctness.}
+The baseline is each design's own host program, which runs the same configuration, kernels, and weights as our composed schedules.
+Every run's logits must be bit-identical to the baseline's, and the kernel log must show no driver or IOMMU message during the run.
+
+\textbf{Measurement.}
+TTFT is the wall time of the prefill call, from token identifiers to logits, and we report the median of 3 timed runs after one warm run, with the order of schedules rotated between rounds.
+Each batch of runs holds an exclusive lock on the device, checks that no other process holds it, and brackets the runs with a DRAM bandwidth probe and an empty-command dispatch measurement.
+The aggregate DRAM read cap varies between 50 and 56\,GB/s across batches, so every ratio compares runs within one batch.
+% Lock: flock ~/.local/state/npu.lock; brackets: roofline.py 1x1 / 8x2 reads (256 MiB), dispatch floor (4 KB bypass), loadavg, NPU mode, EPP, governor (lab-prefill-device (1), lab-prefill-overlap (2), (11)).
+
+% ---------------------------------------------------------------------------------------------------------------
+% Results subsections: placeholders until the decode-half and agent-step results land and the headline numbers pass
+% the independent audit (hub Status). Each subsection opens with the pattern it supports and ends with it.
+
+\subsection{Prefill Latency}
+\label{subsec:ttft}
+% VALUE: composing concurrent commands lowers TTFT on every model and length, more at longer prompts where attention's share grows; report the essential decisions (co-scheduled groups, instruction order) separately from the host-boundary handling (queue depth, packing).
+\E{TTFT by model and prompt length; the ladder from the existing schedule through co-scheduled groups, completion order, and host-boundary handling.}
+
+\subsection{Generality Across Models}
+\label{subsec:generality}
+% VALUE: the same composer and policy rule apply unchanged to a second model family, with bit-identical outputs.
+\E{Second and further models.}
+
+\subsection{Model Accuracy}
+\label{subsec:accuracy}
+% VALUE: the event model predicts held-out schedules and an unseen model within a few percent, component by component, and states where it misses (longer prompts) and why.
+\E{Held-out and unseen-model predictions, per component; the regime where the model misses.}
+
+\subsection{Decode and Agent Steps}
+\label{subsec:decode}
+% VALUE: pending the decode-half and agent-step measurements.
+\E{Decode run-ahead and end-to-end agent-shaped turns.}

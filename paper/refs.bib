@@ -1,0 +1,181 @@
+% Bibliography (IEEEtran.bst). Entries marked "from FCPR" are copied from the FCPR paper's refs.bib
+% (aie-ctrlpkt-reconfig 1549615 paper/refs.bib), where they were verified; @software became @misc for IEEEtran.
+% Entries marked VERIFY: metadata from memory or a vault abstract; read the source and add a vault 5-sources note
+% before submission (STYLE.md, Citations).
+
+% ---- Platform and toolchain ----
+
+% from FCPR
+@article{rico2024xdna,
+  author    = {Rico, Alejandro and Pareek, Satyaprakash and Cabezas, Javier and Clarke, David and Ozgul, Baris and Barat, Francisco and Fu, Yao and M{\"u}nz, Stephan and Stuart, Dylan and Schlangen, Patrick and Duarte, Pedro and Date, Sneha and Paul, Indrani and Weng, Jian and Santan, Sonal and Kathail, Vinod and Sirasao, Ashish and Noguera, Juanjo},
+  title     = {{AMD} {XDNA} {NPU} in {Ryzen} {AI} Processors},
+  journal   = {IEEE Micro},
+  volume    = {44},
+  number    = {6},
+  pages     = {73--82},
+  year      = {2024},
+  doi       = {10.1109/MM.2024.3423692}
+}
+
+% from FCPR
+@manual{amd_am027,
+  title        = {Versal Adaptive {SoC} {AIE-ML} v2 Architecture Manual},
+  author       = {{Advanced Micro Devices, Inc.}},
+  organization = {AMD},
+  number       = {AM027},
+  edition      = {v1.1},
+  year         = {2025},
+  month        = oct,
+  url          = {https://docs.amd.com/r/en-US/am027-versal-aie-ml-v2}
+}
+
+% from FCPR
+@misc{linux-amdnpu,
+  author       = {Santan, Sonal},
+  title        = {{AMD} {NPU}},
+  howpublished = {The Linux Kernel Documentation},
+  year         = {2024},
+  url          = {https://docs.kernel.org/accel/amdxdna/amdnpu.html}
+}
+
+% from FCPR
+@inproceedings{hunhoff2025iron,
+  author    = {Hunhoff, Erika and Melber, Joseph and Denolf, Kristof and Bisca, Andra and Bayliss, Samuel and Neuendorffer, Stephen and Fifield, Jeff and Lo, Jack and Vasireddy, Pranathi and James-Roxby, Phil and Keller, Eric},
+  title     = {Efficiency, Expressivity, and Extensibility in a Close-to-Metal {NPU} Programming Interface},
+  booktitle = {2025 IEEE 33rd Annual International Symposium on Field-Programmable Custom Computing Machines (FCCM)},
+  pages     = {85--94},
+  year      = {2025},
+  doi       = {10.1109/FCCM62733.2025.00043}
+}
+
+% from FCPR
+@misc{mlir-aie-repo,
+  author       = {{AMD / Xilinx}},
+  title        = {{MLIR-AIE}: A Close-to-Metal {Python} {API} for Programming {AMD} {Ryzen} {AI} {NPUs}, Built on an Open-Source {MLIR}-Based Compiler Toolchain},
+  url          = {https://github.com/Xilinx/mlir-aie},
+  year         = {2021}
+}
+
+% from FCPR
+@article{wang2026mlirair,
+  author    = {Wang, Erwei and Bayliss, Samuel and Bisca, Andra and Blair, Zachary and Chowdhary, Sangeeta and Denolf, Kristof and Fifield, Jeff and Freiberger, Brandon and Hunhoff, Erika and James-Roxby, Phil and Lo, Jack and Melber, Joseph and Neuendorffer, Stephen and Richter, Eddie and R{\"o}sti, Andr{\'e} and Setoain, Javier and Singh, Gagandeep and Taka, Endri and Vasireddy, Pranathi and Yu, Zhewen and Zhang, Niansong and Zhuang, Jinming},
+  title     = {From Loop Nests to Silicon: Mapping {AI} Workloads onto {AMD} {NPUs} with {MLIR-AIR}},
+  journal   = {ACM Transactions on Reconfigurable Technology and Systems},
+  volume    = {19},
+  year      = {2026},
+  doi       = {10.1145/3785670}
+}
+
+% from FCPR
+@misc{xrt-repo,
+  author       = {{AMD / Xilinx}},
+  title        = {{XRT}: Run Time for {AIE} and {FPGA} Based Platforms},
+  url          = {https://github.com/Xilinx/XRT},
+  year         = {2018}
+}
+
+% from FCPR
+@misc{xdna-driver,
+  author       = {{Advanced Micro Devices, Inc.}},
+  title        = {{AMD} {XDNA} Driver (amdxdna.ko) for {Linux} and {XRT} {SHIM} Library},
+  url          = {https://github.com/amd/xdna-driver},
+  year         = {2024}
+}
+
+% VERIFY: repository owner (vault src-fastflowlm lists ROCm/FastFlowLM after AMD took on the team in 2026-07), title, year.
+@misc{fastflowlm-repo,
+  author       = {{FastFlowLM}},
+  title        = {{FastFlowLM}: {LLM} Runtime for {AMD} {Ryzen} {AI} {NPUs}},
+  url          = {https://github.com/ROCm/FastFlowLM},
+  year         = {2025}
+}
+
+% VERIFY: title and URL of the CUDA Graphs section.
+@misc{nvidia-cudagraphs,
+  author       = {{NVIDIA Corporation}},
+  title        = {{CUDA} {C++} Programming Guide: {CUDA} Graphs},
+  url          = {https://docs.nvidia.com/cuda/cuda-c-programming-guide/},
+  year         = {2025}
+}
+
+% ---- Command processor primitive (third person, double-blind) ----
+
+% DECISION FOR THE AUTHOR: FCPR is under review at FPGA'27 (paper 233). Until it is published, cite it as an
+% anonymous submission (third person), or drop the citation and state the primitive without it.
+@misc{fcpr2027,
+  author       = {Anonymous},
+  title        = {{FCPR}: Reset-Free, Parallel In-Band Reconfiguration of an {AI} Engine Array},
+  howpublished = {Under submission},
+  year         = {2026}
+}
+
+% ---- Related work ----
+
+% Vault 5-sources/aie/src-stream-dse (arXiv v2 HTML read 2026-10-14). VERIFY: pages.
+@article{symons2025stream,
+  author    = {Symons, Arne and Mei, Linyan and Colleman, Steven and Houshmand, Pouya and Karl, Sebastian and Verhelst, Marian},
+  title     = {Stream: Design Space Exploration of Layer-Fused {DNNs} on Heterogeneous Dataflow Accelerators},
+  journal   = {IEEE Transactions on Computers},
+  volume    = {74},
+  number    = {1},
+  year      = {2025}
+}
+
+% VERIFY: author list and pages; no vault source note yet.
+@inproceedings{zhu2025nanoflow,
+  author    = {Zhu, Kan and Gao, Yufei and Zhao, Yilong and Zhao, Liangyu and Zuo, Gefei and Gu, Yile and Xie, Dedong and Tang, Tian and Xu, Qinyu and Ye, Zihao and Kamahori, Keisuke and Lin, Chien-Yu and Wang, Ziren and Wang, Stephanie and Krishnamurthy, Arvind and Kasikci, Baris},
+  title     = {{NanoFlow}: Towards Optimal Large Language Model Serving Throughput},
+  booktitle = {19th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
+  year      = {2025}
+}
+
+% VERIFY: full text not read (ch3-formulation: "L, abstract or metadata read").
+@article{hall2000common,
+  author  = {Hall, Nicholas G. and Potts, Chris N. and Sriskandarajah, Chelliah},
+  title   = {Parallel Machine Scheduling with a Common Server},
+  journal = {Discrete Applied Mathematics},
+  volume  = {102},
+  number  = {3},
+  pages   = {223--243},
+  year    = {2000}
+}
+
+% VERIFY: full text not read.
+@article{glass2000dedicated,
+  author  = {Glass, Celia A. and Shafransky, Yakov M. and Strusevich, Vitaly A.},
+  title   = {Scheduling for Parallel Dedicated Machines with a Single Server},
+  journal = {Naval Research Logistics},
+  volume  = {47},
+  number  = {4},
+  pages   = {304--328},
+  year    = {2000}
+}
+
+% VERIFY: full text not read.
+@article{wang1997reentrant,
+  author  = {Wang, Michael Y. and Sethi, Suresh P. and van de Velde, Steef L.},
+  title   = {Minimizing Makespan in a Class of Reentrant Shops},
+  journal = {Operations Research},
+  volume  = {45},
+  number  = {5},
+  pages   = {702--712},
+  year    = {1997}
+}
+
+% ---- Workloads ----
+
+% from FCPR
+@misc{meta2024llama32,
+  author       = {{Meta AI}},
+  title        = {{Llama 3.2}: Revolutionizing Edge {AI} and Vision with Open, Customizable Models},
+  year         = {2024},
+  url          = {https://ai.meta.com/blog/llama-3-2-connect-2024-vision-edge-mobile-devices/}
+}
+
+% VERIFY: author list (first author An Yang) and arXiv number.
+@misc{yang2025qwen3,
+  author       = {Yang, An and others},
+  title        = {{Qwen3} Technical Report},
+  howpublished = {arXiv:2505.09388},
+  year         = {2025}
+}

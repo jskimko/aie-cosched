@@ -1,0 +1,27 @@
+n=512 C=4 cap=53.0 floor=97us | TTFT 158.3 ms | S(isolated sum) 183.8 | N=395 dispatches x floor = 38.2 | S-busy 145.6 ms (= 92% of TTFT) | F_ddr 119.5 ms -> TTFT/F_ddr 1.33, busy/F_ddr 1.22
+   per-chunk-per-layer GEMM: device 2.219 ms (busy 1.735) vs floor 1.585 (1.09x) | attn total 25.5 ms (floor 2.3) | LM 16.3 ms (busy 15.3, floor 15.7) | busy split GEMM 76% attn 13% LM 10%
+     0.qkv   device 0.258 busy 0.162 floor 0.156 -> 1.03x
+     0.o     device 0.225 busy 0.128 floor 0.118 -> 1.09x
+     0.gate  device 0.638 busy 0.542 floor 0.424 -> 1.28x
+     0.up    device 0.537 busy 0.440 floor 0.424 -> 1.04x
+     0.down  device 0.561 busy 0.464 floor 0.463 -> 1.00x
+     lm.0    device 1.559 busy 1.462 floor 1.506 -> 0.97x
+     lm.10   device 0.744 busy 0.647 floor 0.660 -> 0.98x
+n=2048 C=16 cap=54.5 floor=96us | TTFT 748.7 ms | S(isolated sum) 861.0 | N=1547 dispatches x floor = 147.9 | S-busy 713.1 ms (= 95% of TTFT) | F_ddr 435.5 ms -> TTFT/F_ddr 1.72, busy/F_ddr 1.64
+   per-chunk-per-layer GEMM: device 2.241 ms (busy 1.763) vs floor 1.542 (1.14x) | attn total 270.7 ms (floor 25.5) | LM 16.6 ms (busy 15.5, floor 15.3) | busy split GEMM 63% attn 35% LM 2%
+     0.qkv   device 0.264 busy 0.168 floor 0.152 -> 1.11x
+     0.o     device 0.220 busy 0.124 floor 0.115 -> 1.08x
+     0.gate  device 0.648 busy 0.552 floor 0.413 -> 1.34x
+     0.up    device 0.543 busy 0.447 floor 0.413 -> 1.08x
+     0.down  device 0.567 busy 0.472 floor 0.450 -> 1.05x
+     lm.0    device 1.583 busy 1.487 floor 1.465 -> 1.02x
+     lm.10   device 0.739 busy 0.643 floor 0.642 -> 1.00x
+n=4096 C=32 cap=55.1 floor=95us | TTFT 1907.7 ms | S(isolated sum) 2151.5 | N=3083 dispatches x floor = 291.8 | S-busy 1859.7 ms (= 97% of TTFT) | F_ddr 889.7 ms -> TTFT/F_ddr 2.14, busy/F_ddr 2.09
+   per-chunk-per-layer GEMM: device 2.246 ms (busy 1.773) vs floor 1.524 (1.16x) | attn total 984.7 ms (floor 94.3) | LM 16.7 ms (busy 15.6, floor 15.1) | busy split GEMM 49% attn 50% LM 1%
+     0.qkv   device 0.267 busy 0.172 floor 0.150 -> 1.15x
+     0.o     device 0.231 busy 0.137 floor 0.113 -> 1.21x
+     0.gate  device 0.658 busy 0.563 floor 0.408 -> 1.38x
+     0.up    device 0.526 busy 0.431 floor 0.408 -> 1.06x
+     0.down  device 0.565 busy 0.470 floor 0.445 -> 1.06x
+     lm.0    device 1.593 busy 1.499 floor 1.448 -> 1.04x
+     lm.10   device 0.751 busy 0.656 floor 0.635 -> 1.03x

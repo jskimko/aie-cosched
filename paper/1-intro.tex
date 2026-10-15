@@ -1,0 +1,20 @@
+\section{Introduction}
+\label{sec:intro}
+
+% Placeholder. The introduction is written once the claim is set by the decode-half and agent-step results.
+% Planned shape (STYLE.md, Paper structure): five paragraphs.
+
+% VALUE: (1) context. Spatial NPUs run LLM inference as compositions of per-operator designs, and optimized kernels are quick to get; the gap: how the composition is issued has received far less attention than the kernels.
+\E{Paragraph 1: context and gap.}
+
+% VALUE: (2) existing approaches and why they fall short. Expert designs fix one spatial split and issue one operator per command, so the column groups take turns; packing operators into one dispatch is standard practice but does not by itself create concurrency on one in-order CP. Points to Figure 1.
+\E{Paragraph 2: existing approaches and Figure~1.}
+
+% VALUE: (3) "In this work, we ..." one sentence per mechanism (co-scheduled column groups in one command; completion-ordered issue; legality including argument arenas; the event-simulation model that prices a schedule), each with its headline number.
+\E{Paragraph 3: this work, one sentence per mechanism with its headline number.}
+
+% VALUE: (4) the insight in one sentence (on a spatial array, concurrency is free in the hardware but rationed by one in-order command processor, whose instruction order is the schedule) and the model as "a model that takes X and returns Y".
+\E{Paragraph 4: the insight and the model.}
+
+% VALUE: (5) "In summary, the primary contributions of this work are as follows:" 3-4 noun-phrase items, no numbers; engineering contributions as one sentence after the list.
+\E{Paragraph 5: contributions.}

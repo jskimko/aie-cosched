@@ -1,0 +1,48 @@
+% Venue: FCCM'27 or ISPASS'27 (IEEE conference, double-blind). Preamble follows the author's FCCM'26 paper.
+\documentclass[conference]{IEEEtran}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{enumitem}
+\usepackage{threeparttable}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+
+% Placeholders: \E marks a value or passage still owed; \figph stands in for a figure not yet drawn.
+\newcommand{\E}[1]{\textcolor{red}{$\langle$#1$\rangle$}}
+\newcommand{\figph}[2][0.9\linewidth]{\fbox{\parbox[c][3cm][c]{#1}{\centering\small\textcolor{red}{#2}}}}
+
+\newcommand{\us}{\,\textmu{}s}
+\newcommand{\ms}{\,ms}
+
+\let\oldtexttt\texttt
+\renewcommand{\texttt}[1]{{\small\oldtexttt{#1}}}
+
+\hyphenation{tool-chain}
+
+\begin{document}
+
+% VALUE: the title names the setting and the contribution, method-first; set after the decode-half and agent-step results land.
+\title{\E{Title: pending the decode and agent-step results}}
+
+\author{\IEEEauthorblockN{Anonymous Authors}
+\IEEEauthorblockA{Anonymized for review}}
+
+\maketitle
+
+\input{0-abstract}
+\input{1-intro}
+\input{2-background}
+\input{3-model}
+\input{4-method}
+\input{5-eval}
+\input{6-conclusion}
+
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+\end{document}
