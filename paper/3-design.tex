@@ -164,13 +164,14 @@ A separate check asserts, over the whole plan, that no slot is reused before its
 The depths follow from the plan and are not set by hand; for example, every QKV input of a layer is written before the layer's first QKV command completes, so that ring needs one slot per chunk.
 % SOURCE: merged.colour, assert_no_hazard, and Layout (a0ee2ed); the hazard check turns red on an overlapping slot; ring depths at 4,096 tokens: shared 2048-wide input 32, 8192-wide input 4, outputs 4-18 (lab-prefill-overlap (9)).
 
-% VALUE: decode attention's KV loop has the same false dependence inside one operator: one buffer makes each block's transfer wait for the previous block's compute; giving the loop two KV buffers, with the softmax state still carried across blocks, removes it; this is the one change inside a design, made by hand, with unchanged kernels and the same arithmetic order
+% VALUE: decode attention holds two false dependences inside one operator: one KV buffer makes each block's transfer wait for the previous block's compute, and the scores pass between its two cores once per pair of blocks, so each core waits for the other; removing only the first gains nothing, removing both brings each position's cost close to the transfer alone; applied by hand with unchanged kernels and the same arithmetic order
 Decode attention holds the same false dependence inside one operator, where a single KV buffer makes each block's transfer wait for the compute on the previous block (Section~\ref{subsec:losses}).
 Only the running maximum and the accumulator must carry across blocks, whereas each block's keys and values are read once, so we give the loop two KV buffers that alternate between transfer and compute.
-The compiler's double-buffering transformation declines the loop because of the carried state, so we apply the rule by hand in the design's source, with unchanged kernels and the same arithmetic order.
-\E{The local memory each attention core needs for the second buffer, and the resulting time per token by context length.}
-% DECISION: the decode double buffer is a hand edit to the design's dataflow, not an output of the composer (vault paper-cosched-plan, section 7, and paper-ch3-outline, 2026-10-15); automating it is left to future work.
-% DECISION: the result enters after the static local-memory check and the bit-identical gate on Llama-3.2-1B (vault paper-cosched-plan; go/no-go 2026-10-21).
+Renaming the KV buffers alone, however, leaves the time per token unchanged, because it exposes a second false dependence: one core computes a block's scores and another folds them into the output, and the compiler synchronizes their score buffers once per pair of blocks, so each core waits for the other.
+We therefore also pass the scores from one core to the other through a queue of two buffers that each core takes and releases once per block, so the first core computes block $b+1$ while the second folds block $b$.
+The compiler's double-buffering transformation declines the loop because of the carried state, so we apply both changes by hand in the design's source, with unchanged kernels and the same arithmetic order, and the decoded tokens and logits stay bit-identical.
+% SOURCE: renamed KV loop alone (K0/K1, V0/V1, per-pair score locks): 0.997-0.984x per token at 4k-32.5k, slope 1.181 vs 1.153 us; with the per-block score channel: slope 0.712 us against a transfer-only 0.677 us; tokens and every step's logits identical at P = 2,048 / 4,096 / 16,384 / 32,512 (Llama-3.2-1B; vault lab-decode-long-context (13), amd-npu aab2aae).
+% DECISION: both are hand edits to the design's dataflow, not outputs of the composer (vault paper-cosched-plan, section 7, and paper-ch3-outline, 2026-10-15); automating them is left to future work.
 
 \subsection{Partitioning per Regime}
 \label{subsec:split}
@@ -226,6 +227,7 @@ The event model chooses the depth and the packing for each prompt length, and we
 % SOURCE: merged.plan with lag = D; Layout claims an output slot when its command is queued, D - 1.6 commands before it runs (a0ee2ed).
 
 \textbf{Decode Double Buffer.}
-% VALUE: what the hand edit to the decode design changes, in its source and in local memory, and that it keeps kernels and arithmetic order
-\E{The change to the fused decode's attention source: the second KV buffer per core, the un-shared score buffer, and the local memory it uses.}
-% DECISION: written once the edit passes its bit-identical gate (vault paper-cosched-plan, decode double buffer).
+% VALUE: what the hand edit to the decode design changes, in its source and in local memory, and that it keeps kernels and arithmetic order; the per-block score queue is a stream between the two cores inside the array, off the DRAM path
+The edit unrolls the KV block loop by two with two key, two value, and two score buffers, always runs an even number of blocks, whose extra block both kernels skip because it lies past the context, and moves the scores between the two cores over a stream inside the array rather than through shared memory.
+It adds 4--5\,KB of local memory per attention core and uses at most 5 of 16 buffer descriptors and 7 of 16 locks per tile, and with the edit switched off the design's compiled form is byte-identical to the original.
+% SOURCE: mlir-air 36cefefb (DECODE_RENAME=2) against a3e26261; score channel memref<192xbf16> (128 scores + the per-block rescale at offset 128), DMA flow qk MM2S0 -> kv S2MM1; L1 used 26,568 / 28,616 B (qk / kv), BDs 5/16, locks 7/16; RENAME unset emits MLIR byte-identical to a3e26261 (amd-npu 0812e4b, c6218d2 decode-rename/; vault lab-decode-long-context (10), (12)).
