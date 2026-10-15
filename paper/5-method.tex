@@ -1,12 +1,12 @@
 \section{Composing Concurrent Commands}
 \label{sec:method}
 
-% VALUE: the composer takes an existing design's per-operator streams, column map, dependency graph, and time estimates, and emits composed commands that run the same kernels, weights, and configuration with bit-identical outputs; it replaces only the host's dispatch loop
+% VALUE: the composer takes an existing design's per-operator streams, column map, dependency graph, and time estimates, and emits composed commands that run the same kernels, weights, and configuration with bit-identical outputs; it replaces only the host's dispatch loop and makes the two essential decisions, the order within commands and the split, plus the buffer placement they need
 We build a composer that takes an existing design's per-operator instruction streams, its map of operators to columns, the dependency graph of its host program, and an estimate of each operator's device time.
-From these, it emits a sequence of composed commands that runs the same kernels, weights, and configuration, and produces bit-identical outputs.
-The composer replaces only the host program's dispatch loop and changes no kernel, configuration, compiler, driver, or firmware.
-It makes three kinds of decisions in turn: which operators share a command (Section~\ref{subsec:plan}), the CP's instruction order within each command (Section~\ref{subsec:order}), and where each operator's buffers live (Sections~\ref{subsec:arenas} and~\ref{subsec:rings}).
-Each composed command passes a static legality check before any dispatch (Section~\ref{subsec:compose}), and an event model of the CP, the groups, and the host prices a candidate schedule (Section~\ref{subsec:pricing}).
+From these, it emits a sequence of composed commands that runs the same kernels and weights, and produces bit-identical outputs.
+The composer replaces only the host program's dispatch loop and changes no kernel, compiler, driver, or firmware.
+It decides which operators share a command (Section~\ref{subsec:plan}), the CP's instruction order within each command (Section~\ref{subsec:order}), where each operator's buffers live (Sections~\ref{subsec:arenas} and~\ref{subsec:rings}), and which split of the columns to use for each regime (Section~\ref{subsec:split}).
+Each composed command passes a static legality check before any dispatch (Section~\ref{subsec:compose}), and the event model of Section~\ref{subsec:pricing} prices each candidate.
 % SOURCE: amd-npu a0ee2edf44e0 (tag composer-v1.1), prefill-overlap/txn.py (111 lines), merged.py (616), component_model.py (180); Python, on the engine's hardware context.
 
 \subsection{Composing Instruction Streams}
@@ -31,7 +31,7 @@ Operators on the same group, such as several GEMMs, are composed in sequence rat
 \subsection{Argument Arenas}
 \label{subsec:arenas}
 
-% VALUE: the existing design binds one buffer per argument slot, so a command holds only one GEMM; we retarget only a patch's byte offset, never its slot, so any number of GEMMs share the GEMM slots through arenas, under an offset bound the planner respects
+% VALUE: the existing design binds one buffer per argument slot, so a command holds only one GEMM; we retarget only a patch's byte offset, never its slot, so any number of GEMMs share the GEMM slots through arenas, under an offset bound the composer respects
 The configuration's kernel declares a fixed set of argument slots, and the existing design gives each operator kind its own: three slots for a GEMM's input, weights, and output, and three for each attention group.
 With one buffer per slot, a command that carries attention can hold only one GEMM.
 An address patch names a slot and a byte offset within that slot's buffer.
@@ -46,25 +46,18 @@ The offset field bounds an arena to $2^{31}$ bytes, so the composer splits the w
 \subsection{Planning Commands}
 \label{subsec:plan}
 
-% VALUE: the planner list-schedules the dependency graph chunk by chunk rather than stage by stage, so each attention operator meets independent GEMMs of earlier chunks, and it sizes each command so its GEMM work matches the attention work
+% VALUE: the composer list-schedules the dependency graph chunk by chunk rather than stage by stage, so each attention operator meets independent GEMMs of earlier chunks, and it sizes each command so its GEMM work matches the attention work
 The existing host program runs each layer stage by stage, so every output projection waits behind the layer's entire attention, and no GEMM is ready to run beside attention.
 The composer instead list-schedules the dependency graph chunk by chunk.
 At each step, it takes the ready attention operator of the lowest layer and chunk and adds ready GEMMs, in the same order, until their estimated work reaches that of the attention operator.
 The GEMMs then run in sequence on columns 1--6 while attention runs on columns 0 and 7.
 A step without a ready attention operator packs up to a fixed number of ready GEMMs into one command, following standard practice for amortizing dispatch cost (Section~\ref{subsec:prefill}).
 Operators separated by host work never share a command, and a GEMM whose weights lie in another arena waits for a later command.
+For an append to a cached context, the composer plans only the new chunks, and their attention estimates use each chunk's absolute index.
 % SOURCE: merged.plan (a0ee2ed): qkv(L, c) after down(L-1, c); attn(L, c) after qkv(L, 0..c); o after attn; gate and up after o; down after gate and up; an optional cap on the GEMMs per attention command; a fixed number of GEMMs per command without attention.
 
 \subsection{Instruction Order}
 \label{subsec:order}
-
-\begin{figure}[t]
-    \centering
-    % VALUE: in one command, the in-turn order makes the CP wait on attention before it issues the second GEMM, while the predicted-completion order issues each GEMM as soon as the previous one completes and keeps both attention columns fed
-    \figph{Schematic: CP instruction order and column activity for one command (attention on columns 0 and 7, three GEMMs on columns 1--6), in turn vs.\ in predicted completion order.}
-    \caption{CP instruction order and the activity of the column groups in one composed command: (a) the operators in turn; (b) synchronizations in predicted completion order.}
-    \label{fig:order}
-\end{figure}
 
 % VALUE: within a command, the CP opens every group's work first and then places each synchronization at its predicted completion, followed by the issue it gates, so no synchronization holds back another group's work; the order is fixed before dispatch from the estimates
 Within a command, the order of synchronizations decides how long each group waits for its next issue (Figure~\ref{fig:order}).
@@ -98,40 +91,25 @@ A command can therefore carry only operators whose inputs come from commands at 
 A deeper queue hides more of the boundary cost and of the host work, but it leaves fewer operators ready to share a command with attention.
 The composer models this delay directly, so the queue depth and the packing of GEMMs are chosen for each prompt length (Section~\ref{sec:eval}).
 % SOURCE: merged.plan with lag = D; Layout claims an output slot when its command is queued, D - 1.6 commands before it runs (a0ee2ed).
+% SOURCE: append = Merged.prefill(ids, start=L) on the same plan rules; attention estimates linear in the absolute chunk index (vault lab-agent-step (1)).
 
-\subsection{Pricing a Schedule}
-\label{subsec:pricing}
+\subsection{Choosing the Split}
+\label{subsec:split}
 
-\begin{table}[t]
-    \centering
-    \caption{Parameters of the Event Model, Llama-3.2-1B, 2{,}048 Tokens}
-    \label{tab:params}
-    % VALUE: every term of the model is measured, on the device or from the host's timestamps, and none is a free scale factor
-    % DECISION: values are in raw units until the author chooses the reference units (STYLE.md, Per-paper decisions); then they are converted.
-    \begin{threeparttable}
-    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}>{\raggedright\arraybackslash}p{0.34\linewidth}lr}
-        \toprule
-        Term & Source & Value \\
-        \midrule
-        \input{fig/params-rows}
-    \end{tabular*}
-    \begin{tablenotes}\footnotesize
-    \item Device terms from each command dispatched alone; host terms from per-command timestamps of three schedules.
-    \end{tablenotes}
-    \end{threeparttable}
-\end{table}
+% VALUE: the split of columns between attention and GEMMs is a build-time parameter of the existing design, fixed by hand; the legal splits follow from the heads, each split is a separate configuration built in seconds, and the composer needs only more argument slots to serve it
+The existing design fixes the split of columns between attention and the GEMMs by hand: attention groups are listed per column, and the GEMMs take a contiguous block of the remaining columns.
+Since each attention group serves an equal share of the KV heads, a model with 8 KV heads admits attention on 1, 2, or 4 columns, with the GEMMs on the other 7, 6, or 4.
+We build each split as its own configuration from the unchanged design source, which takes seconds, and each split's outputs are bit-identical to those of the default split.
+The composer serves every split with one change, namely three argument slots per attention group instead of a fixed six.
+A split also changes each GEMM's width per column, so the composer checks every GEMM's encoded iteration count and stride against the shim BD's field limits before it uses the split.
+% SOURCE: mlir-air a3e26261 fused_prefill/device.py: Attn(col=...) per group in Config.attn, GCOL0, GNC = 1, 6 as module constants; spec() splits kv_heads evenly, so 1, 2, or 4 attention columns with 8 KV heads (vault lab-split-sweep (1)).
+% SOURCE: out-of-tree split modules, builds of 13-14 s; logits bit-identical to the default split in every configuration on both models (vault lab-split-sweep (2), (4), (5)).
+% SOURCE: BD iteration wrap 6 bits (at most 64 rounds), stride 20 bits (words); the four-column split's LM-head GEMM runs 48 rounds; decoded from aie-rt xaie2pgbl_params.h fields with a round-trip check (vault lab-split-sweep (5)).
 
-% VALUE: to choose among plans without running each, the composer prices a plan with an event simulation whose every term is measured, and which reports device time, host exposure, and the fixed head and tail separately
-To choose among plans without running each on the device, the composer prices a plan with an event simulation of the device, the CP, and the host (Table~\ref{tab:params}).
-On the device, command $k$ ends at
-\begin{equation}
-\label{eq:cmd}
-e_k = \max\bigl(e_{k-1} + \epsilon,\; q_k + F\bigr) + b_k,
-\end{equation}
-where $q_k$ is the time the host queues it, so a queued command pays the boundary cost $\epsilon$ and a command that arrives at an idle device pays the dispatch floor $F$.
-A command's busy time $b_k$ is the sum of its GEMMs' busy times plus a gap $\gamma$ per additional GEMM, and a command that also carries attention takes $\max(a, g) + \beta \min(a, g)$ for attention work $a$ and GEMM work $g$.
-Attention's busy time grows linearly with the chunk index, as the number of earlier key blocks does.
-The host pays an issue cost per command and a post-processing cost per operator, and it waits on the oldest command once $D$ are in flight.
-The TTFT is the simulated span plus a fixed head and tail, namely the embedding, the first normalization, and the LM head.
-Because each term is measured separately, an error in one term cannot hide behind another, and the model reports the device time, the host's exposed time, and the head and tail separately.
-% SOURCE: component_model.py (amd-npu a0ee2ed prefill-overlap/component_model.py); parameters prefill-overlap/v1/component_model.json (first committed 6735c61); host terms fitted on the 2,048-token schedules with depth 2, 4, and 16 and no packing.
+% VALUE: the composer picks the split per regime with the event model from one probe per split, and keeps the chosen splits resident so a deployment switches between them at a turn boundary for a suspend and resume; a cached context stays with the split that computed it
+For each split, the composer probes every operator alone once and predicts the TTFT of each regime with the event model (Section~\ref{subsec:pricing}), and it picks the split with the lower prediction.
+More attention columns shorten attention, whose time grows with the context, but lengthen every GEMM, so the choice depends on the prompt length and on the cached context.
+A deployment keeps each chosen split resident in its own hardware context, with its own copy of the weights, and switches between them at a turn boundary by suspending one context and resuming the other.
+The KV cache of a cached context is laid out by the attention groups of the split that computed it, so a conversation that changes split must lay out or recompute its context again, which we do not evaluate.
+% SOURCE: per-split probes at n = 2,048, prediction with component_model.simulate (amd-npu 0f61651 prefill-overlap/g1_split_model.py, vault lab-split-sweep (6)-(7)); switch = suspend + resume + first prefill in one process, both splits' weights resident (vault lab-split-sweep (5)).
+% SOURCE: the four-column split's GEMMs are 27% (1B) and 35% (Qwen3-4B) slower than on six columns, and its attention slope per chunk 3.0-3.1x lower than the default split's existing stream (vault lab-split-sweep (4)-(5)).

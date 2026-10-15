@@ -1,5 +1,6 @@
-% Bibliography (IEEEtran.bst). Entries marked "from FCPR" are copied from the FCPR paper's refs.bib
-% (aie-ctrlpkt-reconfig 1549615 paper/refs.bib), where they were verified; software entries became misc entries for IEEEtran.
+% Bibliography (mlsys2025.bst, natbib author-year). Entries marked "from FCPR" are copied from the FCPR paper's refs.bib
+% (aie-ctrlpkt-reconfig 1549615 paper/refs.bib), where they were verified; software entries are misc entries.
+% The MLSys 2027 call requires every reference to list all of its authors.
 % Entries marked VERIFY: metadata from memory or a vault abstract; read the source and add a vault 5-sources note
 % before submission (STYLE.md, Citations).
 
@@ -100,8 +101,7 @@
 
 % ---- Command processor primitive (third person, double-blind) ----
 
-% DECISION FOR THE AUTHOR: FCPR is under review at FPGA'27 (paper 233). Until it is published, cite it as an
-% anonymous submission (third person), or drop the citation and state the primitive without it.
+% DECISION: FCPR is under review at FPGA'27 (paper 233), so it is cited as an anonymous manuscript in the third person; the MLSys template requires an anonymized copy of such a manuscript in the supplementary material.
 @misc{fcpr2027,
   author       = {Anonymous},
   title        = {{FCPR}: Reset-Free, Parallel In-Band Reconfiguration of an {AI} Engine Array},
@@ -121,7 +121,7 @@
   year      = {2025}
 }
 
-% VERIFY: author list and pages; no vault source note yet.
+% Author list checked against arXiv 2408.12757 (2026-10-15). VERIFY: the OSDI version's pages; no vault source note yet.
 @inproceedings{zhu2025nanoflow,
   author    = {Zhu, Kan and Gao, Yufei and Zhao, Yilong and Zhao, Liangyu and Zuo, Gefei and Gu, Yile and Xie, Dedong and Tang, Tian and Xu, Qinyu and Ye, Zihao and Kamahori, Keisuke and Lin, Chien-Yu and Wang, Ziren and Wang, Stephanie and Krishnamurthy, Arvind and Kasikci, Baris},
   title     = {{NanoFlow}: Towards Optimal Large Language Model Serving Throughput},
@@ -172,10 +172,11 @@
   url          = {https://ai.meta.com/blog/llama-3-2-connect-2024-vision-edge-mobile-devices/}
 }
 
-% VERIFY: author list (first author An Yang) and arXiv number.
+% Author list and number from arXiv 2505.09388 (60 authors, read 2026-10-15). VERIFY: no vault source note yet.
 @misc{yang2025qwen3,
-  author       = {Yang, An and others},
+  author       = {An Yang and Anfeng Li and Baosong Yang and Beichen Zhang and Binyuan Hui and Bo Zheng and Bowen Yu and Chang Gao and Chengen Huang and Chenxu Lv and Chujie Zheng and Dayiheng Liu and Fan Zhou and Fei Huang and Feng Hu and Hao Ge and Haoran Wei and Huan Lin and Jialong Tang and Jian Yang and Jianhong Tu and Jianwei Zhang and Jianxin Yang and Jiaxi Yang and Jing Zhou and Jingren Zhou and Junyang Lin and Kai Dang and Keqin Bao and Kexin Yang and Le Yu and Lianghao Deng and Mei Li and Mingfeng Xue and Mingze Li and Pei Zhang and Peng Wang and Qin Zhu and Rui Men and Ruize Gao and Shixuan Liu and Shuang Luo and Tianhao Li and Tianyi Tang and Wenbiao Yin and Xingzhang Ren and Xinyu Wang and Xinyu Zhang and Xuancheng Ren and Yang Fan and Yang Su and Yichang Zhang and Yinger Zhang and Yu Wan and Yuqiong Liu and Zekun Wang and Zeyu Cui and Zhenru Zhang and Zhipeng Zhou and Zihan Qiu},
   title        = {{Qwen3} Technical Report},
   howpublished = {arXiv:2505.09388},
   year         = {2025}
 }
+

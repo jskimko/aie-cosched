@@ -1,0 +1,51 @@
+\section{Evaluation}
+\label{sec:eval}
+
+\subsection{Experimental Setup}
+\label{subsec:setup}
+
+% VALUE: one setup paragraph: the platform and its power state, the software, the workloads and prompt lengths, the baseline, how TTFT is measured, the correctness gate, and how the machine state is controlled; defaults stated once
+We measure on a GMKtec NucBox EVO-X2 with an AMD Ryzen\texttrademark{} AI Max+ 395 processor, whose XDNA~2 NPU has 8 columns of 4 compute tiles, and 64\,GB of shared system memory.
+The host runs Linux~7.0 with the amdxdna driver and XRT~2.25.0~\citep{xdna-driver,xrt-repo}, the NPU in its performance power mode, and the CPU's frequency governor and energy preference set to performance.
+We evaluate Llama-3.2-1B~\citep{meta2024llama32} and Qwen3-4B~\citep{yang2025qwen3}, and \E{a third, 8B-class model}, with 4-bit quantized weights in FastFlowLM's format~\citep{fastflowlm-repo}.
+Prompts computed from scratch have 2{,}048 or 4{,}096 tokens, and appends add 2{,}048 or 4{,}096 tokens to a cached context of 4{,}096, 16{,}384, or 28{,}672 tokens, which spans the turns of a coding agent \E{citation for agent-turn shapes}.
+The designs are MLIR-AIR's fused prefill and fused decode~\citep{wang2026mlirair}, compiled with MLIR-AIE~\citep{mlir-aie-repo} and used unchanged.
+The baseline is each design's own host program on its default split, which runs the same configuration, kernels, and weights as our composed schedules.
+Every run's logits must be bit-identical to the baseline's, every append's logits bit-identical to those of a full prefill of the whole prompt, and the kernel log must show no driver or IOMMU message during the run.
+TTFT is the wall time of the prefill call, from token identifiers to logits, and we report the median of \E{3} timed runs after one warm run, with the order of schedules rotated between rounds.
+Decode time per token is measured over 64 generated tokens at a given context length.
+Each batch of runs holds the device exclusively, checks that no other process has it open, and brackets the runs with a DRAM bandwidth probe and an empty-command dispatch.
+Because the aggregate DRAM read cap varies by up to 12\% between batches, every ratio compares runs within one batch.
+% SOURCE: machine files read 2026-10-14: uname -r 7.0.0-34-generic; amdxdna 2.25.0_20260922 (DKMS, 31c01f2019e7); XRT 2.25.0 (3923b2b5be55); BIOS EVO-X2 1.12; NPU power mode performance, CPU EPP and governor performance (lab-prefill-overlap (11)).
+% SOURCE: mlir-air a3e26261 (llms/shared/fused_prefill); mlir_aie wheel 1.4.5.dev22+g35fa6b1; weights FastFlowLM/Qwen3-4B-NPU2 rev 07651f11cac7 and the Llama-3.2-1B q4nx bundle, both sha256-verified (lab-prefill-overlap (23)).
+% SOURCE: runs per point today: 3 for the from-scratch and Llama-3.2-1B append comparisons, 2 for the split comparison and the Qwen3-4B appends (vault lab-prefill-overlap (18)-(26), lab-agent-step (2), lab-split-sweep (4)-(5)); decode, 64 timed tokens (lab-decode-long-context (5)).
+% DECISION: the run count is fixed at the results freeze; a count that differs by comparison is stated where it applies.
+% SOURCE: lock = flock ~/.local/state/npu.lock; brackets = 1x1 and 8x2 DRAM reads of 256 MiB, the dispatch floor, load, NPU mode, EPP, governor; 8x2 cap 49.9-55.7 GB/s over the batches, 55.7 / 49.9 = 1.116 (lab-prefill-device (1), lab-prefill-overlap (2), (11), lab-split-sweep (4)-(5), lab-agent-step (2)).
+% DECISION: the NPU firmware version and the BIOS power mode are not yet recorded; add them to the setup once the author records them.
+
+\subsection{Instruction Order}
+\label{subsec:ttft}
+% VALUE: composing the instruction order lowers TTFT on every model and length, more where attention's share is larger, with bit-identical outputs; on appends to a cached context the gain holds at a steady 1.5-1.6x; the existing order's slowdown at positions ~8k-20k on Llama-3.2-1B is explained, not quoted as a gain; the essential decisions are reported apart from host-boundary handling (queue depth, packing); the gap to the lower bound per configuration
+% DECISION: results stay \E until the results freeze (2026-10-21) and the audit's verdicts.
+\E{TTFT from scratch and on appends, by model and length; the steps from the existing schedule through co-scheduled groups, predicted-completion order, and host-boundary handling; the gap to the lower bound.}
+
+\subsection{Spatial Split}
+\label{subsec:split-eval}
+% VALUE: the faster split changes with the regime on both models (two attention columns from scratch, four for appends to a long context), and the gain of choosing both the split and the order grows with the cached context; switching between resident splits costs a suspend and resume, under 1% of an append; the four-column split's gain comes from attention despite slower GEMMs
+\E{TTFT per split, schedule, and regime on both models; the switch cost.}
+
+\subsection{Model Accuracy}
+\label{subsec:accuracy}
+% VALUE: the event model prices schedules and a model it was not fitted on within a few percent, picks the faster split in every configuration measured, and states where its error grows (attention read off its trend, the existing order's mid-range slowdown) with the size of each
+\E{Prediction error on schedules and models not used to build the model, per component; the split choice; the regime where the error grows.}
+
+\subsection{Generality Across Models}
+\label{subsec:generality}
+% VALUE: the same composer and rules apply unchanged to a second family and an 8B-class model, with bit-identical outputs; the arena rule splits the larger weights
+\E{Second and third models.}
+
+\subsection{Agent Turns}
+\label{subsec:turns}
+% VALUE: measured whole turns (an append plus its decode) on both models; decode's share of the turn, characterized in Section 3.2, bounds the turn-level gain
+% DECISION: turn-level numbers are stated only once measured; until then this subsection stays a placeholder.
+\E{Measured whole turns on both models.}

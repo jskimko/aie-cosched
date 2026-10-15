@@ -1,16 +1,24 @@
-% DECISION: IEEE conference format, double-blind, for FCCM'27 or ISPASS'27; the preamble follows the author's FCCM'26 paper.
-\documentclass[conference]{IEEEtran}
+% DECISION: MLSys'27 research track (author, 2026-10-15): the MLSys 2025 style files, which the MLSys 2027 call names; two columns, at most 10 pages before the references; double-blind.
+%% Template: mlsys2025.sty and mlsys2025.bst copied unchanged from media.mlsys.org/Conferences/MLSYS2025/mlsys2025style.zip (sha256 04e77090...ba3768ef); algorithm, algorithmic, and fancyhdr come from TeX Live.
+\documentclass{article}
+
+\usepackage{microtype}
 \usepackage{graphicx}
-\usepackage{textcomp}
-\usepackage{xcolor}
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage{amsmath}
 \usepackage{amssymb}
-\usepackage{enumitem}
+\usepackage{textcomp}
+\usepackage{xcolor}
 \usepackage{threeparttable}
-\usepackage{url}
+\usepackage[hyphens]{url}
 \usepackage[hidelinks]{hyperref}
+
+%% The template's recommended pairing of hyperref and algorithmic.
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+%% The review version; the camera-ready version passes [accepted].
+\usepackage{mlsys2025}
 
 % Placeholders: \E marks a value or passage still owed; \figph stands in for a figure not yet drawn.
 \newcommand{\E}[1]{\textcolor{red}{$\langle$#1$\rangle$}}
@@ -24,26 +32,42 @@
 
 \hyphenation{tool-chain}
 
+% VALUE: the setting and the contribution, method-first
+% DECISION: working title from the vault's paper-ch3-outline (Narrative), with "Modules" made "Operators" to match the paper's term; the author confirms it.
+\mlsystitlerunning{One Command Processor, Many Columns}
+
 \begin{document}
 
-% VALUE: the setting and the contribution, method-first
-% DECISION: set once the decode-half and agent-step results land.
-\title{\E{Title: pending the decode and agent-step results}}
+\twocolumn[
+\mlsystitle{One Command Processor, Many Columns: Composing Concurrent Operators on Spatial NPUs}
 
-\author{\IEEEauthorblockN{Anonymous Authors}
-\IEEEauthorblockA{Anonymized for review}}
+%% The style file omits the author block in the review version.
+\begin{mlsysauthorlist}
+\mlsysauthor{Anonymous Authors}{anon}
+\end{mlsysauthorlist}
+\mlsysaffiliation{anon}{Anonymous Institution}
+\mlsyscorrespondingauthor{Anonymous Authors}{anonymous@anonymous.org}
 
-\maketitle
+\mlsyskeywords{Spatial NPU, AI Engine, LLM inference, command processor, scheduling}
+
+\vskip 0.3in
 
 \input{0-abstract}
+]
+
+\printAffiliationsAndNotice{}
+
 \input{1-intro}
 \input{2-background}
-\input{3-model}
-\input{4-method}
-\input{5-eval}
-\input{6-conclusion}
+\input{3-characterization}
+\input{4-model}
+\input{5-method}
+\input{6-eval}
+\input{7-conclusion}
 
-\bibliographystyle{IEEEtran}
 \bibliography{refs}
+\bibliographystyle{mlsys2025}
+
+\input{8-ai-disclosure}
 
 \end{document}

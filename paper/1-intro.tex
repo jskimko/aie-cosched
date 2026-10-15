@@ -1,19 +1,60 @@
 \section{Introduction}
 \label{sec:intro}
 
-% DECISION: the introduction is written once the decode-half and agent-step results set the claim; it follows STYLE.md's five-paragraph shape.
+% VALUE: (1) context. Client NPUs run LLMs as compositions of per-operator designs on a spatial array, issued by one in-order CP; kernels and mappings are well served; the expert designs still leave columns idle in prefill and read KV at half rate in decode; gap: how the composition is issued has received far less attention
+Neural processing units (NPUs) such as the AMD XDNA~2 in Ryzen\texttrademark{} AI processors bring large language model (LLM) inference to client machines~\citep{rico2024xdna}.
+Their AI Engine array is spatial, so each operator of a model runs on its own group of columns, and the host composes the operators' work into a sequence of commands that a single in-order command processor (CP) executes~\citep{rico2024xdna,linux-amdnpu}.
+Compilers and mapping frameworks already map single operators and fused groups onto the array~\citep{wang2026mlirair,hunhoff2025iron,symons2025stream}, and expert end-to-end designs exist for prefill and decode~\citep{wang2026mlirair,fastflowlm-repo}.
+Yet these expert designs leave much of the array idle.
+In MLIR-AIR's prefill of Llama-3.2-1B, the device is busy for over 90\% of the time-to-first-token (TTFT), but attention and the matrix multiplications (GEMMs) run on disjoint columns that take turns, and attention's share of TTFT grows from 12\% to 49\% between 512 and 4{,}096 tokens.
+In decode, long-context attention reads its key-value (KV) cache at half the DRAM read rate that the platform sustains.
+However, while prior work has optimized what each operator computes and where it runs, how the operators are composed and issued through the command processor has received far less attention.
+% SOURCE: busy 92-97% of TTFT, attention 12.2% -> 49.1% of TTFT at 512 -> 4,096 tokens (amd-npu e3acc8a prefill-e2/decomp.txt; Section 3, Figure busy).
+% SOURCE: decode attention reads KV at 28.4 GB/s = 51% of the same-batch read cap (vault lab-decode-long-context (5)).
 
-% VALUE: (1) context. Spatial NPUs run LLM inference as compositions of per-operator designs, and optimized kernels are quick to get; the gap: how the composition is issued has received far less attention than the kernels.
-\E{Paragraph 1: context and gap.}
+% VALUE: (2) existing approaches and why they fall short: one operator per command with a hand-fixed split; packing into one dispatch is standard practice but on an in-order CP gives no overlap; a wait on one group holds back the other; the right split changes with the workload. Points to Figure 1.
+\begin{figure}[t]
+    \centering
+    % VALUE: the same operators under three compositions: one per command (groups take turns), packed in one command in turn (a wait on attention holds back the GEMMs), and issued first with synchronizations in predicted completion order (ours; both groups busy)
+    \figph{Schematic: CP instruction order and column activity for one attention operator (columns 0 and 7) and three GEMMs (columns 1--6): (a) one operator per command; (b) one command, operators in turn; (c) one command, synchronizations in predicted completion order (ours).}
+    \caption{CP instruction order and the activity of the column groups for one attention operator and three GEMMs: (a) one operator per command, (b) one command with the operators in turn, and (c) one command with synchronizations in predicted completion order.}
+    \label{fig:order}
+\end{figure}
+Expert designs fix the split of the array by hand and issue one operator per command, so the column groups execute one after another (Figure~\ref{fig:order}a).
+Packing several operators into one dispatch is standard practice for amortizing launch overhead, as in CUDA Graphs~\citep{nvidia-cudagraphs} and XRT's run lists~\citep{xrt-repo}.
+On an in-order CP, however, packing alone creates no overlap, because a synchronization on one group delays the issue of every later instruction, whichever group it feeds (Figure~\ref{fig:order}b).
+The same delay occurs inside a single operator, where the existing attention stream waits on one column before it starts the other.
+Furthermore, the split that suits a short prompt computed from scratch does not suit a long prompt appended to a cached context, as in an agent's turn, so one hand-fixed split leaves part of the array idle in one regime or the other.
 
-% VALUE: (2) existing approaches and why they fall short. Expert designs fix one spatial split and issue one operator per command, so the column groups take turns; packing operators into one dispatch is standard practice but does not by itself create concurrency on one in-order CP. Points to Figure 1.
-\E{Paragraph 2: existing approaches and Figure~1.}
+% VALUE: (3) this work: the CP's instruction stream is the schedule; the composer makes two decisions automatically on unmodified designs (instruction order, spatial split), with legality derived from the instructions; each with its headline number; combined result last
+In this work, we treat the CP's instruction stream as the schedule of the spatial array and compose it automatically from an existing design's per-operator streams, with no change to the design's source, compiler, or driver.
+First, our composer issues every group's work before the CP waits on any group and places each synchronization at its predicted completion, so that disjoint column groups run concurrently (Figure~\ref{fig:order}c).
+This instruction order lowers TTFT by 1.4--1.8$\times$ on two model families with bit-identical outputs, and by a steady 1.5--1.6$\times$ on prompts appended to a cached context.
+Second, the composer chooses the split of columns between attention and the GEMMs for each regime, which favors two attention columns for prompts computed from scratch and four for appends to a long context.
+Because the chosen splits stay resident, switching between them costs under 1\% of an append.
+Third, the composer derives which operators may share a command from the instructions themselves, and it lifts the one-GEMM-per-command limit of the existing argument binding by placing many operators' buffers in shared arenas.
+Together, the instruction order and the split lower the time of appending 4{,}096 tokens to a 16{,}384-token context by 3.0$\times$ and 4.3$\times$ on the two models.
+% SOURCE: from scratch, composed vs the existing host program on the default split: Llama-3.2-1B 1.41x at 2,048 and 1.70x at 4,096 tokens; Qwen3-4B 1.43x and 1.76x (vault lab-prefill-overlap (18)-(26)).
+% SOURCE: append, steady band 1.51-1.61x: Llama-3.2-1B at L = 28,672 (1.51x, 1.57x) and Qwen3-4B at L = 16,384 and 28,672 (1.52-1.61x); the 1B's 1.8-2.3x at L = 16,384 includes a slowdown of the existing order at positions ~8k-20k (vault lab-agent-step (2), (4)).
+% SOURCE: warm switch S2 <-> S4 7.1 ms (1B) and 7.7 ms (Qwen3-4B), 0.2% of a Qwen3-4B 4k + 4k append on S4 (5,238 ms) (vault lab-split-sweep (5)).
+% SOURCE: 16k + 4k append, composer on S4 vs the existing host program on S2: Qwen3-4B 31,141 -> 10,343 ms (3.01x), Llama-3.2-1B 12,589 -> 2,951 ms (4.27x) (vault lab-split-sweep (4)-(5)).
+% DECISION: the headline numbers are re-checked against the audit's verdicts at the results freeze (2026-10-21); the 1B's 4.3x includes the existing order's mid-range slowdown, and the author decides whether the introduction quotes 3.0x alone.
+% DECISION: turn-level speedups (an append plus its decode) are inferred until measured, and the introduction does not state them.
 
-% VALUE: (3) "In this work, we ..." one sentence per mechanism (co-scheduled column groups in one command; completion-ordered issue; legality including argument arenas; the event-simulation model that prices a schedule), each with its headline number.
-\E{Paragraph 3: this work, one sentence per mechanism with its headline number.}
+% VALUE: (4) insight: concurrency is free in the hardware but rationed by one in-order CP whose instruction order is the schedule; the model takes per-operator times and a schedule and returns its TTFT, with its accuracy and its split choices
+The insight behind these results is that concurrency on a spatial array is free in the hardware but rationed by one in-order command processor.
+Commands queued on one hardware context never overlap, whereas one command that issues two groups' work before it waits on either runs them in 1.00--1.06$\times$ the time of the longer one.
+The CP's instruction order is therefore the schedule, and its cost can be computed before anything runs.
+We capture it in an event model that takes each operator's device time, measured once per configuration, and a candidate schedule, and returns the schedule's TTFT.
+The model is within 3.5\% of the measured TTFT on schedules and on a model family it was not fitted on, and it picks the faster split in all 16 configurations measured.
+% SOURCE: pair overlap 0.998-1.058 over 9 pairs (vault lab-prefill-overlap (3)); event model within +3.5% on every schedule not used for fitting on both models, -0.3% on Qwen3-4B at 2,048 tokens (vault ch3-formulation, 4k model fixes); split winners 16 of 16 with a least-squares attention line (vault lab-split-sweep (7)).
 
-% VALUE: (4) the insight in one sentence (on a spatial array, concurrency is free in the hardware but rationed by one in-order command processor, whose instruction order is the schedule) and the model as "a model that takes X and returns Y".
-\E{Paragraph 4: the insight and the model.}
-
-% VALUE: (5) "In summary, the primary contributions of this work are as follows:" 3-4 noun-phrase items, no numbers; engineering contributions as one sentence after the list.
-\E{Paragraph 5: contributions.}
+% VALUE: (5) contributions: 4 noun-phrase items, no numbers; engineering sentence after
+In summary, the primary contributions of this work are as follows:
+\begin{itemize}
+    \item A characterization of where expert designs lose end-to-end LLM time on a spatial NPU, in both prefill and decode.
+    \item A measured model of how one in-order command processor turns instruction streams into concurrency on disjoint column groups, with an event model that prices a schedule before it runs.
+    \item A formulation of composing concurrent column groups as scheduling through a single in-order server, with a lower bound and the legality conditions that a composed command must meet.
+    \item The design and implementation of a composer that makes the instruction-order and spatial-split decisions automatically for unmodified designs, with bit-identical outputs.
+\end{itemize}
+The composer replaces only the dispatch loop of the design's host program, builds every split from the design's unchanged source, and runs on the existing compiler, driver, and firmware.

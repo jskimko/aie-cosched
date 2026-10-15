@@ -1,8 +1,8 @@
 \section{Command-Processor Model and Formulation}
 \label{sec:model}
 
-% VALUE: we first establish how the CP turns instruction streams into overlap, on the existing prefill's own operators, then state the scheduling problem these semantics define
-In this section, we present how the CP turns instruction streams into overlap, and the scheduling problem that these semantics define.
+% VALUE: we first establish how the CP turns instruction streams into overlap, on the existing prefill's own operators, then state the scheduling problem these semantics define and the event model that prices a schedule
+In this section, we present how the CP turns instruction streams into overlap, the scheduling problem that these semantics define, and an event model that prices a schedule before it runs.
 We characterize the semantics on the existing prefill's own operators, pairing one attention operator on columns 0 and 7 with one GEMM operator on columns 1--6.
 Every composed command in this section produces outputs bit-identical to those of the operators run alone.
 
@@ -36,14 +36,11 @@ The serial execution of the existing prefill is therefore a property of how its 
 % SOURCE: DRAM rate during the interleaved command 52.2 GB/s against a same-batch 8x2 cap of 53.9-55.3 GB/s for c8 + lm, the largest overlap cost (1.054-1.058) (lab-prefill-overlap (3)).
 
 \textbf{Synchronization Order.}
-% VALUE: because the CP is in order, a wait on one group delays the issue of every other group's work; the existing attention stream loses a third of its busy time this way, inside a single operator
+% VALUE: because the CP is in order, a wait on one group delays the issue of every other group's work; the attention measurement of Section 3.1 isolates this effect, so the instruction order is a scheduling decision of its own
 Since the CP executes in order, a synchronization on one group delays every later issue, including the issue of another group's work.
-The existing attention operator shows the cost within a single operator: its stream issues column~7's inputs only after two synchronizations on column~0's key and value transfers, which complete when column~0 is about half done.
-Alternating the two columns' segments, so that both columns start before the CP waits on either, reduces attention's device-busy time to $0.67\times$ that of the existing order at every chunk measured, with bit-identical outputs.
-Each column's half alone takes the same time within 1\%, so the difference comes from the CP's instruction order rather than from an imbalance of work.
+The existing attention operator isolates this effect (Section~\ref{subsec:loss-prefill}): its two columns carry equal work, yet alternating their segments lowers its device time to $0.67\times$ with the same instructions.
 The CP's instruction order, and not only the assignment of operators to commands, is therefore a scheduling decision.
-% SOURCE: decoded from the shipped a_32_4_0_0 stream, mid-stream synchronizations at ops 70, 75 (column 0) and 92, 97 (column 7); column 7's issue (ops 81-91) follows column 0's two mid-stream synchronizations (lab-prefill-overlap (4)).
-% SOURCE: (alternated - F) / (existing - F) = 0.666-0.668 on 7 pairs, chunks 2-14 at 2,048 tokens; column 7 alone / column 0 alone = 0.994-1.010 (amd-npu 17f7ec3 ovl4/, lab-prefill-overlap (5)c).
+% SOURCE: vault lab-prefill-overlap (4)-(5)c; Section 3.1 carries the numbers.
 
 \subsection{Problem Formulation}
 \label{subsec:formulation}
@@ -67,7 +64,7 @@ When host work lies between producer and consumer, the consumer must also wait f
 A schedule makes two essential decisions.
 The first is the spatial assignment $g(\cdot)$ of operators to column groups, which determines what can run concurrently.
 The second is the CP's instruction order, namely a partition of $\mathcal{O}$ into a sequence of commands $C_1, \dots, C_K$ and, for each command, an interleaving $\sigma_k$ of its operators' segments that keeps each operator's segments in their own order.
-Two further decisions manage the boundaries with the host: how many commands the host keeps in flight, and how operators that do not overlap are packed into commands.
+Two further decisions manage the boundaries with the host: the number $D$ of commands the host keeps in flight, and how operators that do not overlap are packed into commands.
 Both would disappear if the host work moved onto the array, so we report their effect separately from that of the essential decisions.
 
 \textbf{Timing.}
@@ -95,3 +92,48 @@ The first term is the busiest group's work, which no schedule on a fixed assignm
 The bound therefore measures how far a schedule lies from what a given spatial assignment allows.
 % DECISION: the bound's value for the studied instances, from the measured per-operator times, is stated with the evaluation's gap.
 % DECISION: no NP-hardness claim until a reduction is written; with negligible issue cost and one layer's fixed per-chunk pattern the problem has the structure of a two-machine chain-reentrant shop (wang1997reentrant), and with non-negligible issue cost the CP acts as a shared server (glass2000dedicated, hall2000common) (vault ch3-formulation, Relation to classical scheduling).
+
+\subsection{Event Model}
+\label{subsec:pricing}
+
+\begin{table}[t]
+    \centering
+    \caption{Parameters of the Event Model, Llama-3.2-1B, 2{,}048 Tokens}
+    \label{tab:params}
+    % VALUE: every term of the model is measured, on the device or from the host's timestamps, and none is a free scale factor
+    % DECISION: values are in raw units until the author chooses the reference units (STYLE.md, Per-paper decisions); then they are converted.
+    \begin{threeparttable}
+    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}>{\raggedright\arraybackslash}p{0.36\linewidth}r}
+        \toprule
+        Term & Value \\
+        \midrule
+        \input{fig/params-rows}
+    \end{tabular*}
+    \begin{tablenotes}\footnotesize
+    \item Device terms from each command dispatched alone; host terms from per-command timestamps of three schedules.
+    \end{tablenotes}
+    \end{threeparttable}
+\end{table}
+
+% VALUE: to choose among schedules without running each, an event simulation of the device, the CP, and the host prices a schedule from measured terms only, and reports device time, host exposure, and the fixed head and tail separately
+To choose among schedules without running each on the device, we price a schedule with an event simulation of the device, the CP, and the host, whose every term is measured (Table~\ref{tab:params}).
+On the device, command $k$ ends at
+\begin{equation}
+\label{eq:cmd}
+e_k = \max\bigl(e_{k-1} + \epsilon,\; q_k + F\bigr) + b_k,
+\end{equation}
+where $q_k$ is the time the host queues it, so a queued command pays the boundary cost $\epsilon$ and a command that arrives at an idle device pays the dispatch floor $F$.
+A command's busy time $b_k$ is the sum of its GEMMs' busy times plus a gap $\gamma$ per additional GEMM, and a command that also carries attention takes $\max(a, g) + \beta \min(a, g)$ for attention work $a$ and GEMM work $g$.
+Attention's busy time grows linearly with the chunk index, as the number of earlier key blocks does.
+The host pays an issue cost per command and a post-processing cost per operator, and it waits on the oldest command once $D$ are in flight.
+The TTFT is the simulated span plus a fixed head and tail, namely the embedding, the first normalization, and the LM head.
+Because each term is measured separately, an error in one term cannot hide behind another, and the model reports the device time, the host's exposed time, and the head and tail separately.
+% SOURCE: component_model.py (amd-npu a0ee2ed prefill-overlap/component_model.py); parameters prefill-overlap/v1/component_model.json (first committed 6735c61); host terms fitted on the 2,048-token schedules with depth 2, 4, and 16 and no packing.
+
+% VALUE: the model's inputs for a new configuration or model are one probe of each operator alone; the structural terms carry over unchanged
+Only the per-operator busy times depend on the configuration and the model.
+For a new split or model, we dispatch each operator alone once, at one prompt length, and take attention's busy time per chunk from a line fitted over the probed chunks, because single readings of attention can depart from its trend.
+For an append, the line is evaluated at each chunk's absolute index.
+The structural terms, namely $\gamma$, $\beta$, $\epsilon$, and the host's costs, are measured once on Llama-3.2-1B and carried over to other models and splits unchanged, with the head and tail scaled by the model's hidden size.
+% SOURCE: per-split probes at n = 2,048, attention line over chunks 0-15, structural terms from the 1B 2,048-token schedules; head and tail = probe LM + head_1B(2048) x N / 2048 x hidden / 2048 (vault lab-split-sweep (6); ch3-formulation, Generality and 4k model fixes).
+% DECISION: the line fit (least squares, as tested on the split choice, or the median of pairwise slopes) is fixed at the results freeze; the text names the fit only if the evaluation reports both.

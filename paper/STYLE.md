@@ -428,10 +428,23 @@ Copied from the portable guide (vault `0-notes/ai-instructions/paper-writing-sty
 FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`, the IEEE template) and FPGA'27
 (`~/docs/FPGA27__Control_Packet_Reconfiguration.pdf`, FCPR). Entries marked *proposal* wait for the author.
 
-- **Stage** (2026-10-14): phase 3 (first draft) of the scope-independent parts: background, the command-processor
-  model and formulation, the method, and the setup. Title, abstract, introduction, results, and conclusion are `\E{}`
-  placeholders until the decode-half and agent-step results land and the headline numbers pass an independent audit
-  (author's brief, 2026-10-14).
+- **Venue** (author, 2026-10-15): **MLSys'27** research track; FCCM'27 is the fallback only if the audit kills a
+  headline. Call (mlsys.org/Conferences/2027/CallForResearchPapers, read 2026-10-15): OpenReview, submissions open Oct
+  19, deadline **Oct 30, 2026** (the call says 20:00 UTC, the home page 12:00 PM PDT, which is 19:00 UTC; plan for the
+  earlier), no separate abstract deadline; the MLSys 2025 style files; two columns, at most 10 pages before the
+  references, appendix uploaded separately and unlimited; double-blind (self-references in the third person; an
+  unpublished manuscript may be cited anonymously, with an anonymized copy in the supplementary material); every
+  reference lists all of its authors; a mandatory "AI Usage Disclosure" section after the references (outside the
+  page limit); an authorship quota per author.
+- **Stage** (2026-10-15): full draft toward the milestones of the vault's `paper-ch3-outline` (§ Decision: MLSys'27):
+  results freeze Oct 21, full draft Oct 27 (then the audit's second round on the results text), final pass Oct 29.
+  Written: introduction, background, §3 characterization (prefill and decode), §4 model and formulation, §5 method
+  (with the split), setup. Still `\E{}`: abstract, results subsections, conclusion, Figure 1 (schematic), the AI
+  usage disclosure (the author's), and the third model.
+- **Structure** (differs from the FCCM26 shape for the contributions): §3 *Composition Losses* carries the
+  characterization contribution (prefill and decode) apart from the background; the event model sits in §4 with the
+  formulation, because it is part of the model contribution; Figure 1 is the instruction-order schematic, shared by
+  the introduction and §5.
 - **The evaluation's message** (*proposal*, from the vault's `paper-ch3-outline`; decided after the results): on a
   spatial array, concurrency is free in the hardware but rationed by one in-order command processor, whose instruction
   order is the schedule. Patterns to test across every run: (1) queued commands never overlap, so concurrency lives
@@ -446,8 +459,8 @@ FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`, the IEEE templa
   fused prefill, cited); ours is "the composer" and its schedules "composed schedules". No method-family name or
   design-space labels yet (*proposal*: none until the evaluation needs them).
 - **Core terms:** command, hardware context, instruction stream, issue instruction, synchronization, address patch,
-  argument slot, dispatch floor $F$ (§2); column group, segment, boundary cost $\epsilon$ (§3); arenas, predicted
-  completion order, buffer rings, commands in flight $D$ (§4). Avoid: arm names (edf, naive, Ar, q2, g4, b4), composer
+  argument slot, dispatch floor $F$, append (§2); column group, segment, boundary cost $\epsilon$, commands in flight $D$,
+  event model (§4); arenas, predicted completion order, buffer rings, split (§5). Avoid: arm names (edf, naive, Ar, q2, g4, b4), composer
   versions, "lag" (say "commands in flight"), "planner", "projection" for the model (it is a layer operator here),
   "the ladder".
 - **Framing** (author's brief, 2026-10-14): method-first; never "N× over AMD's code". Packing several operators per
@@ -455,20 +468,27 @@ FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`, the IEEE templa
   primitive only, in one background sentence; no text or figures are reused from it. The essential decisions
   (spatial assignment, CP instruction order) are reported apart from the host-boundary handling (queue depth,
   packing).
-- **The baseline:** each design's own host program on the same configuration, kernels, and weights. FastFlowLM and a
+- **The baseline:** each design's own host program on its default split (attention on columns 0 and 7), with the same
+  configuration, kernels, and weights. FastFlowLM and a
   hand-optimal reference appear only where comparable (vault `paper-ch3-outline`, Evaluation).
 - **Figure palette** (`figs/make_figs.py`): GEMMs blue, LM head purple, attention orange, host and dispatch gray
   (busy); the existing schedules near-black (open square queued, filled triangle in sequence), ours magenta circles
   (pairs); reference lines black dashed (sum) and dotted (longer alone).
-- **Defaults** (setup): median of 3 timed runs after one warm run; bit-identical logits; one batch per comparison.
-- **Not mentioned:** speedups framed against AMD's code; NP-hardness (until a reduction exists); the exactness of
+- **Defaults** (setup): median of timed runs after one warm run (3 today, 2 in the split and Qwen3-4B append
+  comparisons; fixed at the freeze); bit-identical logits, appends also against a full prefill; one batch per comparison.
+- **Not mentioned:** speedups framed against AMD's code; turn-level speedups until measured (inferred until then); decode as a gain (characterization only); NP-hardness (until a reduction exists); the exactness of
   the predicted-completion order as a theorem (it is a remark until proven); FCPR-scoped partitions (deferred);
   internal labels and history.
-- **Deliberate differences from the guide:** IEEEtran instead of ACM, so software entries are `@misc` (IEEEtran.bst
-  has no `@software`), `lastaccessed` is not printed, and there is no `\Description`; figure fonts are Times through
-  `newtxtext`/`newtxmath`; `main.tex` sits in `paper/` because the repository root holds the artifact.
-- **Open for the author:** how to cite FCPR while it is under review (`refs.bib`, `fcpr2027`); bib entries marked
-  VERIFY need their sources read and a vault source note each.
+- **Deliberate differences from the guide:** the MLSys template (natbib author-year through `mlsys2025.bst`) instead
+  of ACM, so software entries are `@misc` (no `@software`), `lastaccessed` is not printed, and there is no
+  `\Description`; figures are 3.25 in wide (the MLSys column) with Times through `newtxtext`/`newtxmath`, while the
+  template sets text in Times and math in Computer Modern; `main.tex` sits in `paper/` because the repository root
+  holds the artifact. The template itself logs duplicate `figure.N` anchors and an empty anchor from
+  `\printAffiliationsAndNotice`; its own example does the same, so they are not fixed.
+- **Open for the author:** whether the introduction quotes the 16k + 4k append as 3.0x (Qwen3-4B) alone, since the
+  1B's 4.3x includes the existing order's mid-range slowdown; the anonymized FCPR copy for the supplementary material;
+  the AI usage disclosure; the working title; bib entries marked VERIFY need their sources read and a vault source
+  note each; the reference units (Table `params` is still raw).
 
 ## Links
 paper-writing-process · repo-workflow · ai-instructions · pref-documentation-and-record
