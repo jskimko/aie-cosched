@@ -13,8 +13,8 @@ These appends range from below the median to beyond the 90th percentile of the n
 The designs are MLIR-AIR's fused prefill and fused decode~\citep{wang2026mlirair}, compiled with MLIR-AIE~\citep{mlir-aie-repo}.
 The baselines are each design's own host program on its default split and, as a stronger baseline, the same program with its attention columns alternated, both with the same configuration, kernels, and weights as our schedules; \E{FastFlowLM~\citep{fastflowlm-repo} on the same weights gives an absolute reference.}
 Every run's logits must be bit-identical to the baseline's, every append's logits bit-identical to those of a full prefill of the whole prompt, and the kernel log must show no driver or IOMMU message during the run.
-TTFT is the wall time of the prefill call, from token identifiers to logits, decode time per token is measured over 64 generated tokens, and a turn's time is its append, its 250 decoded tokens, and the handoff of the KV cache from the prefill design to the decode design.
-We report the median of \E{5} timed runs after one warm run, with the order of schedules rotated between rounds.
+TTFT is the wall time of the prefill call, from token identifiers to logits, decode time per token is measured over 250 greedy tokens after a prefill of the context, and a turn's time is its append, its 250 decoded tokens, and the handoff of the KV cache from the prefill design to the decode design.
+We report the median of \E{5 timed runs of prefill and 3 of decode and turns} after one warm run, with the order of schedules rotated between rounds.
 Each batch of runs holds the device exclusively, checks that no other process has it open, and brackets the runs with a DRAM bandwidth probe and an empty-command dispatch.
 Because the aggregate DRAM read cap varies by up to 12\% between batches, every ratio compares runs within one batch.
 % SOURCE: machine files read 2026-10-14/15: uname -r 7.0.0-34-generic; amdxdna 2.25.0_20260922 (DKMS, 31c01f2019e7); XRT 2.25.0 (3923b2b5be55); NPU firmware 1.1.2.65 (sysfs fw_version); BIOS EVO-X2 1.12; NPU power mode performance, CPU EPP and governor performance (lab-prefill-overlap (11), lab-split-sweep (9)).
@@ -39,8 +39,9 @@ Because the aggregate DRAM read cap varies by up to 12\% between batches, every 
 
 \subsection{Decode}
 \label{subsec:decode-eval}
-% VALUE: the double-buffered KV loop lowers decode's time per token by a factor that grows with the context and with the KV share of a token, small on Gemma3 whose most layers attend within a window, as the two-term model predicts; placement would add at most a few percent under the read cap
-\E{Figure: decode time per token by context length, existing and double-buffered, per model, with the model's prediction and the cap-bounded estimate for placement.}
+% VALUE: renaming the KV loop and passing scores per block lowers decode's time per token by a factor that grows with the context and with the ratio of serialized compute to KV transfer per position (larger on the 1B than on Qwen3-4B), small on Gemma3 whose most layers attend within a window, as the two-term model predicts; the renamed loop runs at the KV transfer bound; placement would add at most a few percent under the read cap
+% SOURCE: Llama-3.2-1B 1.051 / 1.101 / 1.274 / 1.366x at P = 2,048 / 4,096 / 16,384 / 32,512 (lab-decode-long-context (13)); Qwen3-4B 1.037 / 1.065 / 1.165 / 1.209x at P = 2,048 / 4,096 / 16,384 / 28,800, slopes 4.074 -> 3.061 us, every per-token time within 1% of its prediction written before the run (lab-decode-long-context (14)-(15), amd-npu 320d2d3).
+\E{Figure: decode time per token by context length, existing and renamed, per model, with the model's prediction and the cap-bounded estimate for placement.}
 
 \subsection{Agent Turns}
 \label{subsec:turns}
