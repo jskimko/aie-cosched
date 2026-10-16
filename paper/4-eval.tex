@@ -54,6 +54,9 @@ Because the aggregate DRAM read cap varies by up to 12\% between batches, every 
 \subsection{Model Accuracy}
 \label{subsec:accuracy}
 % VALUE: the event model prices schedules and models it was not fitted on within a few percent, picks the faster split in every configuration measured (on the new models with its rule fixed before the runs), and states where its error grows (attention read off its trend, the existing order's mid-range slowdown) with the size of each
+% SOURCE: Gemma3-4B with the rule fixed before its runs: faster split 8/8, signs 20/20, |error| median 1.5%, max 3.8%; the existing program predicted 1.8-3.8% low, the composer within 1.2%; composer S4 over S2 at 16k + 4k predicted 3.5%, measured 2.7% (vault lab-split-sweep (21)-(22), amd-npu 08a56cd); Llama-3.1-8B: 8/8, 7/7, median 1.3% (lab-split-sweep (14)).
+% SOURCE: computed after the turns were measured, with the model unchanged (amd-npu e30be08 adds cell selection only; two earlier cells reproduce bit-identically): at 512-token appends the model prices the existing S4 order below the composed one, 249.9 / 469.7 / 689.4 vs 294.7 / 513.6 / 732.4 ms at 4k / 16k / 28k (measured 265.0 / 482.1 / 699.7 vs 300.6 / 521.3 / 754.3), and the faster S4 order on 14/14 turn cells; at 1k appends its margin is 0.2-0.3%, inside its error, and choosing by it costs at most 23 ms of a turn (vault lab-agent-step (11), amd-npu 9d4f63f).
+% DECISION: the 512-token result is stated as a prediction checked after the measurement, not as a choice the system made during the runs.
 \E{Figure: predicted against measured TTFT, and the split chosen against the faster split measured, per model and regime.}
 
 \subsection{Distance to the Bound}
