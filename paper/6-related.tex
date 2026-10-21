@@ -1,28 +1,46 @@
 \section{Related Work}
 \label{sec:related}
 
-\textbf{Mapping and Fusion on Spatial Accelerators.}
-% VALUE: mapping frameworks choose fused groups and their placement; the designs are separately issued, and their concurrency is not addressed
-Stream explores layer-fused mappings on multi-core dataflow accelerators with memory- and communication-aware cost models, and its AIE backend emits one design per fused group~\citep{symons2025stream}.
-MLIR-AIR and IRON compile operators and fused multi-operator designs onto the AIE array~\citep{wang2026mlirair,hunhoff2025iron}.
-These works decide what a design computes and where, whereas our setting takes the designs as given and concerns how one CP issues them.
-% SOURCE: Stream describes no switching cost and no concurrency across fused groups (vault src-stream-dse, arXiv v2 read 2026-10-14).
+\textbf{Statically Ordered Accelerators.}
+% VALUE: other machines fix order or timing in the compiler (TSP: timing; ReGate: compiler-managed idleness for energy; Rammer: a compile-time schedule on GPUs and IPUs); on XDNA 2 only the order is fixed by the program, across asynchronous engines
+Groq's TSP removes reactive hardware such as arbiters and caches so that its compiler determines when every instruction executes~\citep{abts2020tsp}.
+ReGate power-gates the components of an NPU, with a compiler that manages the idle periods of vector units and SRAM through ISA extensions and hardware idle detection for the inter-chip interconnect and memory controllers~\citep{xue2025regate}.
+Rammer generates a static spatio-temporal schedule of a DNN's operators at compile time on GPUs and IPUs, instead of relying on a second, run-time scheduler~\citep{ma2020rammer}.
+On XDNA~2, the program fixes the order of each engine's work and the waits between engines, whereas the durations of the DMA, core, and CP engines are not fixed, so the order can be read from the shipped program while time remains a measured input.
 
-\textbf{LLM Inference on AMD NPUs.}
-% VALUE: existing NPU LLM runtimes compose hand-tuned designs per model, with the composition fixed by hand
-FastFlowLM runs many model families on XDNA~2 NPUs with hand-tuned designs~\citep{fastflowlm-repo}, and MLIR-AIR builds end-to-end decoder models from fused operator designs~\citep{wang2026mlirair}.
-In both, the composition of operators into commands and the split of the array are fixed by hand for each model, whereas our setting derives them from the designs' instruction streams and from probes.
+\textbf{NPU Compilers and Deployments.}
+% VALUE: compilers, mapping frameworks, and hand-tuned runtimes decide what a design computes and where, and NPU schedulers reorder command graphs or split work across devices from their own models; our setting analyses designs already compiled, open and closed
+MLIR-AIR and IRON compile operators and fused multi-operator designs onto the AIE array~\citep{wang2026mlirair,hunhoff2025iron}, and Stream explores layer-fused mappings on multi-core dataflow accelerators with memory- and communication-aware cost models, emitting one design per fused group on its AIE backend~\citep{symons2025stream}.
+A FlashAttention case study on XDNA NPUs maps the fused kernel by hand and uses a roofline per memory level to decide when to stop fusing~\citep{wang2026flashattention}.
+FastFlowLM runs many model families on XDNA~2 NPUs with hand-tuned designs~\citep{fastflowlm-repo}, and its authors' Gemma3 mapping double-buffers the keys and values of decode attention~\citep{du2026gemma3}.
+MLIR-AIR also builds end-to-end decoder models from fused operator designs, and in both stacks the composition of operators into commands and the split of the array are fixed by hand for each model.
+TileFuse fuses mixed-precision dequantization into the GEMM kernels of XDNA~2~\citep{pang2026tilefuse}, and an agent skill system deploys decoder models end to end through MLIR-AIR~\citep{li2026agentnpu}.
+On mobile NPUs, llm.npu offloads prefill through chunked static graphs and runs outlier channels on the CPU~\citep{xu2025llmnpu}.
+LATTICE reorders NPU command graphs taken from traces jointly with memory planning and reports a modeled makespan~\citep{liu2026lattice}, whereas HeteroMosaic and Agent.xpu schedule LLM work across the CPU, GPU, and NPU of one SoC~\citep{jun2026heteromosaic,wei2025agentxpu}.
+These works decide what a design computes, where it runs, or how a given command graph is ordered, whereas our setting takes compiled designs as given, including a closed one, and concerns the dependences inside and between them on one array.
+% SOURCE: FlashAttention case study's stop-fusing rule and ridge points (vault src-xdna-flashattention-study); FlowKV in 2602.06063 section 4.1 and 3.2.3, full text checked by review r14 (vault src-gemma3-edge, outline v9 section 2); Stream describes no switching cost and no concurrency across fused groups (vault src-stream-dse, arXiv v2 read 2026-10-14).
+
+\textbf{Performance Prediction and Attribution.}
+% VALUE: what-if tools take the order from traces and simulate transformed graphs, causal profiling measures a line's worth by experiment, GPA attributes stalls within GPU kernels from PC samples, cost models and WCET analysis predict or bound execution time, and command streams have been captured from a closed GPU driver; none takes the order between asynchronous engines from the program or bounds the worth of removing one ordering
+Daydream and dPRO build dependency graphs from run-time traces and simulate transformed graphs to predict what an optimization gains~\citep{zhu2020daydream,hu2022dpro}, and Habitat predicts a model's training time on one GPU from a run on another~\citep{yu2021habitat}.
+Coz measures what speeding up a line of code would gain by slowing down all code that runs concurrently with it~\citep{curtsinger2015coz}.
+GPA attributes sampled GPU instruction stalls to their causes by data-flow analysis within a kernel and estimates the speedup of each suggested fix~\citep{zhou2021gpa}.
+Learned and analytical models predict the time of a tensor program or of a mapping on an accelerator~\citep{kaufman2021learned,parashar2019timeloop,kwon2019maestro}, and WCET analysis bounds the execution time of a binary statically~\citep{wilhelm2008wcet}.
+Command streams have also been recovered from a closed GPU driver to attribute runtime behavior~\citep{yan2026revealing}.
+These tools take the order of operations from a trace, or predict or bound execution time, whereas the order between the NPU's engines is fixed by its program, and the quantity we bound is the worth of removing one ordering.
+
+\textbf{Dependences and Dataflow Analysis.}
+% VALUE: the dependence classes, renaming, software pipelining, scheduling with a common server, and SDF throughput analysis are established and cited; they take the program or graph as given, whereas here the graph spans asynchronous engines and is recovered from compiled instruction streams
+Compilers distinguish flow dependences from anti and output dependences~\citep{kuck1981dependence}, which processors remove by renaming registers~\citep{tomasulo1967} and software pipelining removes across loop iterations through modulo variable expansion~\citep{lam1988software}.
+The throughput of a synchronous dataflow graph is bounded by its critical cycle, which state-space exploration and cycle-mean analysis compute~\citep{ghamarian2006throughput}, and buffer sizes trade against that throughput~\citep{stuijk2008throughput}.
+Scheduling theory studies parallel machines whose jobs each need a common server for setup~\citep{hall2000common,glass2000dedicated}, and reentrant shops in which jobs return to a machine several times~\citep{wang1997reentrant}.
+The CP resembles such a common server that also blocks on synchronizations until a machine's work completes, and it issues strictly in order.
+These analyses start from a program or graph whose dependences are known, whereas here the graph spans the DMA, core, and CP engines of a spatial array and is recovered from compiled instruction streams.
+% DECISION: the dependence classes, renaming, and critical-cycle analysis are cited, never claimed (outline v9 section 2, "Not contributions").
 
 \textbf{Overlap and Phase Partitioning on GPUs.}
-% VALUE: GPU serving overlaps heterogeneous operators within one device, where the hardware schedules concurrent kernels, and partitions prefill and decode across devices, batches, or a GPU's units; our partition is spatial within one array and chosen per regime of one request
-NanoFlow splits a batch into nano-batches so that compute-, memory-, and network-bound operations overlap within one GPU~\citep{zhu2025nanoflow}.
+% VALUE: GPU serving and inference engines overlap heterogeneous operators within one device, where the hardware schedules concurrent kernels, and partition prefill and decode across devices, batches, or a GPU's units; on the NPU concurrency must be written into one in-order instruction stream, and one request's regimes take turns on one array
+IOS and Nimble run independent operators concurrently on multiple GPU streams, scheduled ahead of time~\citep{ding2021ios,kwon2020nimble}, and NanoFlow splits a batch into nano-batches so that compute-, memory-, and network-bound operations overlap within one GPU~\citep{zhu2025nanoflow}.
 DistServe and Splitwise run prefill and decode on separate GPUs~\citep{zhong2024distserve,patel2024splitwise}, Sarathi-Serve mixes chunks of prefill into batches of decode~\citep{agrawal2024sarathi}, and POD-Attention runs prefill and decode attention concurrently within one GPU kernel~\citep{kamath2025pod}.
 On a GPU, kernels on separate streams are scheduled concurrently by the hardware, whereas on the NPU, concurrency must be written into one in-order instruction stream, and one request's regimes take turns on one array rather than many requests sharing a device.
 % DECISION: the NanoFlow, DistServe, Splitwise, Sarathi-Serve, and POD-Attention sentences state only what their papers show; read each PDF and add a vault source note before submission.
-
-\textbf{Scheduling and Renaming.}
-% VALUE: classical scheduling covers machines that share one server and reentrant shops; software pipelining and register renaming remove false dependences in processors; the CP is an in-order server that also blocks on completions, and our renaming acts on buffers in DRAM and local memory of compiled designs
-Scheduling theory studies parallel machines whose jobs each need a common server for setup~\citep{hall2000common,glass2000dedicated}, and reentrant shops in which jobs return to a machine several times~\citep{wang1997reentrant}.
-Processors remove false dependences by renaming registers~\citep{tomasulo1967} and by software pipelining, which overlaps the iterations of a loop~\citep{lam1988software}.
-The CP resembles a shared server that also blocks on synchronizations until a machine's work completes, and it issues strictly in order, so our composer applies these ideas statically, to compiled designs, by ordering issue and renaming buffers before the commands run.
-% DECISION: the scheduling, renaming, and pipelining works are cited from their metadata only; read each and add a vault source note before submission.
