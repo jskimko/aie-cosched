@@ -437,8 +437,8 @@ FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`, the IEEE templa
   anonymously with an anonymized copy as supplementary material); every
   reference lists all of its authors; a mandatory "AI Usage Disclosure" section after the references (outside the
   page limit); an authorship quota per author.
-- **Stage** (2026-10-21): the spine is the vault's `paper-cosched-outline-v9` (revision 27, accepted after 27 independent
-  review rounds; D4 option A). The draft at fe3e74e was written on the earlier composer framing and is being restructured to
+- **Stage** (2026-10-21): the spine is the vault's `paper-cosched-outline-v9` (revision 31, 2026-10-21: T-rec withdrawn, the ML
+  Timeline adopted as a figure, D13; revision 27 accepted after 27 independent review rounds, D4 option A). The draft at fe3e74e was written on the earlier composer framing and is being restructured to
   v9; replaced text goes verbatim to the vault.
 - **Structure** (2026-10-21, outline v9 §4): 1 Introduction; 2 Background; 3 The Order Is in the Program (measured command
   semantics, the execution model, reading a stream and its attribution, closed binaries); 4 What Reading the Binaries Shows

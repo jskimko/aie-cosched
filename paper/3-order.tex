@@ -118,9 +118,17 @@ It counts a loop with data-dependent control as control.
 Loop-carried edges are classed in the same way on the loop's iterations, with their distance recorded.
 % SOURCE: classification by Lost(e), REDUNDANT, CONTROL, loop-carried distance (vault lab-cosched-passes (30), item 3).
 
-% VALUE: whether the recovered order matches a hardware event trace, on the engine classes the trace instrument can observe, is the analysis's direct test; its verb and counts follow the registered outcome
-\E{The recovered order against a hardware event trace: the engine classes tested, the tested and untested relations per design, and the outcome.}
-% DECISION: the verb for this result (recovers / bounds / predicts / attributes) is set by outline v9 section 3's rows; the tested classes and counts are named wherever "recovers" is used.
+% VALUE: the recovered order is the method and is checked through its consequences, not against a trace: removed false waits leave outputs bit-identical, measured gains stay within their bounds, and what the analysis leaves out is counted; the CP's own timer records show the issue and wait order inside each command without changing the array's configuration, and they cannot see core loops or the gaps between commands
+We check the recovered order through its consequences rather than against a hardware trace.
+Every wait that the analysis classes as false and that our passes remove leaves the outputs bit-identical (Section~\ref{sec:method}), each measured gain is compared with its bound (Section~\ref{subsec:tests}), and the operations that the analysis leaves out are counted per stream.
+To show how the CP executes the order, we insert the runtime's record-timer instruction after each synchronization and after each run of issue instructions, so that the firmware writes an identifier and a 1.8~GHz device timer into a buffer that the host reads after the run.
+The array's configuration is left unchanged.
+On one 128-token prefill chunk of Llama-3.2-1B, 1{,}468 records per run leave the logits bit-identical and add no measurable device time.
+For each command, they show when each column group's work was issued and how long each synchronization blocked the CP (Figure~\E{timeline}).
+Between commands the timer advances at less than a tenth of its rate, so the records time intervals within a command, whereas the host's clock times the gaps between commands.
+Order inside a core's loop is invisible to the CP, so the decode loop's order rests on its removal (Section~\ref{subsec:rings}).
+% SOURCE: record-timer instruction TXN opcode 0x83 (12 bytes: header, size, 32-bit id; aiebu 48b69735 xaie_txn.h), XRT 2.25.0 ML Timeline (XDP 67165d6 clientDev/ml_timeline.cpp; Strix Halo listed as a client device with a debug buffer); feasibility check: split-1b-S4-L20480, 108 commands, 1,468 records per run, 5 runs with and 5 without, logits sha equal in all 10, summed start-to-wait with / without records 0.93-0.95, per-command fit of the timer 1,752-1,767 MHz against the 1,800 MHz H clock at the top DPM level (xdna-driver bc5dd96 npu4_dpm_clk_table), 110-125 M timer cycles per host second between commands (amd-npu b98e3044; vault lab-flm-streams (39), decisions log D13).
+% DECISION: T-rec was withdrawn by the author (outline v9 revision 31, D13); recovery is the method in every verb row, and the timer records are a figure that governs no verb.
 
 \subsection{Closed Binaries}
 \label{subsec:closed}
@@ -131,8 +139,11 @@ Every stream recorded offline round-trips through the lifter byte for byte, so t
 Because FastFlowLM's attention reads through shim tiles of the GEMM columns, attributing an issue to its column would mix the groups, so the analysis decodes the configuration's stream routes and attributes each issue to the group whose compute tiles its data reaches.
 Under this attribution, the one capture we analyse, a 1{,}009-token prefill of Gemma-4-E2B, changes column group only at the boundary between two commands, once into attention and once out of it in every layer, so it issues serially, one group per command.
 The sum of its commands' times measured alone, each less the dispatch floor and plus the boundary cost between commands, matches its measured time within 10.0\%, inside the check's tolerance of 20.8\%, whereas full overlap would place it 36.5\% lower.
+Since FastFlowLM's closed libraries build these streams and their buffers, we measure removals on MLIR-AIR's fused prefill, which reimplements FastFlowLM's designs~\citep{wang2026mlirair}.
+Its decoded configuration places the GEMMs on columns 1--6 and attention on columns 0 and 7, as FastFlowLM's fused prefill does, so the two share the column groups whose turns our passes remove.
 Appendix~\E{A} states how the attribution was chosen and which inputs of this check the capture had already shown.
 % SOURCE: recording libhrx (FastFlowLM 44d01787, gemma4e-flash), every prompt length 1-1,024 recorded with 0 /dev/accel opens; 8 buckets, 218 distinct streams, round trip and identity 218 / 218 (vault lab-cosched-passes (14)); lifter fix mlir-aie 91f64387ffb, 375 / 375 MLIR-AIR streams byte-identical (lab-cosched-passes (3)).
 % SOURCE: device capture through an XRT interposer, gemma4e-flash:e2b, 1,009 tokens; route maps from the frozen cdo_routes decoder: shim 3 and shim 6 MM2S0 reach only columns 0 and 7; 70 group transitions, all between commands (35 GEMM -> attention, 35 attention -> GEMM) (vault lab-flm-streams (11), (13)).
 % SOURCE: closed-stack check: T = 1.444 s, serial prediction 1.300 s (error 0.100), overlap prediction 0.917 s (error 0.365), tolerance 0.2075, of which 0.102 is one slow floor repetition; without it the tolerance is 0.106 and the serial prediction still passes (vault lab-flm-streams (12) RESULT, amd-npu 52c8401d, 3d0d1036).
+% SOURCE: MLIR-AIR's llms README: "reimplement AMD NPU LLM designs originally developed by the FastFlowLM team" (mlir-air 740cae0f, a3e26261); fused_prefill/device.py "laid out like FastFlowLM's fused_prefill"; FastFlowLM's Gemma4-E2B fused_prefill.xclbin decoded with tools/xclbin_layout.py: attention programs on columns 0 and 7, a GEMM program on the 24 cores of columns 1-6 (vault lab-flm-streams (5)); coverage ruling D13(b).
 % DECISION: the serial label is scoped to this one capture (Gemma-4-E2B, 1,009 tokens, the engine's cap); the attribution by routes was ruled after the capture, and the label under the first attribution by tile column was MIXED-majority; both disclosures go to the appendix (outline v9 section 2, C2).
