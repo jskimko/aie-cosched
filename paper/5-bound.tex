@@ -70,6 +70,14 @@ In a loop, the graph repeats, and its critical cycle determines the time per ite
 Removing one edge of that cycle therefore gains nothing while another edge keeps the cycle's length.
 The bound applies Amdahl's law to an ordering rather than to a component, and it needs only the program's order and the measured durations of its operations, not a timing trace (Section~\ref{sec:related}).
 
+% VALUE: the DRAM cap makes the allowed overlap depend on which group holds the critical path: co-running costs a bandwidth-bound group a fixed fraction of its partner's duration and a compute-bound group almost nothing, so one regime prices a removal lower than the other
+How much overlap the DRAM read rate allows depends on which group holds the critical path.
+We measure this on pairs of one attention operator and one GEMM, issued in one command on disjoint columns.
+Where the GEMM holds the critical path and the pair reads 52.0--52.3~GB/s against a measured cap of 53.9--55.3~GB/s, co-running costs it 8.4--10.5\% of the attention operator's duration.
+Where attention holds the critical path, co-running costs a fixed 21~$\mu$s and does not grow with the GEMM's duration.
+Two operators of equal duration therefore overlap to within $1.84\times$ of the longer one in the first case and $2.00\times$ in the second.
+% SOURCE: computed in aie-cosched-paper-0 tmp/regime/{pairs,model,final}.py from lab-prefill-overlap (3)'s pre-registered pair table (10 pair-runs on Llama-3.2-1B, 5 attention chunk indices x 3 GEMM shapes, medians of 20, DRAM measured during each concurrent run, cap 53.9-55.3 GB/s): with the GEMM on the critical path the penalty is 3 us + 0.085 x the co-runner's duration (R2 = 0.993, 5 runs, ratio 0.084-0.105); with attention on it the penalty is 21 us - 0.015 x the co-runner (R2 = 0.896, 5 runs, ratio -0.002 to 0.029); penalty against the pair's total DRAM rate correlates at only r = 0.54, so the regime of the critical-path operator is the predictor and total bandwidth is not (vault decisions log, "Regime analysis, step 1").
+
 % VALUE: the bound is prescriptive: a removal is worth building only where its bound exceeds its cost (local memory, BDs, locks, and channels for a rename; added synchronization and planning for a reorder); a bound of at least one cannot predict a loss, which the 512-token appends show
 A removal is therefore worth building only where its bound exceeds its cost, which for a rename is the local memory, BDs, locks, and channels it takes, and for a reorder the synchronization and planning it adds.
 The bound itself never falls below one, so it cannot predict a loss.

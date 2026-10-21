@@ -29,6 +29,14 @@ Learned and analytical models predict the time of a tensor program or of a mappi
 Command streams have also been recovered from a closed GPU driver to attribute runtime behavior~\citep{yan2026revealing}.
 These tools take the order of operations from a trace, or predict or bound execution time, whereas the order between the NPU's engines is fixed by its program, and the quantity we bound is the worth of removing one ordering.
 
+\textbf{Compile-Time Synchronization and Binary-Level Analysis.}
+% VALUE: other work places synchronization while a kernel is lowered, or needs a trace and a simulator to study what ran; we read the synchronization already present in a shipped binary, including one we did not compile, and bound in time what removing a given wait is worth; minimizing the count of synchronizations is a different objective from removing a wait that costs time
+The auto-sync feature of AscendNPU-IR inserts a kernel's synchronization as it lowers, deciding set and wait pairs from a memory-dependence analysis over its own intermediate representation and dropping redundant pairs so that the fewest hardware events are used~\citep{ascend-autosync}.
+xPU-Shark records traces from production accelerator deployments and replays them in a microarchitecture simulator, which lets it analyze a deployed model at the level of machine code~\citep{zarkadas2025xpushark}.
+These approaches place synchronization while a design is compiled, or study what ran from a trace and a simulator, whereas our analysis reads the synchronization already present in a shipped binary, including one that we did not compile, and bounds in time what removing a given wait is worth.
+Using the fewest synchronizations is also a different objective from removing a false dependence: a wait that a stack needs is not redundant, even where its position holds one column group behind another.
+% VERIFY: Arm's Vela reports an estimated cycle count after compilation, which Arm's own documentation presents as a guide; cite it here once the developer-blog source is read (outline v9 section 9).
+
 \textbf{Dependences and Dataflow Analysis.}
 % VALUE: the dependence classes, renaming, software pipelining, scheduling with a common server, and SDF throughput analysis are established and cited; they take the program or graph as given, whereas here the graph spans asynchronous engines and is recovered from compiled instruction streams
 Compilers distinguish flow dependences from anti and output dependences~\citep{kuck1981dependence}, which processors remove by renaming registers~\citep{tomasulo1967} and software pipelining removes across loop iterations through modulo variable expansion~\citep{lam1988software}.

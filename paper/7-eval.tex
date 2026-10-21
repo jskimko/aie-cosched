@@ -65,6 +65,15 @@ Because the two stacks differ in kernels, quantization path, tokenization, and p
 % COMMENT: the existing S2 append at 16k + 4k ran in its slow state (12.8-13.1 s), so order and system ratios at that cell are not quoted; the comparison of faster splits uses the existing S4 turn there.
 \E{Figure: turn speedup over the cached context and the append, with the traces' 25th, 50th, and 90th percentiles of the append marked.}
 
+% VALUE: which group binds the bound flips with the workload, and that flip is what moves the faster split; the overlap cost of the bound appears only where the GEMMs bind; the rest of the distance to the bound is host work the schedule does not hide
+Which group binds the lower bound flips with the workload.
+From scratch at 2{,}048 tokens the GEMMs bind at every split on both models, whereas on an append to a 16{,}384-token context attention binds at every split.
+The split names the number of attention columns, so a GEMM-bound configuration is served by fewer of them and an attention-bound one by more, which is why the faster split moves from two columns for prompts computed from scratch to four for appends.
+The overlap cost of Section~\ref{subsec:removal} appears only where the GEMMs bind, at 1.0--5.1\% of TTFT, and accounts for part of the distance to the bound.
+The remainder is the CP's time and the host work that the schedule does not hide.
+% SOURCE: computed in aie-cosched-paper-0 tmp/regime/cells.py over the 24 committed bound cells (2 models x 3 splits x 4 configurations, vault lab-split-sweep (8) / ch3-formulation G6): the binding term is the GEMMs in 12 cells and attention in 12; 1B at 2,048 from scratch the GEMM term rises 377 / 413 / 564 ms from S1 to S4, and on a 16,384 + 4,096 append attention falls 10,776 / 5,258 / 2,631 ms; applying 0.085 x the co-runner where the GEMMs bind gives 6.4-269.2 ms, 1.0-5.1% of TTFT, tightening the gap to the bound from a median 1.23 to 1.17 on those cells; the unhidden CP and host residual is 63-264 ms on the 1B's non-anomalous cells and 139-741 ms on Qwen3-4B's.
+% COMMENT: two of the 24 cells are already-excluded artifacts, not evidence: the 1B's S1 16,384 + 4,096 cell ran in the intermittent slow state the record does not quote, and Qwen3-4B's S1 16,384 + 4,096 measures 0.98 of its own bound, which lab-split-sweep (8) records as the bound not being strict where attention is extrapolated tenfold.
+
 \subsection{Model Accuracy}
 \label{subsec:accuracy}
 % VALUE: the event model prices schedules and models it was not fitted on within a few percent, picks the faster split in every configuration measured (on the new models with its rule fixed before the runs), and states where its error grows (attention read off its trend, the existing order's mid-range slowdown) with the size of each
