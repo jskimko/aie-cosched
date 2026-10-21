@@ -88,9 +88,10 @@ We find false dependences at two granularities, in the CP's instruction stream a
 \end{table}
 
 % VALUE: the instances per cell, and why two cells are empty in the existing designs; DMA-only instances stay visible through an engine label
-Table~\ref{tab:grid} places each instance we know of.
-In prefill, order dependences in the instruction stream hold back one column group behind another and one column of an operator behind the other.
-In decode, the attention loop holds name dependences on its keys, its values, and the one buffer through which its two cores pass scores, while its running maximum and accumulator carry true dependences across blocks.
+Table~\ref{tab:grid} places each instance we know of in the MLIR-AIR designs, which are the designs our passes rewrite.
+In its prefill, order dependences in the instruction stream hold back one column group behind another and one column of an operator behind the other, and the one captured prefill of the production engine shares the first of these.
+In its decode, the attention loop holds name dependences on its keys, its values, and the one buffer through which its two cores pass scores, while its running maximum and accumulator carry true dependences across blocks.
+The census extends the same reading to IRON and to the production engine's streams, which no instance in this table covers (Section~\ref{subsec:census}).
 No name dependence appears in the stream, because the existing prefill already gives each chunk its own buffers, and rings added nothing beyond reordering there, within 0.1\%.
 No order dependence is known in decode attention's loop, where acquires that cover a pair of blocks arose only in a hand edit's unrolled loop, and loops with nested control are not analysed, so the census tests this cell.
 The loop row carries an engine label, so an instance confined to a DMA engine stays visible.
