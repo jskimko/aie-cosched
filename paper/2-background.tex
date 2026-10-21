@@ -37,6 +37,13 @@ Submitting and completing a command costs a fixed time, which we call the \emph{
 The host can queue further commands before it waits on the first, which hides part of the dispatch floor behind the device's work.
 % SOURCE: XRT empty dispatch (4 KB bypass), 93.0-98.5 us at every bracket of lab-prefill-device (3); 92-99 us in lab-prefill-overlap (3).
 
+\textbf{Software Stacks.}
+% VALUE: three stacks produce LLM designs for the NPU: MLIR-AIR compiles from loop nests, IRON is a close-to-metal Python interface, and FastFlowLM ships hand-tuned designs as binaries; all three reach the array through the same commands and instruction streams, so one analysis can read all of them
+Three stacks produce LLM designs for XDNA~2.
+MLIR-AIR maps loop nests onto the array and builds fused multi-operator designs~\citep{wang2026mlirair}, IRON offers a close-to-metal Python programming interface to MLIR-AIE~\citep{hunhoff2025iron}, and FastFlowLM ships hand-tuned designs as binaries~\citep{fastflowlm-repo}.
+All three reach the array through the same commands and instruction streams, so one analysis can read the designs of each (Section~\ref{subsec:closed}).
+% SOURCE: FastFlowLM's engines reach the runtime through libhrx and ship as compiled libraries and xclbins (FastFlowLM 44d01787, lib/hrx/libgemma4e_flash.so; vault lab-cosched-passes (14)).
+
 \subsection{LLM Inference on the NPU}
 \label{subsec:prefill}
 
