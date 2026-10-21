@@ -66,8 +66,16 @@ The bound therefore measures how far a schedule lies from what a given spatial a
 Removing a false dependence $d$ speeds a phase up by at most $T / (T - O(d))$, where $T$ is the phase's time and $O(d)$ is the time during which $d$ keeps work on disjoint resources from overlapping, given every other edge of the happens-before graph.
 The resources are typed, namely the column groups, the CP with its cost at each command boundary, the DRAM read rate up to its cap, and the channels that one group borrows from another's columns.
 Work on one resource cannot overlap itself, so $O(d)$ counts only the overlap that the resources allow, and it is zero when $d$ lies off the longest path.
-In a loop, the graph repeats, and its critical cycle determines the time per iteration, as in the throughput analysis of synchronous dataflow graphs~\citep{ghamarian2006throughput}.
-Removing one edge of that cycle therefore gains nothing while another edge keeps the cycle's length.
+In a loop, the graph repeats, and the maximum cycle mean over its cycles determines the time per iteration, as in the throughput analysis of synchronous dataflow graphs~\citep{ghamarian2006throughput}.
+Which test applies therefore follows from the granularity of Table~\ref{tab:grid}: the longest path within a command, and the maximum cycle mean inside an engine's loop.
+Both give the same necessary condition on a set $S$ of removals: unless $S$ cuts every path or cycle that attains the maximum, one of them survives with its length unchanged, so the phase is still bounded by it and $S$ gains nothing.
+The condition is necessary and not sufficient, for two reasons that this machine supplies.
+After a cut, the next longest path or cycle bounds what remains, so the gain is what separates them rather than the whole of $O(S)$.
+And the groups share the DRAM read cap, so a set that does cut every critical path can still gain nothing when that cap binds, which Section~\ref{subsec:tests} reports for a model whose composed prefill already reads at 93--96\% of it.
+% VALUE: the test says which candidate sets cannot pay, from the graph alone, and says nothing about how much a set that can pay is worth; the magnitude needs the durations and the capacity, which the event model supplies
+We therefore use the condition as a test of which candidate sets cannot pay, and leave the magnitude to the event model of Section~\ref{subsec:pricing}.
+% SOURCE: the acyclic condition is the minimum cut of a critical subnetwork in project crashing (Kelley 1961; Fulkerson 1961), the cyclic one the iteration bound and maximum cycle mean (Ghamarian 2006; Stuijk 2008); both are cited, never claimed (Section~\ref{sec:related}).
+% DECISION: the condition is stated as necessary only, after review r5 showed that a longest-path or cycle criterion is valid on an uncapacitated graph and this machine has a shared DRAM cap, a shared command processor and a per-command boundary cost; the capacity half is the measured regime of this section, and the 8B at cap and the loss at 512-token appends are the two negative instances inside the paper.
 The bound applies Amdahl's law to an ordering rather than to a component, and it needs only the program's order and the measured durations of its operations, not a timing trace (Section~\ref{sec:related}).
 
 % VALUE: the DRAM cap makes the allowed overlap depend on which group holds the critical path: co-running costs a bandwidth-bound group a fixed fraction of its partner's duration and a compute-bound group almost nothing, so one regime prices a removal lower than the other
