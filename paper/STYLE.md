@@ -437,19 +437,16 @@ FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`, the IEEE templa
   anonymously with an anonymized copy as supplementary material); every
   reference lists all of its authors; a mandatory "AI Usage Disclosure" section after the references (outside the
   page limit); an authorship quota per author.
-- **Stage** (2026-10-15): full draft toward the vault's `paper-cosched-plan` (author-directed, converged over three
-  independent review rounds). Restructured to the MLSys order with the thesis re-cut around false dependences. Written:
-  introduction, background and motivation, design (model, composition, reordering, renaming, partitioning,
-  implementation), setup, discussion, related work. Still `\E{}`: abstract, results subsections, conclusion, Figure 1
-  (schematic plus the composer's inputs and outputs), the decode double buffer's result, the cache move between splits,
-  the three further models, the AI usage disclosure (the author's).
-- **Structure** (2026-10-15, the author asked for the MLSys convention): 1 Introduction; 2 Background and Motivation
-  (platform; LLM inference and agent turns; *Where the Array Idles*, the characterization; *Concurrency Through One
-  Command Processor*, the measured semantics and why not separate partitions); 3 Design (formulation with the lower
-  bound, event model with decode's two-term model, then one subsection per property: composing streams, reordering
-  issue, renaming buffers, partitioning per regime, and a short implementation subsection); 4 Evaluation; 5 Discussion
-  (transferable insights only, FCPR's voice); 6 Related Work; 7 Conclusion (no outlook). Figure 1 holds the
-  instruction-order schematic (a-c) and the composer's inputs and outputs (d).
+- **Stage** (2026-10-21): the spine is the vault's `paper-cosched-outline-v9` (revision 27, accepted after 27 independent
+  review rounds; D4 option A). The draft at fe3e74e was written on the earlier composer framing and is being restructured to
+  v9; replaced text goes verbatim to the vault.
+- **Structure** (2026-10-21, outline v9 §4): 1 Introduction; 2 Background; 3 The Order Is in the Program (measured command
+  semantics, the execution model, reading a stream and its attribution, closed binaries); 4 What Reading the Binaries Shows
+  (the idle array per stack, the textbook classes and the grid, the census); 5 Bounding and Pricing Removals (the bound,
+  joint pricing, the tests); 6 Removing Them (the passes and their legality checkers, as the implementation); 7 Evaluation;
+  8 Discussion (compiler-owned concurrency; where static-order hardware sits); 9 Related Work; 10 Conclusion. The earlier
+  §2.3 grid paragraph becomes §4's seed, with "We call such a wait a false dependence" replaced by a citation of the
+  textbook classes.
 - **The evaluation's message** (*proposal*, from the vault's `paper-ch3-outline`; decided after the results): on a
   spatial array, concurrency is free in the hardware but rationed by one in-order command processor, whose instruction
   order is the schedule. Patterns to test across every run: (1) queued commands never overlap, so concurrency lives
@@ -468,6 +465,15 @@ FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`, the IEEE templa
   $\epsilon$, commands in flight $D$, event model (§3.1-3.2); predicted completion order, buffer rings, renaming, split,
   arenas (§3.3-3.7). Avoid: arm names (edf, naive, Ar, q2, g4, b4), composer versions, "lag" (say "commands in
   flight"), "planner", "projection" for the model (it is a layer operator here), "the ladder", workstream labels (W1-W7).
+- **Framing** (author, 2026-10-21; supersedes the earlier framing where they differ): false dependences are textbook
+  (Bernstein's conditions; anti and output dependences; renaming; Tomasulo; modulo variable expansion) and are cited where
+  defined, never presented as ours. The lead (C1) is static dependence analysis on a static-order NPU: each engine runs its
+  program in order and nothing schedules across engines, so the dependence structure is read from the program (host
+  dispatch sequence, runtime sequences and PDIs) without a timing trace, and each removal is bounded before it is built.
+  The verb the title and abstract use for C1 (recovers / bounds / predicts / attributes) is set by outline v9 §3's rows, never
+  chosen by the writer. C2 is what the analysis finds (the census, the production stream, the grid's instances); C3 is
+  end-to-end worth. The passes and checkers are the implementation, not a contribution. ReGate, Daydream, GPA, LATTICE and
+  SDF critical-cycle analysis are argued by name.
 - **Framing** (author's brief, 2026-10-14; thesis re-cut 2026-10-15): method-first; the composer works on unchanged
   kernels, and the one change inside a design (decode attention's double buffer) is the same rule applied by hand and
   stated as such; never "N× over AMD's code". Packing several operators per
