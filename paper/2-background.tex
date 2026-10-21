@@ -66,9 +66,15 @@ On the NPU, prefill accounts for \E{6--54\%} of an agent's turn, depending on th
 \subsection{Where the Array Idles}
 \label{subsec:losses}
 
-% VALUE: the expert designs lose end-to-end time to false dependences, where work waits on other work it does not consume: between column groups and inside one operator in prefill, and between a transfer and its own compute in decode
+% VALUE: the expert designs lose end-to-end time to false dependences, waits on work whose results the waiting work does not consume; each has one of two causes (order: a wait placed where the written program put it; name: storage shared by work that need not share it), and we find them at two granularities (the CP's instruction stream, an operator's loop): order dependences between column groups and inside one operator in prefill, and in decode a name dependence on the single KV buffer that exposes a second one in the same loop
 The expert designs lose end-to-end time on the NPU because work waits on other work that it does not consume.
-We call such a wait a \emph{false dependence}, and we find one between column groups and one inside an operator in prefill, and one between a transfer and its compute in decode.
+We call such a wait a \emph{false dependence}, which is an ordering that the lowered program imposes although no data flows between the two pieces of work.
+A false dependence has one of two causes.
+An \emph{order} dependence is a wait placed where the written program order put it rather than where data requires it, and reordering removes it.
+A \emph{name} dependence arises where two pieces of work share a buffer, lock, or channel that they need not share, and renaming the storage removes it.
+We find false dependences at two granularities, in the CP's instruction stream and inside an operator's loop.
+In prefill, order dependences in the instruction stream hold back one column group behind another and one column of an operator behind the other.
+In decode, a name dependence on the attention loop's single KV buffer makes each transfer wait for the compute on the previous block, and removing it exposes a second false dependence in the same loop (Section~\ref{subsec:rings}).
 
 \begin{figure}[t]
     \centering
