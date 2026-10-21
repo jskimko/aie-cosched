@@ -1,0 +1,133 @@
+\section{The Order Is in the Program}
+\label{sec:order}
+
+% VALUE: on XDNA 2 each engine runs its program in order and nothing schedules across engines, so the order of the work and the waits between engines are in the compiled program; the section shows this from measured command semantics, states the execution model, reads a stream into a happens-before graph with a cause per wait, and extends the reading to closed binaries
+On XDNA~2, each engine runs its own program in order, and no hardware or runtime scheduler reorders work across engines.
+The order of the work and the waits between engines are therefore fixed by the compiled program, whereas their durations are not.
+We first measure how the CP turns instruction streams into concurrency (Section~\ref{subsec:semantics}), then state the execution model the analysis assumes (Section~\ref{subsec:model}), read a stream into a graph of what must finish before what starts, with a cause for each wait (Section~\ref{subsec:reading}), and extend the reading to binaries shipped without source (Section~\ref{subsec:closed}).
+
+\subsection{Measured Command Semantics}
+\label{subsec:semantics}
+
+% VALUE: the CP semantics, measured on the existing prefill's own operators, say where concurrency can come from: not from queued commands, but from one command that issues both groups' work before it waits on either
+To find where concurrency can come from, we measure how the CP turns instruction streams into overlap on the existing prefill's own operators, pairing one attention operator on columns 0 and 7 with one GEMM operator on columns 1--6.
+Every composed command here produces outputs bit-identical to those of the operators run alone.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{fig/pairs.pdf}
+    % VALUE: queued commands take the sum of the two operators, one command that issues both before waiting takes the longer one
+    \caption{Median time of one attention and one GEMM operator on disjoint column groups, normalized to the longer operator alone, over 20 runs per pair. Holding both streams in one command saves one dispatch floor against the sum.}
+    \label{fig:pairs}
+\end{figure}
+
+\textbf{Queued Commands.}
+% VALUE: the runtime gives no overlap across commands, and placing two operators in one command is itself neutral, so overlap must come from within a command
+Two commands queued on one hardware context, with no wait between them, take as long as one command that holds both streams in sequence, within 3\% on every pair (Figure~\ref{fig:pairs}).
+Holding both streams in sequence in one command takes the sum of the two operators' times minus one dispatch floor, within 2\%, so placing two operators in one command is itself neutral.
+This is why packing several operators into one dispatch, which is standard practice for amortizing launch cost, as in CUDA Graphs~\citep{nvidia-cudagraphs}, XRT's run lists~\citep{xrt-repo}, and MLIR-AIR's multi-launch programs~\citep{wang2026mlirair}, removes dispatch cost on the NPU but creates no overlap.
+% SOURCE: queued / in-sequence = 1.007-1.029 on 7 pairs (amd-npu 17f7ec3 prefill-overlap/ovl4/, lab-prefill-overlap (5)b); in-sequence / (A + G - F) = 0.996-1.021 over 17 pair runs (ovl/, ovl2/ at 8f13e05 and ovl4/; report.txt H1 column).
+% SOURCE: XRT run list, /opt/xilinx/xrt/include/xrt/experimental/xrt_kernel.h:21 (XRT 2.25.0); MLIR-AIR stitch_elf (vault src-mlir-air-llms).
+
+\textbf{Concurrent Issue.}
+% VALUE: one command that issues both groups' work before it waits on either runs them concurrently at nearly the longer one's time; the small cost appears when both read DRAM near the cap
+When one command issues all of the GEMM's work, then the attention operator's stream, and only then the GEMM's synchronizations, the two operators run concurrently.
+Such a command takes 1.00--1.06 times the longer operator's time on 9 pairs that cover three GEMM shapes and attention over chunks 0 to 15 (Figure~\ref{fig:pairs}).
+On six further pairs with other shapes and chunks, the overlap hides 90--96\% of the shorter operator's work, after excluding the dispatch floor that the merge already saves.
+The overlap costs most when the pair's combined DRAM read rate approaches the read cap, at about 95\% of the cap measured in the same batch.
+The serial execution of the existing prefill is therefore a property of how its commands are composed, not of the array or its configuration.
+% SOURCE: interleaved / max(A, G) = 0.998-1.058 over 10 pair runs = 9 pairs (c8 + lm measured twice, 1.054 and 1.058; the figure keeps each pair's first measurement); GEMM shapes up, LM head chunk, down; attention chunks 0, 4, 8, 12, 15 (lab-prefill-overlap (3)).
+% SOURCE: hidden fraction of the shorter operator's work, (in-sequence - interleaved) / (min(A, G) - F) = 0.90-0.96 on 2+qkv, 6+o, 11+gate, 14+qkv, 6+gate, 11+o (lab-prefill-overlap (5)a).
+% SOURCE: DRAM rate during the interleaved command 52.2 GB/s against a same-batch 8x2 cap of 53.9-55.3 GB/s for c8 + lm, the costliest overlap (1.054-1.058) (lab-prefill-overlap (3)).
+
+\textbf{Synchronization Order.}
+% VALUE: because the CP is in order, a wait on one group delays the issue of every other group's work; the attention measurement of Section 2.3 isolates this effect, so the instruction order is a scheduling decision of its own
+Since the CP executes in order, a synchronization on one group delays every later issue, including the issue of another group's work.
+The existing attention operator isolates this effect (Section~\ref{subsec:losses}): its two columns carry equal work, yet alternating their segments lowers its device time to $0.67\times$ at 2{,}048 tokens with the same instructions.
+The CP's instruction order, and not only the assignment of operators to commands, is therefore a scheduling decision.
+% SOURCE: vault lab-prefill-overlap (4)-(5)c; Section 2.3 carries the numbers.
+
+\textbf{Hardware Contexts.}
+% VALUE: a second hardware context gives no concurrency here: the driver's source allocates every context the whole array and shares it in time, and narrower partitions would need contiguous columns, rebuilt designs, and a host round trip at every dependence, so concurrency comes from within one command
+Two hardware contexts on disjoint partitions are the obvious alternative, but the driver's source shows that every hardware context on our platform is allocated all eight columns, so co-resident contexts share one partition in time.
+Even where narrower partitions are allowed, a partition spans contiguous columns, whereas the existing attention sits on columns 0 and 7, so each group would need its own rebuilt design.
+Every dependence between attention and a GEMM would then cross the host, which waits on one context before it submits to the other.
+Concurrency on the array therefore comes from within one command, which needs no rebuild and no change to the driver or firmware.
+% SOURCE: amdxdna 2.25.0 (loaded module 2.25.0_20260922, NPU Strix Halo 1022:17f0 rev 11, firmware 1.1.2.65): every firmware protocol the driver accepts on this device enables AIE2_TEMPORAL_ONLY (npu4_regs.c:94-106, the table npu5 shares), and aie2_alloc_resource (aie2_ctx.c:604-608) then requests start column 0 and all columns for every context, which the solver shares as one partition (vault lab-prefill-overlap (31)).
+% SOURCE: contiguous partitions, separate 6- and 2-column builds with attention moved onto adjacent columns, and the host round trip (vault lab-prefill-overlap (1)).
+% DECISION: the temporal sharing is stated from the driver's source with the driver named; a two-context behavioural check is registered and not run, so it is never worded as a measurement.
+
+\subsection{Execution Model}
+\label{subsec:model}
+
+% VALUE: the analysis models a dispatch as operations on engines (CP instructions, BD executions, core loop iterations), each with read and write sets over locations that include every exclusively held resource; under static control one dispatch at given runtime parameters has one static set of operations, a loop with data-dependent control is reported and left out, and durations stay measured inputs
+The analysis models a dispatch as operations on engines, each with a set of locations that it reads and a set that it writes.
+A command contributes one operation per instruction of its stream on the CP, a DMA engine one per execution of a BD on one channel, and a core one per iteration of each counted loop.
+Locations cover every resource that one operation holds exclusively, namely bytes of DRAM, memory tiles, and local memory, as well as BD slots, locks, DMA channels, task-queue slots, stream-switch ports, and configuration registers, so a structural hazard is also a conflict on a location.
+For example, a lock acquire reads and writes its lock, a queue push writes a queue slot and reads its BDs, and a BD execution reads its BD slot and its source bytes and writes its destination bytes.
+We assume static control: the CP's stream is straight-line, since a synchronization waits but does not branch, and every core loop is counted, with a trip count that depends on the dispatch's runtime parameters rather than on computed data.
+A dispatch at given runtime parameters then has one static set of operations, and a loop with data-dependent control is reported as such and left out of the analysis.
+Durations remain measured inputs, because the program fixes the order of each engine's work but not how long the work takes \E{the per-operation costs from the microbenchmarks}.
+% SOURCE: operations, locations, and static control (vault lab-cosched-passes (30), item 1); the decode kernels' early return on the pad block branches on a runtime parameter, so it stays static per context length (lab-decode-long-context (10)).
+
+\subsection{Reading a Stream}
+\label{subsec:reading}
+
+\begin{table}[t]
+    \centering
+    \caption{Ordering Mechanisms}
+    \label{tab:mech}
+    % VALUE: the 11 mechanisms that create a direct happens-before edge, in attribution order, with the granularity of each
+    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}rlr}
+        \toprule
+        \# & Mechanism & Granularity \\
+        \midrule
+        1 & CP synchronization and mask-poll & stream \\
+        2 & CP in-order issue (completes at issue) & stream \\
+        3 & Channel task queue (FIFO, depth 4) & stream \\
+        4 & Dispatch order on one context & stream \\
+        5 & Configuration and control-packet writes & stream \\
+        6 & BD chaining and repeat & data movement \\
+        7 & Locks on DMA BDs & data movement \\
+        8 & Stream-switch back-pressure & data movement \\
+        9 & Cascade and neighbor memory & data movement \\
+        10 & Core locks & core loop \\
+        11 & Core program order & core loop \\
+        \bottomrule
+    \end{tabular*}
+\end{table}
+
+% VALUE: happens-before is completion before start, not issue order; each direct edge comes from one of 11 mechanisms at the stream, data-movement, or loop granularity and is attributed to exactly one, and edges no mechanism explains are counted, so the count measures the model's coverage
+From these operations, the analysis builds a \emph{happens-before} graph, in which an edge from $a$ to $b$ means that $b$ cannot start until $a$ has completed.
+Issue order alone does not create such an edge, because a queue push is issued in order but its transfer completes later.
+Each direct edge comes from one of the 11 ordering mechanisms of Table~\ref{tab:mech}, at the granularity of the CP's stream, of data movement, or of a core loop, and an edge that two mechanisms imply is attributed to the first in the table.
+An operation whose ordering effect no mechanism describes, such as an unknown opcode or a write outside the known register map, receives edges to its neighbors on the CP, which are counted as unattributed per stream, so the count measures the model's coverage.
+Edges of mechanism 2 never stall, because their instructions complete at issue, so they are attributed but reported apart from the blocking edges.
+% SOURCE: the mechanism table, attribution order, granularities, UNATTRIBUTED, and issue edges (vault lab-cosched-passes (30), item 2); the library AIECoschedDeps (mlir-aie f1725dae1f1, pinned).
+
+% VALUE: each direct edge is classed by the pairs of operations it alone orders: a true dependence if one is read after write, a name dependence if one is write after read or write, an order dependence otherwise; classes say whether renaming or reordering can remove the wait; a wait gating several operations is classed per gated operation, pairs ordered by two disjoint paths are counted as redundant, and data-dependent loops as control
+For each direct edge, the analysis computes the pairs of operations that the edge alone orders, namely those ordered with it and not without it.
+The edge is a true dependence if one of these pairs reads a location after the other writes it, a name dependence if none does but one writes after the other reads or writes, and an order dependence otherwise.
+Renaming the conflicting locations can therefore remove a name dependence, reordering can remove an order dependence, and a true dependence stays.
+A synchronization that gates several operations contributes one edge per gated operation, so each operation's conflicts are classed on their own.
+A pair that two disjoint paths order is lost by no single edge, so the analysis counts such pairs as redundant instead of attributing them to either path, and it counts a loop with data-dependent control as control.
+Loop-carried edges are classed in the same way on the loop's iterations, with their distance recorded.
+% SOURCE: classification by Lost(e), REDUNDANT, CONTROL, loop-carried distance (vault lab-cosched-passes (30), item 3).
+
+% VALUE: whether the recovered order matches a hardware event trace, on the engine classes the trace instrument can observe, is the analysis's direct test; its verb and counts follow the registered outcome
+\E{The recovered order against a hardware event trace: the engine classes tested, the tested and untested relations per design, and the outcome.}
+% DECISION: the verb for this result (recovers / bounds / predicts / attributes) is set by outline v9 section 3's rows; the tested classes and counts are named wherever "recovers" is used.
+
+\subsection{Closed Binaries}
+\label{subsec:closed}
+
+% VALUE: a closed stack ships binaries only, so its streams are recorded at the runtime's boundary without the device and lifted with a byte-identical round trip; each issue is attributed to the column group its data reaches through the configuration's decoded routes; FastFlowLM's prefill then issues one group per command, and serial issue predicts its time where overlap does not
+FastFlowLM ships its engines as binaries, so we record their instruction streams at the runtime's boundary with a recording library that never opens the device, and lift each stream into MLIR-AIE's runtime-sequence form.
+Every recorded stream round-trips through the lifter byte for byte, so the analysis reads exactly what the engine dispatches.
+Because FastFlowLM's attention reads through shim tiles of the GEMM columns, attributing an issue to its column would mix the groups, so the analysis decodes the configuration's stream routes and attributes each issue to the group whose compute tiles its data reaches.
+Under this attribution, FastFlowLM's prefill of a 1{,}009-token prompt changes column group only at the boundary between two commands, once into attention and once out of it in every layer, so it issues serially, one group per command.
+Serial issue then predicts the prefill's measured time from each command timed alone within 10\%, inside the check's tolerance of 21\%, whereas a prediction with full overlap misses it by 37\%.
+% SOURCE: recording libhrx (FastFlowLM 44d01787, gemma4e-flash), every prompt length 1-1,024 recorded with 0 /dev/accel opens; 8 buckets, 218 distinct streams, round trip and identity 218 / 218 (vault lab-cosched-passes (14)); lifter fix mlir-aie 91f64387ffb, 375 / 375 MLIR-AIR streams byte-identical (lab-cosched-passes (3)).
+% SOURCE: device capture through an XRT interposer, gemma4e-flash:e2b, 1,009 tokens; route maps from the frozen cdo_routes decoder: shim 3 and shim 6 MM2S0 reach only columns 0 and 7; 70 group transitions, all between commands (35 GEMM -> attention, 35 attention -> GEMM) (vault lab-flm-streams (11), (13)).
+% SOURCE: closed-stack check: T = 1.444 s, serial prediction 1.300 s (error 0.100), overlap prediction 0.917 s (error 0.365), tolerance 0.2075 (vault lab-flm-streams (12) RESULT, amd-npu 52c8401d, 3d0d1036).
+% DECISION: the serial label is scoped to this one capture (Gemma-4-E2B, 1,009 tokens, the engine's cap); the attribution by routes was ruled after the capture, and the label under the first attribution by tile column was MIXED-majority; both disclosures go to the appendix (outline v9 section 2, C2).

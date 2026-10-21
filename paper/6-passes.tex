@@ -1,119 +1,15 @@
-\section{Design}
+\section{Removing False Dependences}
 \label{sec:method}
 
-% VALUE: the semantics of Section 2.4 define a scheduling problem with three decisions, which the formulation states with a lower bound and the event model prices from probes of each operator alone; the composer then answers each property it must give with one mechanism: unchanged work by composing segments under a legality check, no false wait at the CP by reordering issue, no false wait on a shared buffer by renaming, a partition that fits the regime by choosing the split; the event model makes each choice before anything runs
-We first state the scheduling problem that the semantics of Section~\ref{subsec:semantics} define, with a lower bound on any schedule (Section~\ref{subsec:formulation}), and an event model that prices a schedule from probes of each operator alone (Section~\ref{subsec:pricing}).
-We then build a composer that takes an existing design's per-operator instruction streams, its map of operators to columns, the dependency graph of its host program, and the probes, and emits a sequence of composed commands (Figure~\ref{fig:order}d).
+% VALUE: the passes and their legality checkers are the implementation: the composer reorders and renames across the operators of the open prefill, the stream pass reorders within one operator's stream, the loop pass renames inside decode attention's loop, and each output is checked for legality from the instructions and run bit-identically; the event model makes each choice before anything runs
+Our passes remove the false dependences that the analysis finds, and legality checkers accept each rewrite before it runs.
+For the open prefill, a composer takes an existing design's per-operator instruction streams, its map of operators to columns, the dependency graph of its host program, and the probes, and emits a sequence of composed commands (Figure~\ref{fig:order}d).
 The composed commands must do the same work as the existing ones, which the composer guarantees by keeping every instruction and checking legality from the instructions themselves (Section~\ref{subsec:compose}).
-No group may wait at the CP for work it does not consume, so the composer reorders issue across operators (Section~\ref{subsec:order}).
+No group may wait at the CP for work it does not consume, so the composer reorders issue across operators, and a stream pass reorders issue within one operator's stream (Section~\ref{subsec:order}).
 No use of a buffer may wait for another use it does not depend on, so the composer renames buffers into rings, and our loop pass renames decode attention's buffers by the same rule (Section~\ref{subsec:rings}).
 The partition of the array must fit the regime, so the composer chooses the split of columns for each regime (Section~\ref{subsec:split}).
-The event model prices every candidate, so each choice is made before anything runs.
-% SOURCE: amd-npu a0ee2edf44e0 (tag composer-v1.1), prefill-overlap/txn.py, merged.py, component_model.py; Python, on the engine's hardware context.
-
-\subsection{Problem Formulation}
-\label{subsec:formulation}
-
-\textbf{Resources.}
-% VALUE: three kinds of resources: column groups (one operator at a time, data-driven), the CP (one in-order server that issues and blocks), and the host (work between commands)
-The array offers a set $\mathcal{G}$ of disjoint column groups, each running one operator at a time and sharing only DRAM bandwidth with the others.
-The CP is a single in-order server that executes issue instructions, each at a small cost, and blocks at each synchronization until the transfer it names completes.
-The host CPU runs the work between operators that the array does not perform, such as normalizations, and it submits and collects commands.
-
-\textbf{Operators.}
-% VALUE: each operator is defined by its group, its device time, its host work, and its instruction stream split into segments; dependencies pass through DRAM and need a synchronization
-Each operator $o \in \mathcal{O}$ runs on group $g(o)$ for a device-busy time $p_o$, and may need host work of duration $h_o$ after it completes.
-Its instruction stream is a sequence of \emph{segments} $s_{o,1}, \dots, s_{o,n_o}$, where each segment consists of synchronizations followed by the issue instructions they gate, and the first segment has no synchronizations.
-A dependency graph $E \subseteq \mathcal{O} \times \mathcal{O}$ orders the operators.
-Since operators hand data over through DRAM, with no lock on the device between them, a consumer's first issue must follow the producer's final synchronization.
-When host work lies between producer and consumer, the consumer must also wait for that host work, and the two cannot share a command.
-
-\textbf{Decisions.}
-% VALUE: the essential decisions are the spatial assignment, the CP's instruction order, and the assignment of buffers, which together decide which waits are false; the command partition and the queue depth manage host boundaries and are reported apart
-A schedule makes three essential decisions.
-The first is the spatial assignment $g(\cdot)$ of operators to column groups, which determines what can run concurrently.
-The second is the CP's instruction order, namely a partition of $\mathcal{O}$ into a sequence of commands $C_1, \dots, C_K$ and, for each command, an interleaving $\sigma_k$ of its operators' segments that keeps each operator's segments in their own order.
-The third assigns each use of a buffer to a slot in memory, since two uses that share a slot must run one after the other even when neither consumes the other's data.
-Two further decisions manage the boundaries with the host: the number $D$ of commands the host keeps in flight, and how operators that do not overlap are packed into commands.
-Both would disappear if the host work moved onto the array, so we report their effect separately from that of the essential decisions.
-
-\textbf{Timing.}
-% VALUE: the semantics of Section 2.4 as rules: commands in sequence with a boundary cost; within a command, a segment's work starts once issued and its predecessor has finished; a synchronization completes when its work has
-A command starts on the device after its predecessor completes, plus a \emph{boundary cost} $\epsilon$ when it was already queued, or the dispatch floor $F$ when it arrives at an idle device.
-Within a command, the CP walks $\sigma_k$ in order.
-The work of segment $s_{o,j}$ starts on $g(o)$ once the CP has issued it and the work of $s_{o,j-1}$ has finished, and a synchronization completes once the CP reaches it and the work it names has finished.
-Operators that run at the same time on different groups take longer than alone by an overlap cost that grows with their combined DRAM traffic.
-
-\textbf{Objective.}
-% VALUE: minimize the makespan, which for prefill is TTFT less a fixed head and tail
-The objective is the makespan, i.e., the completion time of the last command, which for prefill is the TTFT less a fixed head and tail of work outside the layers.
-
-\textbf{Lower Bound.}
-\label{subsec:bound}
-% VALUE: each of the three resources bounds the makespan, so their maximum bounds the gap of any schedule on a given assignment
-Each resource bounds the makespan from below:
-\begin{equation}
-\label{eq:lb}
-T \;\ge\; \max\Bigl(\max_{g \in \mathcal{G}} \sum_{o:\,g(o)=g} p_o,\;\; L_E,\;\; \sum_{k} c_k\Bigr),
-\end{equation}
-where $L_E$ is the longest path through $E$ weighted by $p_o$ plus, on host-crossing edges, $h_o$, and $c_k$ is the CP's own work in command $k$.
-The first term is the busiest group's work, which no schedule on a fixed assignment can beat.
-The bound therefore measures how far a schedule lies from what a given spatial assignment allows.
-% DECISION: the bound's value for the studied instances, from the measured per-operator times, is stated with the evaluation's gap.
-% DECISION: no NP-hardness claim until a reduction is written; with negligible issue cost and one layer's fixed per-chunk pattern the problem has the structure of a two-machine chain-reentrant shop (wang1997reentrant), and with non-negligible issue cost the CP acts as a shared server (glass2000dedicated, hall2000common) (vault ch3-formulation, Relation to classical scheduling).
-
-\subsection{Event Model}
-\label{subsec:pricing}
-
-\begin{table}[t]
-    \centering
-    \caption{Parameters of the Event Model, Llama-3.2-1B, 2{,}048 Tokens}
-    \label{tab:params}
-    % VALUE: every term of the model is measured, on the device or from the host's timestamps, and none is a free scale factor
-    % DECISION: values are in raw units until the author chooses the reference units (STYLE.md, Per-paper decisions); then they are converted.
-    \begin{threeparttable}
-    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}>{\raggedright\arraybackslash}p{0.36\linewidth}r}
-        \toprule
-        Term & Value \\
-        \midrule
-        \input{fig/params-rows}
-    \end{tabular*}
-    \begin{tablenotes}\footnotesize
-    \item Device terms from each command dispatched alone; host terms from per-command timestamps of three schedules.
-    \end{tablenotes}
-    \end{threeparttable}
-\end{table}
-
-% VALUE: to choose among schedules without running each, an event simulation of the device, the CP, and the host prices a schedule from measured terms only, and reports device time, host exposure, and the fixed head and tail separately
-To choose among schedules without running each on the device, we price a schedule with an event simulation of the device, the CP, and the host, whose every term is measured (Table~\ref{tab:params}).
-On the device, command $k$ ends at
-\begin{equation}
-\label{eq:cmd}
-e_k = \max\bigl(e_{k-1} + \epsilon,\; q_k + F\bigr) + b_k,
-\end{equation}
-where $q_k$ is the time the host queues it, so a queued command pays the boundary cost $\epsilon$ and a command that arrives at an idle device pays the dispatch floor $F$.
-A command's busy time $b_k$ is the sum of its GEMMs' busy times plus a gap $\gamma$ per additional GEMM, and a command that also carries attention takes $\max(a, g) + \beta \min(a, g)$ for attention work $a$ and GEMM work $g$.
-Attention's busy time grows linearly with the chunk index, as the number of earlier key blocks does.
-The host pays an issue cost per command and a post-processing cost per operator, and it waits on the oldest command once $D$ are in flight.
-The TTFT is the simulated span plus a fixed head and tail, namely the embedding, the first normalization, and the LM head.
-Because each term is measured separately, an error in one term cannot hide behind another, and the model reports the device time, the host's exposed time, and the head and tail separately.
-% SOURCE: component_model.py (amd-npu a0ee2ed prefill-overlap/component_model.py); parameters prefill-overlap/v1/component_model.json (first committed 6735c61); host terms fitted on the 2,048-token schedules with depth 2, 4, and 16 and no packing.
-
-% VALUE: the model's inputs for a new configuration or model are one probe of each operator alone; the structural terms carry over unchanged
-Only the per-operator busy times depend on the configuration and the model.
-For a new split or model, we dispatch each operator alone once, at one prompt length, and take attention's busy time per chunk from a line fitted over the probed chunks, because single readings of attention can depart from its trend.
-For an append, the line is evaluated at each chunk's absolute index.
-The structural terms, namely $\gamma$, $\beta$, $\epsilon$, and the host's costs, are measured once on Llama-3.2-1B and carried over to other models and splits unchanged, with the head and tail scaled by the model's hidden size.
-% SOURCE: per-split probes at n = 2,048, attention line over chunks 0-15, structural terms from the 1B 2,048-token schedules; head and tail = probe LM + head_1B(2048) x N / 2048 x hidden / 2048 (vault lab-split-sweep (6); ch3-formulation, Generality and 4k model fixes).
-% DECISION: the split choice on the first two models used a least-squares line (16 of 16 faster splits, 45 of 46 pairs with a gap of 5% or more in the right order, the exception named); the median of pairwise slopes (Theil-Sen) is the rule fixed in advance for the third model, and the evaluation names each fit where it reports its result (vault ch3-formulation, G1).
-
-% VALUE: decode's time per token follows a two-term model from measured terms: a fixed part and a per-position cost that is the transfer and the compute in series when the KV loop is single-buffered, and the larger of the two when it is double-buffered; the same model bounds what placement can add
-Decode needs a simpler model, because it runs one command per token whose CP order already issues the next weights before it waits on the KV cache (Section~\ref{subsec:losses}).
-Its time per token is $T_0 + c\,L$ for a context of $L$ positions, where the fixed part $T_0$ covers the weight reads and the per-position cost $c$ covers attention.
-With a single-buffered KV loop, $c = B + C$ for a transfer time $B$ and a compute time $C$ per position, whereas a double-buffered loop gives $c = \max(B, C)$.
-Both $B$ and $C$ are measured, $B$ by streaming further positions with no further compute and $C$ as the remainder, and $B$ can fall no lower than the DRAM read cap allows.
-% SOURCE: T0 = 15.94 ms, c = 1.156 us (Llama-3.2-1B); B = 0.677 us at the two-shim rate, C = 0.478 us; the cap gives B >= 0.596 us (vault lab-decode-long-context (5), (7)).
-% DECISION: the per-model terms for the other models come from the same two probes per model (vault paper-cosched-plan).
+The event model of Section~\ref{subsec:pricing} prices every candidate, so each choice is made before anything runs.
+% SOURCE: amd-npu a0ee2edf44e0 (tag composer-v1.1), prefill-overlap/txn.py, merged.py, component_model.py; Python, on the engine's hardware context; the stream pass aie-cosched-schedule and the loop pass aie-cosched-rename in mlir-aie (aie-cosched-pass-0 f1725dae1f1).
 
 \subsection{Composing Instruction Streams}
 \label{subsec:compose}
@@ -153,6 +49,14 @@ The order is static: the estimates fix it when the command is built, and the dev
 When issue costs are negligible, the estimates are exact, and the host work is hidden, the CP never blocks on a later-completing operator while an earlier one's successor waits, so the order matches the list schedule of the groups without a CP.
 % SOURCE: merged.cp_order (a0ee2ed); mid-stream fractions (0.25, 0.5) of attention's estimate, the lowest of five placements tried; the in-turn order takes 1.26x as long on the same 38 commands (lab-prefill-overlap (16)).
 % DECISION: the exactness statement in the last sentence is argued, not proven; it stays a remark until a proof is written (vault ch3-formulation, Lower bound and heuristic).
+
+% VALUE: within one operator's stream, the stream pass moves each column's issue block up to the first synchronization of another column after its own column's previous instruction; on the population's attention streams this yields the alternation of the two columns, byte-identical to the hand-alternated streams, and the legality checker accepts each rewrite by checking every inverted pair against the decoded configuration
+Within one operator's stream, a stream pass on the lifted runtime sequence applies the same rule.
+It moves each column's block of issue instructions up to the first synchronization of another column that follows its own column's previous instruction, and it keeps the synchronizations in their order.
+On the existing attention streams, this yields the alternation of the two columns, and on all 42 attention streams of the population the pass's output is byte-identical to the stream alternated by hand.
+A legality checker accepts each rewrite before it runs, by checking every pair of instructions that the rewrite inverts against the routes, BDs, and buffer ranges decoded from the configuration.
+% SOURCE: aie-cosched-schedule (mlir-aie 573e0140174, identical in f1725dae1f1), proposal format /2 frozen at aie-cosched 8dee63f; 42 / 42 decoded order and bytes equal to the hand versions (vault lab-cosched-passes (35), (40)); the pairwise inversion rule of legality.py (lab-cosched-passes (14)).
+% DECISION: the pass emits the alternation and the checker accepts it; it is never said to discover it (Ruling D3, vault decisions log).
 
 \subsection{Renaming Buffers}
 \label{subsec:rings}
