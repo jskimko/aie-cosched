@@ -5,6 +5,7 @@
 Measuring the MLIR-AIR designs and reading FastFlowLM's binaries shows where the array idles although the device is busy (Section~\ref{subsec:losses}).
 The waits behind the idle time are the textbook false dependences, which lowering to the CP's stream and to the cores' loops reintroduces, and we place each instance on a grid of cause and granularity (Section~\ref{subsec:grid}).
 A census over a fixed population of streams from all three stacks counts how often they occur (Section~\ref{subsec:census}).
+What each stack contributes differs: the MLIR-AIR instances are measured, FastFlowLM enters through one captured prefill and the census, and IRON through the census alone.
 
 \subsection{The Idle Array}
 \label{subsec:losses}
