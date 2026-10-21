@@ -2,9 +2,9 @@
 \label{sec:findings}
 
 % VALUE: reading the open and closed stacks' binaries shows the array idle while the device reads busy, per stack; the waits behind it are textbook false dependences that lowering reintroduces, placed on a grid of cause and granularity; the census measures how often they occur across a fixed population
-Reading the shipped binaries of each stack shows where the array idles although the device is busy (Section~\ref{subsec:losses}).
+Measuring the MLIR-AIR designs and reading FastFlowLM's binaries shows where the array idles although the device is busy (Section~\ref{subsec:losses}).
 The waits behind the idle time are the textbook false dependences, which lowering to the CP's stream and to the cores' loops reintroduces, and we place each instance on a grid of cause and granularity (Section~\ref{subsec:grid}).
-A census over a fixed population of streams from all three stacks measures how often they occur (Section~\ref{subsec:census}).
+A census over a fixed population of streams from all three stacks counts how often they occur (Section~\ref{subsec:census}).
 
 \subsection{The Idle Array}
 \label{subsec:losses}
@@ -25,7 +25,7 @@ Because the commands run in submission order, columns 1--6 idle while attention 
 The device is thus busy almost all of the time, but on only one column group at a time.
 % SOURCE: commands = 16 layers x chunks x 6 + 11 LM-head commands = 1,547 at 2,048 tokens (vault lab-prefill-census (1)).
 % SOURCE: amd-npu e3acc8a prefill-e2/decomp.txt via figs/make_figs.py: busy = isolated time - dispatch floor = 92/95/97% of TTFT at 512/2k/4k; of TTFT, attention 12.2/32.9/49.1%, GEMMs 70.1/60.3/47.6%, LM head 9.7/2.1/0.8%.
-% SOURCE: serial execution, the isolated busy times sum to at most TTFT (vault lab-prefill-device (4)); queued commands do not overlap (Section 2.4).
+% SOURCE: serial execution, the isolated busy times sum to at most TTFT (vault lab-prefill-device (4)); queued commands do not overlap (Section 3.1).
 
 \textbf{Columns of One Operator.}
 % VALUE: the same loss occurs inside one operator: the existing attention stream starts column 7 only after waiting on column 0, which costs a third of attention's device time
@@ -53,9 +53,9 @@ Spreading attention over more columns would therefore gain little, since the tra
 % SOURCE: placement bounded by the cap: with the transfer at the cap (0.596 us per position) instead of the two-shim rate (0.677 us), double buffering plus placement gives at most 1.36x / 1.52x per token at 16k / 32k against 1.29x / 1.41x for double buffering alone (derived from lab-decode-long-context (5)-(7); paper plan review, 2026-10-15).
 
 \textbf{The Closed Stack.}
-% VALUE: the shipped closed stack issues its prefill one group per command as well, so its column groups take turns in the same way; its own decode mapping double-buffers keys and values, the first of decode's name dependences
-FastFlowLM's prefill issues one column group per command (Section~\ref{subsec:closed}), so its attention and GEMM columns also take turns, although the engine is tuned by hand.
-In decode, its authors' Gemma3 mapping double-buffers the keys and values of attention~\citep{du2026gemma3}, which removes the first of the name dependences that the open decode design holds.
+% VALUE: in the one captured prefill, the closed stack issues one group per command as well, so its column groups take turns in the same way; its own decode mapping double-buffers keys and values, the transfer-side name dependences, and its score handoff is not described as buffered
+In the one capture we analyse, FastFlowLM's prefill of Gemma-4-E2B issues one column group per command (Section~\ref{subsec:closed}), so its attention and GEMM columns also take turns, although the engine is tuned by hand.
+In decode, its authors' Gemma3 mapping double-buffers the keys and values of attention~\citep{du2026gemma3}, the two name dependences on the transfer side, whereas its handoff of scores between the two attention cores is not described as buffered.
 % SOURCE: vault lab-flm-streams (13); FlowKV, 2602.06063 sections 3.2.3 and 4.1, full text checked by review r14; its handoff between the two attention cores is not described as buffered (outline v9 section 2, C2).
 
 \subsection{Textbook Classes on a Grid}
@@ -63,7 +63,7 @@ In decode, its authors' Gemma3 mapping double-buffers the keys and values of att
 
 % VALUE: the waits are false dependences in the textbook sense, of two causes (order, name) at two granularities (the CP's stream, an engine's loop); the analysis's classes are these columns, a DMA chain is a loop on a DMA engine, and the grid places every known instance, with two cells empty; the classes are cited, the claim is where lowering reintroduces them
 The expert designs lose end-to-end time on the NPU because work waits on other work that it does not consume.
-Such a wait is a \emph{false dependence}, which is an ordering that the lowered program imposes although no data flows between the two pieces of work.
+Such a wait is a \emph{false dependence}, which is an ordering that the lowered program imposes although no data flows between the two pieces of work, namely a name or order dependence in the classes of Section~\ref{subsec:reading}.
 A false dependence has one of two causes.
 An \emph{order} dependence is a wait placed where the written program order put it rather than where data requires it, and reordering removes it.
 A \emph{name} dependence arises where two pieces of work share a buffer, lock, or channel that they need not share, as in the anti and output dependences of compilers~\citep{kuck1981dependence}, and renaming the storage removes it~\citep{tomasulo1967,lam1988software}.
@@ -81,7 +81,7 @@ We find false dependences at two granularities, in the CP's instruction stream a
         & Order & Name \\
         \midrule
         Stream & column groups take turns in prefill; attention's two columns take turns & none found \\
-        Loop & none found & decode attention's keys, values, and scores, each in one buffer \\
+        Loop & none known in decode attention's loop & decode attention's keys, values, and scores, each in one buffer \\
         \bottomrule
     \end{tabular*}
 \end{table}
@@ -90,9 +90,10 @@ We find false dependences at two granularities, in the CP's instruction stream a
 Table~\ref{tab:grid} places each instance we know of.
 In prefill, order dependences in the instruction stream hold back one column group behind another and one column of an operator behind the other.
 In decode, the attention loop holds name dependences on its keys, its values, and the one buffer through which its two cores pass scores, while its running maximum and accumulator carry true dependences across blocks.
-No name dependence appears in the stream, because the existing prefill already gives each chunk its own buffers, and no order dependence appears in a loop of the existing designs, where the acquires that cover a pair of blocks arose only in a hand edit's unrolled loop.
+No name dependence appears in the stream, because the existing prefill already gives each chunk its own buffers, and rings added nothing beyond reordering there, within 0.1\%.
+No order dependence is known in decode attention's loop, where acquires that cover a pair of blocks arose only in a hand edit's unrolled loop, and loops with nested control are not analysed, so the census tests this cell.
 The loop row carries an engine label, so an instance confined to a DMA engine stays visible.
-% SOURCE: the grid and its instances (vault paper-cosched-direction-converged, Clarification (xiii), ruled on lab-cosched-passes (30)); the score buffer shared_l10 is name x loop in the existing build; the pair-level order edge of the hand edit's arms (b) and (c) came from the pair unroll (lab-cosched-passes (30), item 5; outline v9 section 1).
+% SOURCE: the grid and its instances (vault paper-cosched-direction-converged, Clarification (xiii), ruled on lab-cosched-passes (30)); the score buffer shared_l10 is name x loop in the existing build; the pair-level order edge of the hand edit's arms (b) and (c) came from the pair unroll (lab-cosched-passes (30), item 5; outline v9 section 1); rings beyond reorder in the stream: R-ship = pair within 0.1% (amd-npu 71081d1).
 
 \subsection{Census}
 \label{subsec:census}

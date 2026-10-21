@@ -1,10 +1,10 @@
 \section{Bounding and Pricing Removals}
 \label{sec:bound}
 
-% VALUE: because the order is in the program and durations are measured, the worth of removing a dependence can be bounded before the removal is built, and removals must be priced jointly, since one removal gains nothing while another edge keeps the critical cycle; the section states the scheduling problem and a lower bound, the bound on a removal, joint pricing, the event model that prices whole schedules, and the tests
+% VALUE: because the order is in the program and durations are measured, the worth of removing a dependence can be bounded before the removal is built, and removals must be priced jointly, since one removal can gain nothing while another dependence remains; the section states the scheduling problem and a lower bound, the bound on a removal, joint pricing, the event model that prices whole schedules, and the tests
 Since the order is in the program and the durations are measured, the worth of removing a dependence can be bounded before the removal is built.
 We state the scheduling problem that the semantics of Section~\ref{subsec:semantics} define, with a lower bound on any schedule (Section~\ref{subsec:formulation}), and bound what removing one dependence can gain (Section~\ref{subsec:removal}).
-Removals must be priced together, because one removal gains nothing while another edge keeps the critical cycle (Section~\ref{subsec:joint}).
+Removals must be priced together, since one removal can gain nothing while another dependence remains (Section~\ref{subsec:joint}).
 An event model prices whole schedules from probes of each operator alone (Section~\ref{subsec:pricing}), and Section~\ref{subsec:tests} states how each prediction is tested.
 
 \subsection{Problem Formulation}
@@ -12,7 +12,7 @@ An event model prices whole schedules from probes of each operator alone (Sectio
 
 \textbf{Resources.}
 % VALUE: three kinds of resources: column groups (one operator at a time, data-driven), the CP (one in-order server that issues and blocks), and the host (work between commands)
-The array offers a set $\mathcal{G}$ of disjoint column groups, each running one operator at a time and sharing only DRAM bandwidth with the others.
+The array offers a set $\mathcal{G}$ of disjoint column groups, each running one operator at a time, which in the open prefill share only DRAM bandwidth with each other.
 The CP is a single in-order server that executes issue instructions, each at a small cost, and blocks at each synchronization until the transfer it names completes.
 The host CPU runs the work between operators that the array does not perform, such as normalizations, and it submits and collects commands.
 
@@ -34,7 +34,7 @@ Two further decisions manage the boundaries with the host: the number $D$ of com
 Both would disappear if the host work moved onto the array, so we report their effect separately from that of the essential decisions.
 
 \textbf{Timing.}
-% VALUE: the semantics of Section 2.4 as rules: commands in sequence with a boundary cost; within a command, a segment's work starts once issued and its predecessor has finished; a synchronization completes when its work has
+% VALUE: the semantics of Section 3.1 as rules: commands in sequence with a boundary cost; within a command, a segment's work starts once issued and its predecessor has finished; a synchronization completes when its work has
 A command starts on the device after its predecessor completes, plus a \emph{boundary cost} $\epsilon$ when it was already queued, or the dispatch floor $F$ when it arrives at an idle device.
 Within a command, the CP walks $\sigma_k$ in order.
 The work of segment $s_{o,j}$ starts on $g(o)$ once the CP has issued it and the work of $s_{o,j-1}$ has finished, and a synchronization completes once the CP reaches it and the work it names has finished.
@@ -74,20 +74,25 @@ The bound applies Amdahl's law to an ordering rather than to a component, and it
 A removal is therefore worth building only where its bound exceeds its cost, which for a rename is the local memory, BDs, locks, and channels it takes, and for a reorder the synchronization and planning it adds.
 The bound itself never falls below one, so it cannot predict a loss.
 At 512-token appends, for example, the composed prefill runs at 0.88--0.93$\times$ the speed of the existing order, which the event model attributes to the synchronization and planning that the reorder adds.
+% DECISION: the bound's sentences follow outline v9 section 3's rows (P4 withdraws them, P4u marks them untested); the critical-cycle sentences follow the W1-W5 table.
 % SOURCE: the bound and its typed resources (outline v9 section 2, C1; vault lab-bound-validation (1)); the 512-token appends, existing S4 faster at 0.88-0.93x, the cost priced by the event model after the runs (lab-agent-step (8), (10), (11)).
 
 \subsection{Joint Pricing}
 \label{subsec:joint}
 
-% VALUE: decode attention shows why removals are priced jointly: renaming keys and values alone gains nothing while the shared score buffer keeps the two cores waiting on each other, and renaming all three brings each position close to its transfer alone; a search that applies one change at a time stops after the first; reordering decode's stream can gain little, since its phases already read near the cap
-Decode attention shows why removals must be priced together.
-Renaming its keys and values alone, with the score buffer still shared, leaves the time per token within 0.3\% of the existing design's at 16{,}384 and 32{,}512 tokens, because the two cores still wait for each other through the shared score buffer, which keeps the loop's critical cycle.
-Renaming all three lowers the time per token by 1.27$\times$ and 1.39$\times$ at the same contexts, and each position then costs within 1\% of its transfer alone.
-A search that applies one change at a time and keeps only the changes that help would therefore stop after the first rename.
+% VALUE: decode attention: renaming keys and values alone measured null while the shared score buffer remained, and renaming all three brought each position close to its transfer alone; the critical-cycle reading is an explanation stated before the null arm ran and supported by the per-block fix's bands, not a prediction; the cycle model does not reproduce the existing loop's cost in sample, so its joint prediction was not counted; a one-change-at-a-time search could stop after the first rename; reordering decode's stream can gain little
+Decode attention shows that one removal can gain nothing while another dependence remains.
+Renaming its keys and values alone, with the score buffer still shared, leaves the time per token within 0.3\% of the existing design's at 16{,}384 and 32{,}512 tokens, whereas renaming all three lowers it by 1.27$\times$ and 1.39$\times$, and each position then costs within 1\% of its transfer alone.
+Our reading is that the shared score buffer keeps the two cores waiting on each other and so keeps the loop's critical cycle.
+This reading was stated as the explanation of a null result before a hand edit that renamed all three buffers, but acquired the scores once per pair of blocks, measured null, and a per-block score channel then reached gains inside the bands stated before its run.
+It explains these results in sample rather than predicting them, and the per-block channel also adds a transfer hop and keeps a coupling per pair of blocks.
+Our cycle model does not reproduce the existing loop's cost per position in sample, predicting 1.40 against a measured 1.15\us{}, so its joint prediction for renaming keys and values alone, a 1.08--1.11$\times$ gain, was not counted, and the measured gain fell below it.
+Consequently, a search that applies one change at a time and keeps only the changes that help could stop after the first rename.
 By contrast, reordering decode's stream could gain at most about 1.13$\times$, since its phases already read DRAM near the cap.
 % SOURCE: keys and values renamed with the existing score buffer kept: 1.002x (16,384) and 1.003x (32,512), tokens and logits bit-identical (vault lab-decode-long-context (28); amd-npu d8f0bd4c, score 5e1017a5); all three renamed (the loop pass): 1.269x / 1.391x, slope 0.683 us against a transfer-only 0.677 us (lab-decode-long-context (22)).
 % SOURCE: decode reordering or placement bounded at about 1.13x, phases near the DRAM cap (vault lab-bound-validation (1), from lab-decode-long-context (5)-(7)).
-% DECISION: the joint prediction's registered test for this chain is reported in Section 5.5 with its outcome as registered; this paragraph states the measured chain only.
+% SOURCE: the explanation stated before arm (b) ran: lab-decode-long-context (11); (c)'s bands 0.68-0.78 us, 1.22-1.29x, 1.30-1.41x, hit at 0.712 us, 1.274x, 1.366x, the gate's +-3% at 2k missed on the good side by 5.1% (lab-decode-long-context (12)-(13)); the cycle model's census gate 1.399 vs 1.153 us per position, tolerance 0.112; J predicted 1.079x / 1.106x, band lower edges 1.0088 / 1.0095, measured 1.0018x / 1.0027x, outcome UNTESTED (cells uncounted) (lab-decode-long-context (27)-(28); amd-npu a3334f8d).
+% DECISION: the critical-cycle wording is outline v9's W2 row (the census gate failed): the base wording, the in-sample clause, and J's outcome as a clause; the 1.231 vs 1.153 us diagnosis stays open.
 
 \subsection{Event Model}
 \label{subsec:pricing}
