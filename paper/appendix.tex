@@ -194,7 +194,12 @@ differs from its own forward by up to 3.0\% on keys and 7.5\% on values without 
 distinguishes this case is that the larger difference fell on a near tie.
 
 The keys and values that fail came from the shipped prefill program, with no rewrite of ours applied, running on an
-out-of-tree split build, and were stacked by the compiler's own routine. This check therefore does not separate the
+out-of-tree split build, and were stacked by the compiler's own routine. That build is not a variant of the module's program: rebuilding it with the
+module's own builder, in the same checkout and without opening the device, gives 22 of 38 files byte-identical and
+the 16 remaining ones identical in size with their differences confined to header identifiers and a timestamp, which
+do not reproduce between builds. The difference therefore does not come from the build's bytes, and the reported
+timings for this model were taken on a program identical to the module's own. What remains to be separated is the
+host path on which the keys and values were produced. This check therefore does not separate the
 split build from the shipped prefill's own numerics, and no in-tree build of that model's fused prefill exists on our
 machine to compare against, so we claim no cause. The comparative claims elsewhere in the paper are untouched, because
 they compare a rewrite with the shipped program on one build. Of the other models, Qwen3-4B reproduces its module's
