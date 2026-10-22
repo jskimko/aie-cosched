@@ -9,7 +9,7 @@ The composed commands must do the same work as the existing ones, which the comp
 No group may wait at the CP for work it does not consume, which is an order dependence in the stream row of Table~\ref{tab:grid}, so the composer reorders issue across operators and a stream pass reorders issue within one operator's stream (Section~\ref{subsec:order}).
 No use of a buffer may wait for another use it does not depend on, which is a name dependence in the same table, so the composer renames buffers into rings and our loop pass renames decode attention's buffers by the same rule (Section~\ref{subsec:rings}).
 The partition of the array must fit the regime, so the composer chooses the split of columns for each regime (Section~\ref{subsec:split}).
-The event model of Section~\ref{subsec:pricing} prices every candidate, so each choice is made before anything runs.
+The event model of Section~\ref{subsec:pricing} prices every candidate, so each choice is made without running the candidate.
 Removing a dependence is not always worth its cost, and Section~\ref{subsec:removal} gives both the rule that decides and the regime where the composed order loses time.
 % SOURCE: amd-npu a0ee2edf44e0 (tag composer-v1.1), prefill-overlap/txn.py, merged.py, component_model.py; Python, on the engine's hardware context; the stream pass aie-cosched-schedule and the loop pass aie-cosched-rename in mlir-aie (aie-cosched-pass-0 f1725dae1f1).
 
