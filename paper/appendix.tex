@@ -206,7 +206,12 @@ The keys and values that fail came from the shipped prefill program, with no rew
 stacked by the compiler's own routine. Two comparisons settle where the difference comes from. The build our harness
 uses is the module's own program: rebuilt by the module's own builder, in the same checkout and without opening the
 device, 22 of its 38 files are byte-identical and the remaining 16 are identical in size with their differences
-confined to header identifiers and a timestamp, which do not reproduce between builds. And the keys and values do not
+confined to header identifiers and a timestamp, which do not reproduce between builds. The same holds for the two
+models that carry our decode and turn results: rebuilding the baseline prefill behind every reported run of
+Llama-3.2-1B, at both window sizes, and of Qwen3-4B gives 18 of 30 files byte-identical and the 12 remaining of equal
+length with byte-identical images, differing only in those same identifiers. So the program we compare against is the
+module's own on every model we report. This covers the baseline split alone, since the other two splits are
+constructions of ours and have no counterpart to rebuild. And the keys and values do not
 depend on our host path: the in-tree build loaded by the module's own path, the split build loaded by that path, and
 the split build loaded through our turn harness with its specification patch, its weight arenas and its template
 produce keys and values bit-identical to one another, with a maximum absolute difference of zero, each reproducing
