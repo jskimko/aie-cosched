@@ -145,8 +145,32 @@ orders run at 11.65\ms, which is 3.2 times the depth-two time of the faster orde
 the period had expected the two depths to agree for that order. We report it as measured, sought no cause, and left
 the depth as registered.
 
-\section{The Gemma3-4B Gate Result}
+\section{Reference Checks and the Gemma3-4B Gate Result}
 \label{app:gemma-gate}
+
+% VALUE: the three instruments differ in kind, which matters more than how many tokens each covers; then the 1B
+% result that clears the headline model's prefill path, then the Gemma result with its scope
+Three kinds of instrument are available to us, and they are not interchangeable. The expected continuations shipped
+with the Qwen3-4B and Gemma3-4B modules are constants their authors recorded from their own device runs, one of them
+re-recorded after the authors fixed a bug that had zeroed a feed-forward contribution; agreement with such a constant
+is a regression check against the authors' output over ten tokens, not a statement of numerical fidelity. The
+remaining instrument is a floating-point forward on the same quantized weights, which two of the stacks provide and
+which the designs are themselves gated against; comparing to it detects drift of the device's arithmetic from that
+forward, and it is the instrument used for the two checks below. It is not an independent implementation of the
+model, and we do not claim it as one.
+
+\textbf{Llama-3.2-1B.} Against that forward, the shipped prefill's keys differ by 0.4--3.0\% and its values by
+1.1--7.5\% across the sixteen layers, on a six-token prompt and on a 256-token one, and the two split builds give the
+same errors to every digit we report. The error grows over the first eight layers and then holds, with no step of the
+kind the next paragraph describes. The first token matches the forward's on both prompts and both builds. Seeding the
+turn's decoder from the forward's own keys and values, from one split's, and from the other's produces the same
+seventeen tokens in all three cases, so these differences do not change what decode emits. All three agree with the
+forward's own continuation for ten tokens and then differ, at a step where the forward's margin between its top two
+tokens is 0.16, its second-narrowest in that sequence; because the difference appears even when the decoder is seeded
+from the forward's own keys and values, it lies between the device's decode and that forward rather than in the
+prefill we rewrite.
+
+\textbf{Gemma3-4B.}
 
 % VALUE: the per-layer detail behind the body's statement that one configuration fails a reference check, with the
 % scope stated so that it cannot be read as either our build being broken or the stack being inaccurate
