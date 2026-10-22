@@ -46,8 +46,18 @@ Because the aggregate DRAM read cap varies by up to 12\% between batches, every 
 \subsection{End-to-End Latency}
 \label{subsec:e2e}
 % VALUE: per model (T1), absolute TTFT from scratch, the time from a tool result to the first new token on appends, decode per token, and whole turns, for the existing design and ours, with the gap to the lower bound; the gain from appends ranges 1.1-2.6x by (L, N), and the combined split and order reach 3.0x on Qwen3-4B at 16k + 4k against the default configuration
-% DECISION: results stay \E until the results freeze and the audit's verdicts.
-\E{Table~1: per model, TTFT from scratch and on appends, decode per token, and turn time, existing and composed, with the gap to the lower bound.}
+% DECISION: one table per phase, not one combined table: the three phases are scored on three grids, and a single
+% table over them would imply cells that were never run. The append table is below; decode is Figure~\ref{fig:decode}
+% and the turns are Figure~\ref{fig:turns}.
+\input{tab-append}
+Table~\ref{tab:append} gives the append phase in absolute times.
+Against the hand-alternated baseline at its own faster split, the composed schedule shortens the time to the first new token by $1.20$--$1.51\times$ over the four models, and the bound computed from the same probes is a further $1.20$--$1.63\times$ below it.
+On eleven of these twelve cells the hand alternation changes the shipped time by under 0.1\%, because the composer's split gives attention four columns on nine of them and on that split attention's stream already has two segments per column; the exception is Llama-3.1-8B at a 2{,}048-token context, where alternating lowers the shipped time from 10{,}001 to 9{,}625\,ms and the gain over it is $1.47\times$ rather than $1.52\times$.
+Gemma3-4B is the one model whose bound does not grow with the cached context: because it attends within a local window in most layers, a 4{,}096-token append has the same bound at a 2{,}048- and an 8{,}192-token context, 2{,}619\,ms in both, and what changes between those two cells is only how much of it the schedule recovers.
+% SOURCE: all re-derived in this workspace from amd-npu 78ec55b7 prefill-overlap/cp-predict/score-2026-10-21.json; gains 1.20-1.51x, bound ratios 1.196-1.631 over the twelve cells; 8B 2k + 4k shipar 9,624.7 vs ship 10,001.1 ms (1.0391), every other cell |ship/shipar - 1| < 0.001.
+% DECISION: the ratio to the bound quoted here is the bound at the composed schedule's own split, which is what the
+% table reports; Section~\ref{subsec:bound-eval}'s gap analysis uses the smallest bound over the splits, so its
+% fractions are the more conservative of the two readings.
 
 % VALUE: the production engine as an absolute reference point: the composed schedule is below FastFlowLM in every model and regime, and the existing program it rewrites is itself close to that engine, so the gains are not measured against a slow baseline; the two stacks differ in kernels, quantization path, tokenization, and chunking, so the comparison is a reference and not like for like
 FastFlowLM, the production engine for this device, serves the same models from the same quantized weight files, so we measure its TTFT as an absolute reference point.
@@ -124,7 +134,17 @@ We registered both the expected factor and that dilution before the run; the mea
 
 This is also where the finding of Section~\ref{sec:intro} appears in shipped code rather than in a design we wrote: renaming the keys and values alone, which is what a production mapping of another model does by hand~\citep{du2026gemma3}, is worth 0.3\%, because the shared score buffer still closes the loop's cycle; the three together give the factors above.
 % SOURCE: the R arm of vault lab-decode-long-context (22), re-derived here: 1B 35.621 -> 28.072 ms (1.269x) at P = 16,384 and 54.160 -> 38.938 ms (1.391x) at 32,512, slope 0.683 us per position against a measured transfer-only 0.677; Qwen3-4B 118.172 -> 101.839 ms (1.160x) at 16,384 and 168.781 -> 140.058 ms (1.205x) at 28,800, slope 3.099 against a derived 3.047 (amd-npu a6bc94b6 gate-1b.json sha256 36472797..., 455740b1 gate-qwen.json sha256 38e750a2...). The keys-and-values-only figure is Section 5.3's, 0.3% at 16,384 and 32,512.
-\E{Figure: decode time per token by context length, existing and renamed, for each LLM, with the event model's prediction and the cap-bounded estimate for placement.}
+\begin{figure}[t]
+    \centering
+    % VALUE: the decode result as a curve rather than a table, because what the renaming changes is the slope per
+    % position and not a single cell: the baseline's cost per position is the transfer plus the compute it waits
+    % for, and the renamed loop's is the transfer alone.
+    \includegraphics{fig/decode.pdf}
+    \caption{Decode time per token against the length of the cached context, for the shipped design and after our loop pass renames the keys, values, and scores into rings. Each point is the median of three runs of 250 tokens, and every step's logits are bit-identical between the two arms at every point. The annotation on each panel is the fitted cost per decoded position, which the renaming lowers to within 1\% of what transferring the keys and values alone costs.}
+    \label{fig:decode}
+\end{figure}
+% SOURCE: figs/data/decode-1b.json and decode-qwen.json, byte copies of amd-npu a6bc94b6 gate-R/1b-2026-10-21/gate-1b.json and 455740b1 gate-R/qwen-2026-10-21/gate-qwen.json; the figure plots the census (baseline) and R (our pass) arms and drops the 32,517 reproduction point, which repeats 32,512.
+% DECISION: the event model's decode prediction and the cap-bounded estimate are not plotted. Neither is in these two records, and adding a line the data file does not carry would make the figure unreproducible from figs/data; both are stated in the text above instead.
 
 \subsection{Agent Turns}
 \label{subsec:turns}
