@@ -119,12 +119,25 @@ is 40\% of the 248\ms{} difference at 2{,}048 tokens and 49\% of 208\ms{} at 4{,
 serial, and the unit repeated per layer is a dequantization, three matrix multiplications, an attention command and
 four more matrix multiplications.
 
-\textbf{What we cannot.} The remaining 149\ms{} and 105\ms{} are unexplained. The hypothesis that per-request setup
-explains them is contradicted by the capture: the constructions are spread through the window rather than batched at
-its start, and both the timeable setup, from submission to the first command, and the host idle time scale with prompt
-length, from 29--40\ms{} to 51--53\ms{} and from 166--185\ms{} to 316--321\ms{} respectively. The open stack has no equivalent pass. It keeps its weights in four-bit form in memory and dequantizes one weight tile at a time in a core's local memory inside each matrix multiplication's own loop, so that cost is already inside the device time our probes and our measured times contain, with no extra command and no second pass over memory. The exception is a model whose output projection is not tied to its embedding, where that one matrix is dequantized in place. Interposer overhead
-is not visible: the engine's own reported time-to-first-token is 0.7--6.2\% below our reference measurement of it.
+\textbf{Where the difference goes.} Recording both stacks the same way, by the time each command is outstanding on
+the device and the time the host spends with nothing outstanding, accounts for the whole of the difference at a
+4{,}096-token prompt. Of 194\ms{}, the largest part is host time: the production engine spends 318\ms{} with no command
+on the device against our 96\ms. Its fixed passes account for a further 102\ms. Its matrix work runs 65\ms{} longer
+than ours. Against those, its attention runs 196\ms{} \emph{faster} than ours, which is the one place the hand-tuned
+engine is ahead of the design we rewrite, and which is why the difference is not larger.
 
+Two limits on that accounting. The comparison is by command kind rather than by identical work: our matrix figure
+includes the output projection and the dequantization folded into each multiplication, which the engine pays
+elsewhere. And the recording locates the host time without seeing into it, since the interposer observes the gaps
+between calls rather than what runs inside them, so the dominant term is host-side time we can place but not
+decompose. At a 2{,}048-token prompt we have no equivalent record of the open stack and attribute nothing.
+% SOURCE: vault lab-flm-streams (15), no device. FastFlowLM from the capture's serial issue-to-done per kind; the open
+% stack from the ML Timeline hold-2 records, 1B shipped with attention alternated at 4,096 tokens, TTFT 1,607.6 ms,
+% per-command first issue to last return unioned per column group, median of 5 reps: GEMM group 895.0 ms, attention
+% group 617.1 ms, overlap 0.0, host time with nothing outstanding 95.6 ms. FastFlowLM: GEMM 959.9, attention 420.8,
+% separate dequantization and layer passes 102.5, host idle 318.5. Differences +64.9, -196.4, +102.5, +222.9, summing
+% to +194.0 against a measured window difference of 194.1 on these two days. The two sides come from different holds
+% on 2026-10-21.
 \section{Registered Predictions: Flagged Arms}
 \label{app:flags}
 
