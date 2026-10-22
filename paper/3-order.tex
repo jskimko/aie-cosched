@@ -221,6 +221,12 @@ The counts for the other two cells of Table~\ref{tab:grid} come from reading des
 % Removals must be priced together, since one removal can gain nothing while another dependence remains (Section~\ref{subsec:joint}).
 % An event model prices whole schedules from probes of each operator alone (Section~\ref{subsec:pricing}), and Section~\ref{subsec:tests} states how each prediction is tested.
 
+% MERGED: the cost model closes the analysis, since it is computed over the graph the analysis recovers
+% Since the order is in the program and the durations are measured, the worth of removing a dependence can be bounded from the program alone, before the removal is measured.
+% We state the scheduling problem that the semantics of Section~\ref{subsec:semantics} define, with a lower bound on any schedule (Section~\ref{subsec:formulation}), and bound what removing one dependence can gain (Section~\ref{subsec:removal}).
+% Removals must be priced together, since one removal can gain nothing while another dependence remains (Section~\ref{subsec:joint}).
+% An event model prices whole schedules from probes of each operator alone (Section~\ref{subsec:pricing}), and Section~\ref{subsec:tests} states how each prediction is tested.
+
 \section{Cost Model}
 \label{sec:bound}
 % VALUE: the quantity that decides whether a rewrite is attempted at all: a lower bound computable from the
