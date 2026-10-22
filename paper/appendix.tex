@@ -142,8 +142,17 @@ which passed. The other two holds read 13.4--13.5~GB/s at one column and 54.7--5
 
 Third, an observation that was neither predicted nor scored: in the order-by-loop design at buffer depth four, both
 orders run at 11.65\ms, which is 3.2 times the depth-two time of the faster order, where the registration's sketch of
-the period had expected the two depths to agree for that order. We report it as measured, sought no cause, and left
-the depth as registered.
+the period had expected the two depths to agree for that order. We left the design as registered and did not retune
+it, and we can say where the change is not. No cycle of the depth-two graph accounts for it, because adding buffer
+slots can only add tokens to a cycle and so cannot raise any cycle's mean; the per-element time at depth four,
+5.69\us, exceeds not only the depth-two stream order's 1.76\us{} but also the pair order's 3.53\us, which is about the
+sum of the producer's and consumer's own times. The firing times themselves therefore differ at depth four. Comparing
+the final configuration state of the four built designs localises that: every shim-tile and memory-tile register is
+identical between the depths, with no change to a transfer, a route or a lock outside the cores' own tiles, while each
+core's program differs by 156 to 212 words and the depth-four programs are shorter. The change is in what the cores
+execute rather than in how data moves, and naming its cause would need the lowered code at both depths, which we have
+not read. The certificate is unaffected in what it compares, since it is a ratio between the two orders at one depth,
+but the registration's assumption that the producer's and consumer's times do not depend on depth is what failed.
 
 \section{Reference Checks and the Gemma3-4B Gate Result}
 \label{app:gemma-gate}
