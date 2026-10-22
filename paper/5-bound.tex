@@ -84,7 +84,7 @@ How much overlap the DRAM read rate allows depends on which group holds the crit
 We measure this on pairs of one attention operator and one GEMM, issued in one command on disjoint columns.
 Where the GEMM holds the critical path and the pair reads 52.0--52.3~GB/s against a measured cap of 53.9--55.3~GB/s, co-running costs it 8.4--10.5\% of the attention operator's duration.
 Where attention holds the critical path, co-running costs a fixed 21~$\mu$s and does not grow with the GEMM's duration.
-Two operators of equal duration therefore overlap to within $1.84\times$ of the longer one in the first case and $2.00\times$ in the second.
+Two operators of equal duration therefore overlap to within $1.81$--$1.84\times$ of the longer one across those penalties in the first case, and $2.00\times$ in the second.
 Per-command read rates during a whole prefill identify the two regimes directly: on Llama-3.2-1B at 4{,}096 tokens, commands that carry only GEMMs read 50.0~GB/s at the median, which is 90--93\% of the cap, whereas commands that carry only attention read 8.3~GB/s, about 15\% of it.
 Commands that carry both read 48.0~GB/s, so the GEMM remains the operator near the cap.
 Between the existing order and the composed one, the GEMM group's rate over the time its work is outstanding falls from 48.6 to 45.6~GB/s, with the five repetitions of each fully separated, which is the direction the penalty predicts at one cell of one model rather than a second estimate of its size.
