@@ -6,12 +6,12 @@
 
 \textbf{AI Engine Array.}
 % VALUE: the array is columns of tiles that run data-driven once configured, so disjoint columns can compute at the same time; a design is one configuration
-The AMD XDNA~2 neural processing unit (NPU) in AMD Ryzen\texttrademark{} AI processors contains an array of AI Engine (AIE) tiles in 8 columns~\citep{rico2024xdna,amd_am027}.
-Each column holds, from the bottom, a shim tile that moves data between the array and DRAM, a memory tile, and 4 compute tiles, which are VLIW, SIMD vector cores with local memory~\citep{amd_am027}.
+The AMD XDNA~2 neural processing unit (NPU) in AMD Ryzen\texttrademark{} AI processors contains an array of AI Engine (AIE) tiles in 8 columns~\citep{linux-amdnpu}.
+Each column holds, from the bottom, a shim tile that moves data between the array and DRAM, a memory tile, and 4 compute tiles, which are VLIW, SIMD vector cores with local memory~\citep{amd_am027,linux-amdnpu}, so the array has 32 compute tiles and 4\,MB of memory-tile storage in all~\citep{linux-amdnpu}.
 Direct memory access (DMA) engines in the tiles move data over a stream switch network, each transfer described by a buffer descriptor (BD), and locks synchronize producers and consumers~\citep{amd_am027}.
 A design is one configuration of the array, namely its core programs, stream routes, BDs, and locks, which a compiler such as MLIR-AIE~\citep{hunhoff2025iron,mlir-aie-repo} or MLIR-AIR~\citep{wang2026mlirair} emits.
 Once configured, the array executes data-driven: a core runs when its input locks are released, so cores on different columns compute independently whenever their inputs arrive.
-% SOURCE: column layout 8 x (shim, memory tile, 4 compute tiles) on the Ryzen AI Max+ 395 NPU, as stated in FCPR Section 2.1 (~/docs/FPGA27__Control_Packet_Reconfiguration.pdf).
+% SOURCE: the XDNA 2 topology is the kernel documentation's, which states 4 rows of compute tiles in 8 columns, 1 memory-tile row per column, and 4,096 KB of L2 (docs.kernel.org/accel/amdxdna/amdnpu.html, read 2026-10-21; the same citation FCPR Section 2.1 uses for the column count). Confirmed on the Ryzen AI Max+ 395 NPU of this paper's machine. NOTE: Rico et al. (IEEE Micro 2024) is the FIRST XDNA generation (5 columns, 10 TOPS) and must not be cited for an XDNA 2 figure.
 
 \textbf{Command Processor.}
 % VALUE: the host reaches the array only through instruction streams that one in-order CP executes; an issue returns at once, a synchronization blocks the CP, so the CP's order decides when each column receives work
@@ -24,7 +24,7 @@ A \emph{synchronization} blocks the CP until a named DMA transfer signals its co
 Pushing a BD into a DMA queue returns immediately, so the transfer proceeds while the CP moves on, and we call such instructions \emph{issue} instructions.
 Consequently, the CP's instruction order decides when each column receives work, and a synchronization on one column delays every later issue, whichever column it targets.
 The NPU can also be divided into partitions of contiguous columns that run independent applications~\citep{rico2024xdna}, whereas the work this paper studies runs in one partition.
-Prior work models the time of an array reconfiguration as the CP's critical path, namely its commands and its waits on transfers~\citep{fcpr2027}.
+Prior work models the time of an array reconfiguration as the CP's critical path, namely its commands and its waits on transfers~\citep{fcpr2027}, and the cost of configuring an accelerator has been characterized and reduced across several of them~\citep{vandelm2026configwall}.
 % SOURCE: instruction encoding, mlir-air a3e26261 programming_examples/llms/shared/fused_prefill/insts.py: TXN v1.0 stream; address patch = opcode 0x81 (argument index at word 8, byte offset at word 10); synchronization = opcode 0x80.
 % SOURCE: the existing prefill's operators write only shim BDs and queues (row 0, 0x1D000/0x1D200), their own cores' lock registers (0x1F000), and runtime-parameter words in their cores' memory (0x3C00 GEMM, 0x2000 attention); no program loads, core resets, or memory-tile writes (decoded from the shipped streams, lab-prefill-overlap (3)).
 

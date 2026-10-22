@@ -2,8 +2,8 @@
 \label{sec:intro}
 
 % VALUE: (1) context. Client NPUs run LLMs as compositions of per-operator designs on a spatial array, issued by one in-order CP; kernels and mappings are well served; the expert designs still leave columns idle in prefill and read KV at half rate in decode; gap: how the composition is issued has received far less attention
-Neural processing units (NPUs) such as the AMD XDNA~2 in Ryzen\texttrademark{} AI processors bring large language model (LLM) inference to client machines~\citep{rico2024xdna}.
-Such an NPU is now standard equipment rather than a specialist part, because a platform requirement of at least 40 trillion operations per second put one into mainstream laptops~\citep{copilotplus-reqs}, and this generation of the array is rated at 50~\citep{taka2025gemm}.
+Neural processing units (NPUs) such as the AMD XDNA~2 in Ryzen\texttrademark{} AI processors bring large language model (LLM) inference to client machines~\citep{rico2024xdna,linux-amdnpu}.
+Such an NPU is now standard equipment rather than a specialist part, because a platform requirement of at least 40 trillion operations per second put one into mainstream laptops~\citep{copilotplus-reqs}, and this generation is rated at 50 across 32 compute tiles~\citep{taka2025gemm,linux-amdnpu}.
 So a loss in how these machines are programmed is paid on a large installed base, and the toolchains that program them are open.
 Their AI Engine array is spatial, so each operator of a model runs on its own group of columns, and the host composes the operators' work into a sequence of commands that a single in-order command processor (CP) executes~\citep{rico2024xdna,linux-amdnpu}.
 Compilers and mapping frameworks already map single operators and fused groups onto the array~\citep{wang2026mlirair,hunhoff2025iron,symons2025stream}, and expert end-to-end designs exist for prefill and decode~\citep{wang2026mlirair,fastflowlm-repo}.
