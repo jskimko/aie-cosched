@@ -1,4 +1,4 @@
-\section{False Dependences in a Compiled Schedule}
+\section{Dependence Analysis}
 \label{sec:order}
 
 % VALUE: on XDNA 2 each engine runs its program in order and nothing schedules across engines, so the order of the work and the waits between engines are in the compiled program; the section shows this from measured command semantics, states the execution model, reads a stream into a happens-before graph with a cause per wait, and extends the reading to closed binaries
@@ -221,7 +221,7 @@ The counts for the other two cells of Table~\ref{tab:grid} come from reading des
 % Removals must be priced together, since one removal can gain nothing while another dependence remains (Section~\ref{subsec:joint}).
 % An event model prices whole schedules from probes of each operator alone (Section~\ref{subsec:pricing}), and Section~\ref{subsec:tests} states how each prediction is tested.
 
-\section{What a Removal Is Worth}
+\section{Cost Model}
 \label{sec:bound}
 % VALUE: the quantity that decides whether a rewrite is attempted at all: a lower bound computable from the
 % program and probes before anything runs, its necessary-but-not-sufficient condition, and the model that prices
