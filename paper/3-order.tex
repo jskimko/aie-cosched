@@ -69,7 +69,7 @@ We assume static control: the CP's stream is straight-line, since a synchronizat
 A dispatch at given runtime parameters then has one static set of operations, and a loop with data-dependent control is reported as such and left out of the analysis.
 A loop whose body holds nested control, or an access the analysis cannot classify, is likewise reported as unsupported and not analysed, which in the decode design applies to every loop outside attention.
 We also assume that the host follows static control, issuing commands in an order that depends on the LLM and the lengths of the context and the prompt rather than on data, and its own work enters as a measured cost.
-Durations remain measured inputs, because the program fixes the order of each engine's work but not how long the work takes \E{the per-operation costs from the microbenchmarks}.
+Durations remain measured inputs, because the program fixes the order of each engine's work but not how long the work takes; each operator's duration enters as a probe measured once per configuration (Section~\ref{subsec:formulation}).
 % SOURCE: operations, locations, and static control (vault lab-cosched-passes (30), item 1); unsupported loops: 22 in the decode census build, all outside the attention herd (lab-cosched-passes (33), Limits); the host's static control (outline v9 section 1); the decode kernels' early return on the pad block branches on a runtime parameter, so it stays static per context length (lab-decode-long-context (10)).
 
 % MOVED 2026-10-22: the formal setup follows the semantics it rests on, as a Problem Definition section does
@@ -129,7 +129,7 @@ Every wait that the analysis classes as false and that our passes remove leaves 
 To show how the CP executes the order, we insert the runtime's record-timer instruction after each synchronization and after each run of issue instructions, so that the firmware writes an identifier and a 1.8~GHz device timer into a buffer that the host reads after the run.
 The array's configuration is left unchanged.
 On one 128-token prefill chunk of Llama-3.2-1B, 1{,}468 records per run leave the logits bit-identical and add no measurable device time.
-For each command, they show when each column group's work was issued and how long each synchronization blocked the CP (Figure~\E{timeline}).
+For each command, they show when each column group's work was issued and how long each synchronization blocked the CP (Figure~\ref{fig:outstanding}).
 Between commands the timer advances at less than a tenth of its rate, so the records time intervals within a command, whereas the host's clock times the gaps between commands.
 Order inside a core's loop is invisible to the CP, so the decode loop's order rests on its removal (Section~\ref{subsec:rings}).
 % SOURCE: record-timer instruction TXN opcode 0x83 (12 bytes: header, size, 32-bit id; aiebu 48b69735 xaie_txn.h), XRT 2.25.0 ML Timeline (XDP 67165d6 clientDev/ml_timeline.cpp; Strix Halo listed as a client device with a debug buffer); feasibility check: split-1b-S4-L20480, 108 commands, 1,468 records per run, 5 runs with and 5 without, logits sha equal in all 10, summed start-to-wait with / without records 0.93-0.95, per-command fit of the timer 1,752-1,767 MHz against the 1,800 MHz H clock at the top DPM level (xdna-driver bc5dd96 npu4_dpm_clk_table), 110-125 M timer cycles per host second between commands (amd-npu b98e3044; vault lab-flm-streams (39), decisions log D13).
@@ -405,5 +405,11 @@ Both $B$ and $C$ are measured, $B$ by streaming further positions with no furthe
 \label{subsec:tests}
 
 % VALUE: every prediction is tested as registered before its run: the bound against every measured removal, the event model's times, the joint prediction, and the composite test with its expected outcome stated beforehand; counts reported in full
-\E{The tests and their outcomes: whether the bound holds on every measured removal, the event model's time predictions, the joint prediction of the decode chain, and the composite test with its expected failure stated before the runs; k of n reported in full.}
+Every quantity this section computes is predicted before the run that measures it, in a registration committed to the repository, and scored afterwards by a program fixed at the same time.
+Four predictions test the event model: which split is faster at each configuration, the sign of every pairwise comparison between schedules, the absolute error of each predicted time against a tolerance stated in advance and against a linear interpolation between measured configurations, and the end-to-end gain.
+Two test the bound: that no measured gain exceeds the bound computed for it, and that the composed schedule stays within a stated distance of the bound.
+One tests the renaming of the decode loop, as a band on the per-token gain at two context lengths rather than a point.
+One tests the set property directly, on designs written to hold two name dependences at a known position: that a removal off the binding cycle is worth nothing at every level of core work, with that outcome, and not a gain, stated as the prediction.
+Section~\ref{sec:eval} reports each outcome with its counts, including the two that failed and the direction of each failure.
 % DECISION: the outcomes and the verbs they allow follow outline v9 section 3's rows; a test not completed is reported as its least favourable outcome.
+% SOURCE: the inventory is the set actually scored: the event model's four (Section 5.2, E1-E4, with E4 failed), the bound's two (Section 5.7, the 33-run check held and the 1.30x range failed on 5 of 12), the decode band (Section 5.5, both cells in band on Llama-3.1-8B), and the synthetic certificates (Section 5.3, held at two of three work levels). Nothing else in the paper is registered, and this list is re-checked against the scores at the results freeze.

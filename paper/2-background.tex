@@ -65,10 +65,13 @@ Decode generates one token per step with a separate design, MLIR-AIR's fused dec
 % VALUE: agent steps are short appends to long cached contexts with short outputs; on GPU servers with prefix caching, prefill is a small share of agent LLM time, whereas on the NPU it is a large share of a turn, which is why prefill matters here
 Traces of coding agents show that a median step appends 875 new tokens to a cached prefix of 119K tokens and generates 214 tokens~\citep{zhu2026tracelab}.
 On GPU servers that keep the prefix cached, prefill accounts for only 1.4--9.0\% of an agent's LLM time~\citep{yuan2026agentic}.
-On the NPU, prefill accounts for \E{6--54\%} of an agent's turn, depending on the cached context and the append, so the time from a tool's output to the first new token is a large part of what a user waits for (Section~\ref{subsec:turns}).
+On the NPU, prefill accounts for 6--54\% of an agent's turn on Llama-3.2-1B, depending on the cached context and the append, so the time from a tool's output to the first new token is a large part of what a user waits for (Section~\ref{subsec:turns}).
 % SOURCE: TraceLab Section 1 (medians over ~4,300 Claude Code and Codex sessions, ~350,000 steps) and Table 8; Yuan et al. Section on prefill versus decode time and Fig. 9 (Qwen3.6-27B and Gemma4-31B on two H100 NVL GPUs with vLLM, no context thrashing); both PDFs read 2026-10-15.
 % SOURCE: measured whole turns (append + 250 decode tokens), prefill share of the existing turn: Llama-3.2-1B 6-54% with the KV handoff, Qwen3-4B 7-48% before its handoff rerun, over L in {4k, 16k, 28k} and N in {512, 1k, 4k} (vault ch3-formulation, G2/G2b and Qwen3-4B measured turns).
-% DECISION: the share stays \E until the results freeze (ruling of 2026-10-15, vault paper-ch3-outline); the Qwen3-4B values change once the handoff rerun is in.
+% DECISION: the share is scoped to Llama-3.2-1B, the model whose turns include a steady KV handoff; it is measured
+% with that handoff in the denominator, whereas Section 5.6's turn metric excludes it, which makes 6-54% the
+% conservative edge of the no-handoff basis. Qwen3-4B's 7-48% is not quoted until its handoff rerun is in. Both
+% are re-derived on one basis at the results freeze (ruling of 2026-10-15, vault paper-ch3-outline).
 
 % MOVED from the former findings section: the measurements that motivate the work
 \subsection{The Idle Array}

@@ -1,10 +1,6 @@
 \section{Discussion and Conclusion}
 \label{sec:conclusion}
 
-% VALUE: one paragraph: concurrency on a spatial array is free in the hardware but rationed by false dependences, at one in-order CP and inside operators' loops; reordering issue, renaming buffers, and choosing the split per regime recover what the expert designs leave idle, bit-identically, from probes alone; what remains (host work between commands, decode's weight reads); no outlook, which the discussion carries
-% DECISION: written with the evaluation.
-\E{Conclusion: written with the evaluation.}
-
 % MERGED from the former discussion section
 % VALUE: transferable insights only, each a possibility under its condition and tied to a measured result: an in-order issuer rations concurrency so its order is the schedule and packing yields little of it; the faster partition may change with the regime, so evaluations of prompts from scratch only may choose the wrong one; probes may rank configurations reliably before they run; once ordered, the bound may move from the issuer to the groups; a false dependence inside an operator is out of reach of reordering but not of renaming; on agent turns, gains measured from scratch may misstate end-to-end gains
 Although we evaluate one NPU, our findings rest on properties that other spatial accelerators may share.
@@ -29,3 +25,13 @@ A device that reads busy for 92--97\% of TTFT while only one column group works 
 Other arrays whose engines run their programs in order, such as other AIE generations, may share this property, so the same analysis could apply where their streams can be read.
 % SOURCE: Kepler Tuning Guide section 1.4.2.2 (read 2026-10-21); device busy = summed isolated operator times less the dispatch floor, 92/95/97% of TTFT at 512/2k/4k (amd-npu e3acc8a, Figure busy), not a hardware counter.
 % DECISION: "the compiler owns concurrency on static hardware" is cited (Rammer, TSP) and kept as discussion, never a contribution (outline v9 section 2, "Not contributions").
+
+% VALUE: one closing paragraph: concurrency is free in the hardware and rationed by false dependences at two
+% granularities; what the three passes recover and at what cost to the stack; what the measurements leave on the
+% table. No outlook, which the transfer argument above carries.
+% DECISION: the closing numbers repeat only what Sections 3 and 5 state; the two residual terms are the ones the
+% bound analysis names (the groups' own busy time, and the unhidden CP and host residual), not a wish list.
+Concurrency on a spatial array is free in the hardware and rationed by false dependences: at the one in-order command processor that issues every column group's work, and inside the loops of a single operator.
+Both kinds are textbook order and name dependences, and both survive in designs that an expert has tuned, because the quantity a developer can compute on this device reads busy and because removing any proper subset of the waits that lie on one cycle changes nothing measurable.
+Reading a design's order out of the instruction streams its stack has already emitted makes those waits addressable: each can be attributed to a class, priced from probes of each operator alone, and then removed by reordering issue, renaming buffers into rings, or choosing the split of columns the regime wants.
+What this recovers is the concurrency the expert designs leave unused, bit-identically and with the kernels, driver, and firmware unchanged, and what it leaves is the column groups' own busy time, which the bound shows is what now binds, together with the host work that runs between commands.
