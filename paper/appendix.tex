@@ -201,7 +201,10 @@ confined to header identifiers and a timestamp, which do not reproduce between b
 depend on our host path: the in-tree build loaded by the module's own path, the split build loaded by that path, and
 the split build loaded through our turn harness with its specification patch, its weight arenas and its template
 produce keys and values bit-identical to one another, with a maximum absolute difference of zero, each reproducing
-the error above to the digit. The difference is therefore the shipped program's own. We claim no cause for its step at
+the error above to the digit. The first attempt at this comparison did not run: its own floating-point reference step raised the machine's
+load average above the threshold the protocol requires before the device is opened, and it exited at that check
+before any device was opened; the comparison was repeated after a wait for the load to settle.
+The difference is therefore the shipped program's own. We claim no cause for its step at
 the tenth layer, and we report this model's prefill results as measured, taken on that program and producing its own
 keys and values. The comparative claims elsewhere in the paper are untouched, because they compare a rewrite with the
 shipped program on one build.
