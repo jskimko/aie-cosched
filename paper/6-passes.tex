@@ -37,6 +37,12 @@ The existing host program runs each layer stage by stage, so every output projec
 The composer instead list-schedules the dependency graph chunk by chunk.
 At each step, it takes the ready attention operator of the lowest layer and chunk and adds ready GEMMs, in the same order, until their estimated work reaches that of the attention operator.
 The GEMMs then run in sequence on columns 1--6 while attention runs on columns 0 and 7.
+% VALUE: the price of running the two groups at once: the columns share the DRAM read cap, so a group whose partner is bandwidth-bound loses a measured share of its partner's time, and the ceiling on a pair is below the ideal; where a group is already near the cap there is nothing to win
+Running the two groups at once is not free, because the columns share one DRAM read rate.
+A group on the critical path loses \E{8.5\%} of its partner's duration when it is bandwidth-bound and almost nothing when it is not, so two operators of equal duration overlap to within $1.84\times$ of the longer rather than the ideal $2.00\times$ (Section~\ref{subsec:removal}).
+Where a design already reads near the cap the reorder therefore has little to recover, which Section~\ref{subsec:tests} reports for the largest model we evaluate.
+% SOURCE: the penalty by regime and the 1.84x ceiling are Section 5.1's measurement; per command on Llama-3.2-1B at 4,096 tokens, commands carrying GEMMs read 90-93% of the cap and commands carrying attention about 15% (vault decisions log, "Regime analysis" steps 1 and 3); the 8B composed prefill averages 93-96% of the cap (lab-metric-fields (1)).
+% DECISION: tradeoffs are stated beside the decision that incurs them rather than collected in a section (author, 2026-10-21).
 For an append to a cached context, the composer plans only the new chunks, and their attention estimates use each chunk's absolute index.
 % SOURCE: merged.plan (a0ee2ed): qkv(L, c) after down(L-1, c); attn(L, c) after qkv(L, 0..c); o after attn; gate and up after o; down after gate and up; an optional cap on the GEMMs per attention command.
 % SOURCE: append = Merged.prefill(ids, start=L) on the same plan rules; attention estimates linear in the absolute chunk index (vault lab-agent-step (1)).
