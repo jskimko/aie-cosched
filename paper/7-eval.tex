@@ -56,7 +56,7 @@ Because the two stacks differ in kernels, quantization path, tokenization, and p
 \label{subsec:decode-eval}
 % VALUE: renaming the KV loop and passing scores per block lowers decode's time per token by a factor that grows with the context and with the ratio of serialized compute to KV transfer per position (larger on the 1B than on Qwen3-4B), small on Gemma3 whose most layers attend within a window, as the two-term model predicts; the renamed loop runs at the KV transfer bound; placement would add at most a few percent under the read cap
 % SOURCE: Llama-3.2-1B 1.051 / 1.101 / 1.274 / 1.366x at P = 2,048 / 4,096 / 16,384 / 32,512 (lab-decode-long-context (13)); Qwen3-4B 1.037 / 1.065 / 1.165 / 1.209x at P = 2,048 / 4,096 / 16,384 / 28,800, slopes 4.074 -> 3.061 us, every per-token time within 1% of its prediction written before the run (lab-decode-long-context (14)-(15), amd-npu 320d2d3).
-\E{Figure: decode time per token by context length, existing and renamed, per model, with the model's prediction and the cap-bounded estimate for placement.}
+\E{Figure: decode time per token by context length, existing and renamed, for each LLM, with the event model's prediction and the cap-bounded estimate for placement.}
 
 \subsection{Agent Turns}
 \label{subsec:turns}

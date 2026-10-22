@@ -150,14 +150,14 @@ A command's busy time $b_k$ is the sum of its GEMMs' busy times plus a gap $\gam
 Attention's busy time grows linearly with the chunk index, as the number of earlier key blocks does.
 The host pays an issue cost per command and a post-processing cost per operator, and it waits on the oldest command once $D$ are in flight.
 The TTFT is the simulated span plus a fixed head and tail, namely the embedding, the first normalization, and the LM head.
-Because each term is measured separately, an error in one term cannot hide behind another, and the model reports the device time, the host's exposed time, and the head and tail separately.
+Because each term is measured separately, an error in one term cannot hide behind another, and the event model reports the device time, the host's exposed time, and the head and tail separately.
 % SOURCE: component_model.py (amd-npu a0ee2ed prefill-overlap/component_model.py); parameters prefill-overlap/v1/component_model.json (first committed 6735c61); host terms fitted on the 2,048-token schedules with depth 2, 4, and 16 and no packing.
 
 % VALUE: the model's inputs for a new configuration or model are one probe of each operator alone; the structural terms carry over unchanged
-Only the per-operator busy times depend on the configuration and the model.
+Only the per-operator busy times depend on the configuration and the LLM.
 For a new split or model, we dispatch each operator alone once, at one prompt length, and take attention's busy time per chunk from a line fitted over the probed chunks, because single readings of attention can depart from its trend.
 For an append, the line is evaluated at each chunk's absolute index.
-The structural terms, namely $\gamma$, $\beta$, $\epsilon$, and the host's costs, are measured once on Llama-3.2-1B and carried over to other models and splits unchanged, with the head and tail scaled by the model's hidden size.
+The structural terms, namely $\gamma$, $\beta$, $\epsilon$, and the host's costs, are measured once on Llama-3.2-1B and carried over to other LLMs and splits unchanged, with the head and tail scaled by the model's hidden size.
 % SOURCE: per-split probes at n = 2,048, attention line over chunks 0-15, structural terms from the 1B 2,048-token schedules; head and tail = probe LM + head_1B(2048) x N / 2048 x hidden / 2048 (vault lab-split-sweep (6); ch3-formulation, Generality and 4k model fixes).
 % DECISION: the split choice on the first two models used a least-squares line (16 of 16 faster splits, 45 of 46 pairs with a gap of 5% or more in the right order, the exception named); the median of pairwise slopes (Theil-Sen) is the rule fixed in advance for the third model, and the evaluation names each fit where it reports its result (vault ch3-formulation, G1).
 

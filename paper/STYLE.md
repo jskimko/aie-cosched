@@ -460,6 +460,7 @@ FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`, the IEEE templa
 - **Names and labels:** the existing approach is "the existing prefill" or "the existing host program" (MLIR-AIR's
   fused prefill, cited); ours is "the composer" and its schedules "composed schedules". No method-family name or
   design-space labels yet (*proposal*: none until the evaluation needs them).
+- **"Model" is reserved for the predictor** (author, 2026-10-21). The event model is always named as such and never appears as a bare "the model"; where the thing meant is a network being run, write "the LLM" or name it (Llama-3.2-1B, Qwen3-4B). Never use both senses in one sentence.
 - **Core terms:** command, hardware context, instruction stream, issue instruction, synchronization, address patch,
   argument slot, dispatch floor $F$, append (§2.1-2.2); false dependence (§2.3); column group, segment, boundary cost
   $\epsilon$, commands in flight $D$, event model (§3.1-3.2); predicted completion order, buffer rings, renaming, split,
