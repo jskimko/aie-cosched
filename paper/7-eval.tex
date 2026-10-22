@@ -203,4 +203,6 @@ Our registered claim that the distance would stay within 1.30$\times$ therefore 
 \subsection{Overheads}
 \label{subsec:overheads}
 % VALUE: the composer's own costs: planning time per prompt, build time per split, resident memory of the kept splits, the switch between splits and the move of a cached context; and FastFlowLM on the same weights as an absolute reference
-\E{Table~2: planning time, build time, resident memory, switch and cache-move cost, and the reference.}
+The composer's own costs are given where each decision incurs them rather than gathered here: the memory a ring takes and the peak live footprint in Section~\ref{subsec:rings}, the weights a second resident split holds and the cost of switching or moving a cached context in Section~\ref{subsec:split}, and the build time in the same section.
+% DECISION: Table 2 dropped. Four of its five rows restate numbers already stated beside the design decision they price, and a table with a blank row advertises an absence that does not exist. The fifth, planning time, is a question about what TTFT includes and is answered in Section~\ref{subsec:setup} instead.
+% VERIFY: state in the setup whether the composer's per-prompt planning happens inside the measured prefill call or before it, and give its cost if outside. Unanswered, a reader is entitled to assume the reported gains are net of nothing.
