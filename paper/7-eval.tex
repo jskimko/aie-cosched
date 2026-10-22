@@ -53,7 +53,12 @@ Because the two stacks differ in kernels, quantization path, tokenization, and p
 \E{Figure: TTFT by schedule (existing, packed in turn, attention columns alternated, composed) and split, per model and regime.}
 
 % VALUE: where the waits block: the CP's timer records (Section 3.3) show, per column group, how long the CP blocked on each group's synchronizations in the existing stream and in the composed one, so the removed waits are seen as blocking time that disappears, not only as a shorter TTFT
-\E{Figure (timeline): per column group, CP blocking time and time with work issued, on Llama-3.2-1B at 4k tokens from scratch, for the existing order with its attention columns alternated and for the composed one.}
+\begin{figure}[t]
+    \centering
+    \includegraphics{fig/outstanding.pdf}
+    \caption{Per column group, how long the CP was blocked on that group's synchronizations and how long that group's work was outstanding, on a 4{,}096-token prefill of Llama-3.2-1B, from the CP's own record timers. The baseline is the existing order with its attention columns already alternated. In it the two quantities are equal for both groups, so the CP was blocked for as long as either group had work and the groups took turns; in the composed order attention's work is outstanding for 626\,ms while the CP blocks on it for 225.}
+    \label{fig:outstanding}
+\end{figure}
 % SOURCE: measured (amd-npu 57621ff4, verified from the bare): Llama-3.2-1B, 108 commands, 521,550 records per run, 5 reps, cycles at 1,800 MHz; logits identical with and without records and TTFT within 1.1%. Existing order with attention alternated: the CP blocks 895.0 ms on the GEMM group and 615.5 ms on attention, each group's outstanding time equal to its blocked time, so the CP waits on one group at a time. Composed: attention's work is outstanding 626.1 ms while the CP blocks on it 224.8 ms, and the GEMM group is outstanding 954.1 ms against 812.9 blocked (vault lab-decode-long-context (41)).
 % DECISION: the figure is Llama-3.2-1B only. Qwen3-4B faulted at the driver's debug-buffer sync on teardown in both runs that enabled the records, at two buffer sizes, and wrote none (decisions log D15); its gates still hold (logits identical, TTFT within 0.5%). The baseline in this figure is the existing order with its attention columns already alternated, not the shipped order. Absolute times are quoted at 1,800 MHz; a queue-robust fit of the same records gives 1,864-1,941 MHz, so the millisecond values carry 4-8% of scale uncertainty, which does not affect the ratios between arms.
 

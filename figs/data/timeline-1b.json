@@ -1,0 +1,141 @@
+{
+ "about": "Llama-3.2-1B, 4,096-token prefill from scratch, CP record-timer hold 2. Per column group: blocked_ms is how long the CP was blocked on that group's synchronizations; outstanding_ms is how long that group had work issued and not yet complete. Groups: A = columns 0 and 7 (attention), G = columns 1-6 (GEMMs).",
+ "source": "amd-npu 57621ff4 prefill-overlap/ml-timeline/hold-2/report/report-1b.json (521,550 records, 5 reps, gate_logits_identical true)",
+ "ttft_ms": {
+  "shipar": {
+   "N": 1607.572509907186,
+   "R": 1625.5448968149722,
+   "ratio": 1.01117982971034
+  },
+  "comp": {
+   "N": 1113.2351600099355,
+   "R": 1118.2356411591172,
+   "ratio": 1.0044918462233416
+  },
+  "ship": {
+   "N": 1911.6099579259753,
+   "R": 1912.06168779172,
+   "ratio": 1.0002363085962551
+  }
+ },
+ "per_group": {
+  "comp": {
+   "G": {
+    "reps": {
+     "1": {
+      "blocked_ms": 813.0890494446116,
+      "outstanding_ms": 954.3571161111112
+     },
+     "2": {
+      "blocked_ms": 813.4188444446158,
+      "outstanding_ms": 954.7270755555555
+     },
+     "3": {
+      "blocked_ms": 812.1375500001698,
+      "outstanding_ms": 953.5748005555555
+     },
+     "4": {
+      "blocked_ms": 812.8905244446178,
+      "outstanding_ms": 954.1184316666667
+     },
+     "5": {
+      "blocked_ms": 811.7289627779461,
+      "outstanding_ms": 953.1347438888888
+     }
+    },
+    "median_blocked_ms": 812.8905244446178,
+    "median_outstanding_ms": 954.1184316666667
+   },
+   "A": {
+    "reps": {
+     "1": {
+      "blocked_ms": 224.78287999999736,
+      "outstanding_ms": 626.0634200000001
+     },
+     "2": {
+      "blocked_ms": 224.67947333333134,
+      "outstanding_ms": 626.1400933333334
+     },
+     "3": {
+      "blocked_ms": 225.20044666666422,
+      "outstanding_ms": 625.9676766666666
+     },
+     "4": {
+      "blocked_ms": 224.67805499999795,
+      "outstanding_ms": 626.0590433333333
+     },
+     "5": {
+      "blocked_ms": 225.27361944444277,
+      "outstanding_ms": 625.9292994444445
+     }
+    },
+    "median_blocked_ms": 224.78287999999736,
+    "median_outstanding_ms": 626.0590433333333
+   }
+  },
+  "shipar": {
+   "G": {
+    "reps": {
+     "1": {
+      "blocked_ms": 895.2117466669131,
+      "outstanding_ms": 895.2117466666667
+     },
+     "2": {
+      "blocked_ms": 895.0033561113639,
+      "outstanding_ms": 895.0033561111111
+     },
+     "3": {
+      "blocked_ms": 894.8236855557994,
+      "outstanding_ms": 894.8236855555555
+     },
+     "4": {
+      "blocked_ms": 894.8398550002466,
+      "outstanding_ms": 894.839855
+     },
+     "5": {
+      "blocked_ms": 895.1007388891412,
+      "outstanding_ms": 895.1007388888888
+     }
+    },
+    "median_blocked_ms": 895.0033561113639,
+    "median_outstanding_ms": 895.0033561111111
+   },
+   "A": {
+    "reps": {
+     "1": {
+      "blocked_ms": 615.6232188888833,
+      "outstanding_ms": 617.2741094444444
+     },
+     "2": {
+      "blocked_ms": 615.605522777769,
+      "outstanding_ms": 617.2628488888888
+     },
+     "3": {
+      "blocked_ms": 615.496094999994,
+      "outstanding_ms": 617.1442327777778
+     },
+     "4": {
+      "blocked_ms": 615.3064822222142,
+      "outstanding_ms": 616.9625405555556
+     },
+     "5": {
+      "blocked_ms": 614.9867033333244,
+      "outstanding_ms": 616.63996
+     }
+    },
+    "median_blocked_ms": 615.496094999994,
+    "median_outstanding_ms": 617.1442327777778
+   }
+  }
+ },
+ "column_groups": {
+  "0": "A",
+  "1": "G",
+  "2": "G",
+  "3": "G",
+  "4": "G",
+  "5": "G",
+  "6": "G",
+  "7": "A"
+ }
+}

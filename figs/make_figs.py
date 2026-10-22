@@ -4,6 +4,7 @@
 Outputs (into FIGS_OUT, default paper/fig):
   busy.pdf         TTFT of the existing Llama-3.2-1B prefill split into device-busy time per operator class and the rest
   pairs.pdf        one attention and one GEMM operator: queued, in sequence in one command, and interleaved in one command
+  outstanding.pdf  per column group, the CP's blocked time and the time its work was outstanding, existing against composed
   params-rows.tex  rows of the event model's parameter table
 """
 import json
@@ -135,6 +136,44 @@ def fig_pairs():
     plt.close(fig)
 
 
+def fig_outstanding():
+    """Per column group, how long the CP was blocked on it and how long its work was outstanding (ms).
+
+    The existing order and the composed one, on a 4,096-token prefill of Llama-3.2-1B, from the CP's own
+    record timers. Where a group's outstanding time equals the time the CP spent blocked on it, the CP was
+    blocked for as long as that group had work, so the two groups took turns."""
+    d = json.loads((DATA / "timeline-1b.json").read_text())
+    arms = (("shipar", "Existing order"), ("comp", "Composed order"))
+    fig, axes = plt.subplots(1, 2, figsize=(COLUMN, 1.45), sharex=True)
+    for ax, (arm, title) in zip(axes, arms):
+        pg = d["per_group"][arm]
+        ttft = d["ttft_ms"][arm]["R"]
+        ys = [1, 0]  # attention on top, GEMMs below
+        for y, g in zip(ys, ("A", "G")):
+            out = statistics.median(r["outstanding_ms"] for r in pg[g]["reps"].values())
+            blk = statistics.median(r["blocked_ms"] for r in pg[g]["reps"].values())
+            first = y == 1 and arm == "shipar"
+            # The outstanding bar is outlined so that it stays visible where it equals the blocked bar,
+            # which is itself the point of the left panel.
+            ax.barh(y, out, height=0.52, color=GRAY, edgecolor=INK, linewidth=0.4, zorder=2,
+                    label="Work outstanding" if first else None)
+            ax.barh(y, blk, height=0.52, color=INK, edgecolor="none", zorder=3,
+                    label="CP blocked on it" if first else None)
+        ax.axvline(ttft, color="black", linewidth=0.5, linestyle=(0, (4, 2)), zorder=4)
+        ax.annotate(rf"TTFT {ttft / 1000:.2f}\,s", (ttft, -0.62), ha="right", va="bottom", fontsize=6)
+        ax.set_yticks(ys, ["Attention", "GEMMs"])
+        ax.set_ylim(-0.7, 1.5)
+        ax.set_xlim(0, 1750)
+        ax.set_xticks([0, 500, 1000, 1500])
+        ax.set_title(title, fontsize=8, pad=3)
+        ax.tick_params(left=False)
+    axes[0].set_xlabel("Time (ms)", x=1.08)
+    axes[1].tick_params(labelleft=False)
+    axes[0].legend(ncol=2, loc="lower center", bbox_to_anchor=(1.08, 1.22), handlelength=1.2, columnspacing=1.0)
+    fig.savefig(OUT / "outstanding.pdf")
+    plt.close(fig)
+
+
 def params_rows():
     p = json.loads((DATA / "component-model.json").read_text())["params"]
     us = lambda v: f"{v * 1000:.0f}\\us"  # noqa: E731  (parameters are stored in ms)
@@ -169,4 +208,5 @@ if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     fig_busy()
     fig_pairs()
+    fig_outstanding()
     params_rows()
