@@ -79,9 +79,22 @@ There the reorder alone shortens prefill by $1.13$ and $1.22\times$ on prompts c
 At the two-column split, where the hand alternation does change the time, the same decomposition gives it $1.12$--$1.42\times$ and leaves $1.13$--$1.46\times$ to the reorder across groups.
 % SOURCE: vault lab-split-sweep (22), medians of 5, the four cells being scratch 2,048 / scratch 4,096 / 4,096 + 4,096 / 16,384 + 4,096. At S4 shipped + Ar equals shipped within 0.0%, so composer over shipped is the cross-group reorder alone: 1B 1.13 / 1.22 / 1.46 / 1.33, Qwen 1.11 / 1.19 / 1.46 / 1.33. At S2 the order's gain splits into within-operator (shipped -> shipped + Ar) 1B 1.12 / 1.19 / 1.34 / 1.42, Qwen 1.13 / 1.20 / 1.37 / 1.42, and across-operator (shipped + Ar -> composer) 1B 1.25 / 1.45 / 1.37 / 1.13, Qwen 1.27 / 1.46 / 1.36 / 1.13.
 % DECISION: the 1.33x here is prefill TTFT at 16,384 + 4,096 and must not be conflated with Section 7.6's 1.33x, which is a whole turn at a 28,672-token context.
-% VERIFY: why the hand alternation has nothing to act on at the four-column split is stated as measured (within 0.1%), not explained. If the reason can be read from the shipped stream at that split, state it here; a baseline that coincides only at the cell that flatters the result will be read as weakened unless the mechanism is given.
+The reason the alternation has nothing to act on at the four-column split can be read from the shipped stream itself: there attention already issues two segments per column before it waits, so the first segment of the second column is outstanding while the first column's second segment runs, and alternating the segments by hand produces the same order the stream already has.
+At the two-column split each column carries one segment, the stream issues and waits on the first before issuing the second, and alternation has a wait to remove.
+The baseline is therefore not weaker at the split that flatters the result; it is the same program, and the hand optimization is redundant there rather than withheld.
+% SOURCE: the segment counts are read from the shipped attention streams at each split by our own analysis, and the equality is measured: at S4 shipped + Ar equals shipped within 0.1% on every cell of every model (vault lab-split-sweep (22); 1-intro SOURCE on 16k + 4k, "on S4 the existing attention stream has two segments per column, so alternating changes nothing").
+% DECISION: this answers the VERIFY left here on 2026-10-21 rather than carrying it as a caveat; the mechanism was already in the record and only needed stating.
 
-\E{Figure: TTFT by schedule (existing, attention columns alternated, composed) and split, per model and regime. The packed-into-one-command arm is not plotted: the only whole-model measurement of it predates the composer this paper evaluates, and Section~\ref{subsec:semantics} establishes at operator-pair scale that packing alone creates no overlap.}
+\begin{figure}[t]
+    \centering
+    % VALUE: the ablation in one picture: the composed arm is below both shipped arms at every split of every
+    % model, the hand alternation closes part of that distance only where attention has a wait to remove, and
+    % which split is fastest is a property of the model rather than of the regime.
+    \includegraphics{fig/schedules.pdf}
+    \caption{Time to the first new token by split, for the shipped schedule, the shipped schedule with attention's columns alternated by hand, and the composed schedule, on an append of 4{,}096 tokens to an 8{,}192-token context. $S_k$ gives attention $k$ of the eight columns. The shipped and alternated arms coincide wherever attention has no wait to alternate away, which is every split on Gemma3-4B and the four-column split on the others. Llama-3.1-8B is built on two splits only.}
+    \label{fig:schedules}
+\end{figure}
+% SOURCE: figs/data/accuracy.json, the claimed and reported arms at cell append:8192:4096; the packed-into-one-command arm is not plotted because the only whole-model measurement of it predates the composer this paper evaluates, and Section~\ref{subsec:semantics} establishes at operator-pair scale that packing alone creates no overlap.
 
 % VALUE: where the waits block: the CP's timer records (Section 3.3) show, per column group, how long the CP blocked on each group's synchronizations in the existing stream and in the composed one, so the removed waits are seen as blocking time that disappears, not only as a shorter TTFT
 \begin{figure}[t]

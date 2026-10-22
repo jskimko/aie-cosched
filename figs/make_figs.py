@@ -8,6 +8,7 @@ Outputs (into FIGS_OUT, default paper/fig):
   accuracy.pdf     predicted against measured TTFT, with the tolerance committed before the runs
   bound.pdf        distance to the lower bound per cell, measured and as predicted before the runs
   decode.pdf       decode time per token against the cached context, baseline against our loop pass
+  schedules.pdf    TTFT by split for the three schedules, one panel per model
   params-rows.tex  rows of the event model's parameter table
 """
 import json
@@ -404,6 +405,43 @@ def fig_decode():
     plt.close(fig)
 
 
+def fig_schedules():
+    """TTFT by split for the three schedules, one panel per model, at the cell every model shares.
+
+    The shipped arm and the hand-alternated one differ only where attention has two columns to alternate;
+    the composed arm is below both at every split, and which split is fastest is a property of the model."""
+    d = json.loads((DATA / "accuracy.json").read_text())
+    rows = d["claimed"] + d["reported"]
+    cell = "append:8192:4096"
+    models = [("llama32_1b_q4nx", "Llama-3.2-1B"), ("qwen3_4b_q4nx", "Qwen3-4B"),
+              ("gemma3_4b_q4nx", "Gemma3-4B"), ("llama31_8b_q4nx", "Llama-3.1-8B")]
+    series = [("ship", "Shipped", INK, "^", (0, (1, 1.5))),
+              ("shipar", "Alternated", GRAY, "s", (0, (4, 2))),
+              ("comp", "Composed", MAGENTA, "o", (0, ()))]
+    fig, axes = plt.subplots(2, 2, figsize=(COLUMN, 2.6))
+    for ax, (key, label) in zip(axes.flat, models):
+        at = {(r["sched"], r["split"]): r["meas"] for r in rows
+              if r["model"] == key and r["cell"] == cell}
+        splits = sorted({sp for _, sp in at}, key=lambda s: int(s[1:]))
+        for sched, _, color, marker, dash in series:
+            y = [at[(sched, sp)] / 1000 for sp in splits]
+            ax.plot(range(len(splits)), y, color=color, marker=marker, linestyle=dash,
+                    markerfacecolor="white" if sched != "comp" else color, markersize=2.5)
+        ax.set_xticks(range(len(splits)), [f"$S_{sp[1:]}$" for sp in splits])
+        ax.set_xlim(-0.3, len(splits) - 0.7)
+        ax.set_title(label, fontsize=7, pad=2)
+        ax.tick_params(labelsize=7)
+    for ax in axes[:, 0]:
+        ax.set_ylabel("TTFT (s)")
+    handles = [plt.Line2D([], [], color=c, marker=m, linestyle=ds, markersize=2.5,
+                          markerfacecolor="white" if k != "comp" else c) for k, _, c, m, ds in series]
+    fig.legend(handles, [l for _, l, _, _, _ in series], ncol=3, loc="lower center",
+               bbox_to_anchor=(0.5, 0.99), handlelength=1.8, columnspacing=1.0)
+    fig.tight_layout(pad=0.3)
+    fig.savefig(OUT / "schedules.pdf")
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     fig_busy()
@@ -414,4 +452,5 @@ if __name__ == "__main__":
     fig_order()
     fig_turns()
     fig_decode()
+    fig_schedules()
     params_rows()
