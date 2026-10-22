@@ -1,0 +1,172 @@
+% DECISION: the MLSys'27 call says to upload the appendix separately from the main paper, at the same deadline, with
+% no length limit. This file is therefore its own document, not a section of main.tex, and it builds independently.
+% DECISION: nothing here is load-bearing. Every item has a sentence in the body that stands on its own, and this
+% document carries only the detail a sceptical reviewer would ask for. A claim that lives only here is a bug.
+\documentclass{article}
+
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{threeparttable}
+\usepackage[hyphens]{url}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+\usepackage{mlsys2025}
+
+\newcommand{\E}[1]{\textcolor{red}{$\langle$#1$\rangle$}}
+
+\newcommand{\us}{\,\textmu{}s}
+\newcommand{\ms}{\,ms}
+
+\let\oldtexttt\texttt
+\renewcommand{\texttt}[1]{{\small\oldtexttt{#1}}}
+
+% The body refers to these sections as Appendix A, B, ... since the appendix is uploaded as its own document.
+\renewcommand{\thesection}{\Alph{section}}
+
+\mlsystitlerunning{Appendix: One Command Processor, Many Columns}
+
+\begin{document}
+
+\twocolumn[
+\mlsystitle{Appendix: One Command Processor, Many Columns: Composing Concurrent Operators on Spatial NPUs}
+
+\begin{mlsysauthorlist}
+\mlsysauthor{Anonymous Authors}{anon}
+\end{mlsysauthorlist}
+\mlsysaffiliation{anon}{Anonymous Institution}
+\mlsyscorrespondingauthor{Anonymous Authors}{anonymous@anonymous.org}
+
+\mlsyskeywords{Spatial NPU, AI Engine, LLM inference, command processor, scheduling}
+
+\vskip 0.3in
+]
+
+\printAffiliationsAndNotice{}
+
+\section{Attributing an Issue to a Column Group}
+\label{app:attribution}
+
+% VALUE: the one disclosure in the paper that a reviewer should be able to audit in full: the attribution rule was
+% settled after the capture, the earlier rule labels the same capture differently, and the evidence that the later
+% rule is the physically right one comes from waits and argument slots rather than from the rule itself
+Section~4 of the paper attributes each issue in a recorded command stream to the column group whose compute tiles its
+data reaches, rather than to the column the instruction addresses. This appendix states how that rule was chosen,
+because it was settled after the capture it is applied to and the earlier rule gives a different label.
+
+\textbf{Why the addressed column is not the group.} In the production engine's fused prefill, each attention command
+also pushes one shim queue on a column belonging to the other group: one image pushes on column~6 and another on
+column~3. Attributing those pushes by the column they address places them in the GEMM group, inside commands that are
+otherwise attention, which yields 10{,}822 group transitions of which 10{,}752 are internal to a command.
+
+\textbf{Why those pushes belong to attention.} The evidence is independent of the attribution rule. The two images'
+synchronizations are on the attention column only: 128 waits all on column~7 for the first, 256 all on column~0 for
+the second, and no GEMM image touches column~0 or~7 at all. The borrowed channel reads a different argument slot than
+the attention column's own while carrying that slot's exact per-block pattern, which is a second input streamed in
+lockstep rather than GEMM work. The route itself is in the configuration, not in the control code.
+
+\textbf{The two labels.} Under the rule registered first, by addressed tile column, the capture is mixed, with 99.4\%
+of its transitions internal to a command. Under the rule the paper uses, where a command whose compute tiles all lie
+in one group takes that group for all its events, the capture has 70 transitions and every one sits at a command
+boundary, which is the serial label. We record plainly that the second rule was proposed after the capture and moves
+the outcome toward our claim, and that the first rule's compute-weighted share could not be computed as registered,
+because the shape decode it needs was never written; its bytes-only share is 0.912 and its bracket
+$[0.065, 0.912]$ straddles one half.
+
+\textbf{What a population check adds, and what it does not.} Over all 218 recorded streams, the columns that carry any
+instruction fall into four sets: 200 streams address only the GEMM columns, 8 address columns $\{0,3\}$ and 8 address
+$\{6,7\}$, 1 addresses all eight, and 1 carries no instruction. In the capture itself, 276 of 311 commands address only
+the GEMM columns, 28 are one image on $\{6,7\}$ and 7 the other on $\{0,3\}$, and the stream that addresses all eight
+is not dispatched. In every two-column stream the bulk of the instructions sit on the attention column, by 1{,}420
+against 384 in the largest case. This counts addressed columns and not the programs those instructions serve, so it
+corroborates the attribution rather than establishing it; and because the paper's rule reads the same addressed
+columns, the fact that the column set changes exactly 70 times is a re-derivation of that count under the same rule,
+not a second measurement of it.
+
+\section{The Production-Engine Comparison}
+\label{app:flm}
+
+% VALUE: the inequalities behind the reference point, and an honest statement that we can price only part of the gap
+The comparison with the production engine in Section~7 is a reference point, not a like-for-like speedup. The two
+stacks differ in their kernels, their dequantization path, their tokenization, and the chunk size their prefill uses,
+and we hold the weights and the prompt fixed but not those.
+
+\textbf{What we can price.} In a capture of the engine's dense path at two prompt lengths, the command counts are
+fixed: 146 commands, 64 configuration switches, 12 module and kernel constructions and 226 runs per request at both
+lengths. A separate dequantization pass is fixed in count and in time, 16 run lists of four commands taking
+78--84\ms{} at both lengths, and one further pass takes 18--20\ms. That is about 100\ms{} of fixed device time, which
+is 40\% of the 248\ms{} difference at 2{,}048 tokens and 49\% of 208\ms{} at 4{,}096. Every command in the capture is
+serial, and the unit repeated per layer is a dequantization, three matrix multiplications, an attention command and
+four more matrix multiplications.
+
+\textbf{What we cannot.} The remaining 149\ms{} and 105\ms{} are unexplained. The hypothesis that per-request setup
+explains them is contradicted by the capture: the constructions are spread through the window rather than batched at
+its start, and both the timeable setup, from submission to the first command, and the host idle time scale with prompt
+length, from 29--40\ms{} to 51--53\ms{} and from 166--185\ms{} to 316--321\ms{} respectively. The 100\ms{} figure also
+assumes that the open stack pays no equivalent dequantization pass, which we have not established. Interposer overhead
+is not visible: the engine's own reported time-to-first-token is 0.7--6.2\% below our reference measurement of it.
+
+\section{Registered Predictions: Flagged Arms}
+\label{app:flags}
+
+% VALUE: the arms whose spread or bracket exceeded its threshold, listed so that a reader can see that none is a
+% composer arm and that all were scored as they stand
+Four baseline arms varied by more than 5\% across their repetitions: the shipped program at 12{,}288 + 2{,}048 tokens on
+one split of Llama-3.2-1B (+6.3\%), the shipped program at 2{,}048 + 4{,}096 on another split of the same model
+(+6.7\%), and at 2{,}048 + 4{,}096 on Qwen3-4B both the shipped program (+8.4\%) and the shipped program with its
+attention columns alternated (+5.8\%). One bandwidth bracket, on a Gemma3-4B split that the composer does not choose,
+ran 7.3\% above the day that split's probes were taken; it touches only comparisons at that split, and the split the
+composer chooses for Gemma3-4B is the other one throughout. No composer arm was flagged. Every flagged arm is scored
+as it stands, and none was re-run after its outcome was seen.
+
+\section{The Synthetic Designs}
+\label{app:synthetic}
+
+% VALUE: the three disclosures that belong with the synthetic measurements, including the one hold whose bandwidth
+% bracket is missing and an observation the registration did not anticipate
+Three disclosures belong with Section~7's synthetic designs.
+
+First, in the all-or-nothing design at the smallest level of core work, the repetitions of the depth-one baseline span
+193\% of their median, because that variant was the first opened in the hold; its median is the statistic the
+registration names, and every other spread in that design is between 0.4\% and 4.9\%.
+
+Second, the bandwidth cap probe did not run for that hold, because a relative output path was passed to a probe that
+changes directory first, so no cap reading brackets those measurements. It is not one of the output checks, all of
+which passed. The other two holds read 13.4--13.5~GB/s at one column and 54.7--55.1~GB/s at eight columns at both ends.
+
+Third, an observation that was neither predicted nor scored: in the order-by-loop design at buffer depth four, both
+orders run at 11.65\ms, which is 3.2 times the depth-two time of the faster order, where the registration's sketch of
+the period had expected the two depths to agree for that order. We report it as measured, sought no cause, and left
+the depth as registered.
+
+\section{The Gemma3-4B Gate Result}
+\label{app:gemma-gate}
+
+% VALUE: the per-layer detail behind the body's statement that one configuration fails a reference check, with the
+% scope stated so that it cannot be read as either our build being broken or the stack being inaccurate
+Section~7 reports that we measure no turn on Gemma3-4B because the configuration failed a reference check before any
+run was timed. The check crossed two sources of keys and values, the module's own reference forward and the path the
+turn harness uses, with two decode paths, on a six-token prompt with nine greedy dispatches.
+
+Both reference-sourced arms reproduce the reference continuation exactly, and for either source the two decode paths
+give logits that agree bit for bit, so both decode paths and the seeding step are clean. Both arms sourced from the
+split path diverge at the fifth decoded token, with the same continuation the turn run produced. The keys and values
+differ from the reference by 0.6--1.8\% in layers 0--9 and 5.0--9.1\% in layers 10--33, and the values by 0.8--4.9\% in
+layers 0--31 and by 6.8\% and 13.0\% in the last two. The divergence lands on a near tie: with the reference's keys and
+values the correct token leads by 0.875, and with the split path's the other leads by 0.25.
+
+The keys and values that fail came from the shipped prefill program, with no rewrite of ours applied, running on an
+out-of-tree split build, and were stacked by the compiler's own routine. This check therefore does not separate the
+split build from the shipped prefill's own numerics, and no in-tree build of that model's fused prefill exists on our
+machine to compare against, so we claim no cause. The comparative claims elsewhere in the paper are untouched, because
+they compare a rewrite with the shipped program on one build. Of the other models, Qwen3-4B reproduces its module's
+ten-token reference continuation at every window, and Llama-3.2-1B's module supplies no multi-token reference, so a
+drift of this shape would not have been caught there.
+
+\end{document}
