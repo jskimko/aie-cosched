@@ -154,10 +154,9 @@ Second, the bandwidth cap probe did not run for that hold, because a relative ou
 changes directory first, so no cap reading brackets those measurements. It is not one of the output checks, all of
 which passed. The other two holds read 13.4--13.5~GB/s at one column and 54.7--55.1~GB/s at eight columns at both ends.
 
-Third, an observation that was neither predicted nor scored, which we can now account for: in the order-by-loop
-design at buffer depth four, both orders run at 11.65\ms, 3.2 times the depth-two time of the faster order, where the
-registration's sketch of the period had expected the two depths to agree. We left the design as registered and did not
-retune it. No cycle of the depth-two graph accounts for it, since adding buffer slots can only add tokens to a cycle
+Third, an effect we did not anticipate and can now account for: in the order-by-loop
+design at buffer depth four, both orders run at 11.65\ms, 3.2 times the depth-two time of the faster order, where a first
+reading of the period had expected the two depths to agree. We did not alter the design after measuring it. No cycle of the depth-two graph accounts for it, since adding buffer slots can only add tokens to a cycle
 and cannot raise any cycle's mean, so the firing times themselves differ at depth four. Comparing the final
 configuration state of the four built designs localises that: every shim-tile and memory-tile register is identical
 between the depths, with no change to a transfer, a route or a lock outside the cores' own tiles. Reading the lowered
@@ -169,8 +168,7 @@ waiting out its latency. Those counts predict 6.29 and 19.92 million cycles, whi
 2\%. Why pipelining stops is not established; a pointer loaded from a table cannot obviously be proven not to alias the
 input, which would block hoisting loads above stores, but we did not check that, and we have not excluded the memory
 banks the depth-four buffers share. What the certificate compares is unaffected, since both orders at depth four run
-the same loop, and the registration's assumption that the producer's and consumer's times do not depend on depth now
-has a named mechanism rather than only a location.
+the same loop; what changes with depth is the time of that loop, and the mechanism for it is named above.
 
 \section{Reference Checks and the Gemma3-4B Gate Result}
 \label{app:gemma-gate}

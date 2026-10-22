@@ -1,5 +1,15 @@
+% VALUE: the venue requires a section after the references describing how generative AI was used, covering code,
+% data, writing, ideation, literature search and experiment design. Modelled on the author's FPGA'27 paragraph
+% ("We use AI coding agents to write our passes, the measurement harness, and the scripts..."), extended to the
+% activities this call names, and framed as assistance: the authors set the direction and own every decision.
+% DECISION: author to review and amend before submission; this is the authors' own statement, not a drafted claim.
 \section*{AI Usage Disclosure}
 
-% VALUE: the call's mandatory disclosure (after the references, outside the page limit): which generative AI tools were used, for which parts of the work (ideation, literature search, experiment design, code generation, data generation, writing), and to what extent
-% DECISION: the author writes this section; the paper's own record (the vault's lab notes and session records) lists which steps AI agents carried out.
-\E{AI usage disclosure: the author's statement.}
+We used AI coding agents as tools, under the authors' direction and within a protocol the authors set.
+The agents wrote the compiler passes, the measurement harness, and the scripts that analyse measurements, implement the event model, and draw the figures.
+They ran the experiments on hardware the authors released to them for each run, checked each run against gates the authors specified, and maintained the records those gates produce.
+They also searched for related work, proposed candidate experiments and designs, and drafted and revised the text of this paper.
+
+The research direction, the claims, and the scope of what is measured and reported are the authors' own.
+The authors decided which experiments to run and which to stop, which results to quote and which to withhold, and how every claim is qualified.
+Each number in this paper was re-derived from the committed measurement artefacts rather than accepted from an agent's summary, and the predictions registered before the runs, the exclusions, and the limitations stated in Section~\ref{subsec:limits} are the authors' decisions.

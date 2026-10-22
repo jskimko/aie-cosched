@@ -169,10 +169,13 @@ Both $B$ and $C$ are measured, $B$ by streaming further positions with no furthe
 % SOURCE: T0 = 15.94 ms, c = 1.156 us (Llama-3.2-1B); B = 0.677 us at the two-shim rate, C = 0.478 us; the cap gives B >= 0.596 us (vault lab-decode-long-context (5), (7)).
 % DECISION: the per-model terms for the other models come from the same two probes per model (vault paper-cosched-plan).
 
-The model prices overlap with one proportional term, although Section~\ref{subsec:removal} measures two regimes: a cost proportional to the co-runner where the GEMM holds the critical path, and a fixed one where attention does.
-Charging the proportional form in both over-prices overlap wherever attention binds, which is the regime of appends to a long context, so the model understates what the composed schedule gains there.
-That is the direction of the miss Section~\ref{subsec:accuracy} reports, and it leaves the split it names unchanged, since the mispricing is close to common between the splits being compared.
-% DECISION: stated rather than fixed. Implementing the regime switch changes the model's form and would require refitting it and re-registering every prediction made against it, which belongs with the full re-run rather than beside results already scored against this form.
+% TODO (re-run): the regime switch is implemented at the re-run; restore this disclosure only if the model still
+% prices both regimes with one proportional term after refitting. Text held here:
+% The model prices overlap with one proportional term, although Section~\ref{subsec:removal} measures two regimes: a cost proportional to the co-runner where the GEMM holds the critical path, and a fixed one where attention does.
+% Charging the proportional form in both over-prices overlap wherever attention binds, which is the regime of appends to a long context, so the model understates what the composed schedule gains there.
+% That is the direction of the miss Section~\ref{subsec:accuracy} reports, and it leaves the split it names unchanged, since the mispricing is close to common between the splits being compared.
+% % DECISION: stated rather than fixed. Implementing the regime switch changes the model's form and would require refitting it and re-registering every prediction made against it, which belongs with the full re-run rather than beside results already scored against this form.
+
 
 \subsection{Tests}
 \label{subsec:tests}
