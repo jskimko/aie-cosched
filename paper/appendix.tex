@@ -193,17 +193,17 @@ is also not of a different order from this stack's usual quantization error: on 
 differs from its own forward by up to 3.0\% on keys and 7.5\% on values without changing a single decoded token. What
 distinguishes this case is that the larger difference fell on a near tie.
 
-The keys and values that fail came from the shipped prefill program, with no rewrite of ours applied, running on an
-out-of-tree split build, and were stacked by the compiler's own routine. That build is not a variant of the module's program: rebuilding it with the
-module's own builder, in the same checkout and without opening the device, gives 22 of 38 files byte-identical and
-the 16 remaining ones identical in size with their differences confined to header identifiers and a timestamp, which
-do not reproduce between builds. The difference therefore does not come from the build's bytes, and the reported
-timings for this model were taken on a program identical to the module's own. What remains to be separated is the
-host path on which the keys and values were produced. This check therefore does not separate the
-split build from the shipped prefill's own numerics, and no in-tree build of that model's fused prefill exists on our
-machine to compare against, so we claim no cause. The comparative claims elsewhere in the paper are untouched, because
-they compare a rewrite with the shipped program on one build. Of the other models, Qwen3-4B reproduces its module's
-ten-token reference continuation at every window, and Llama-3.2-1B's module supplies no multi-token reference, so a
-drift of this shape would not have been caught there.
+The keys and values that fail came from the shipped prefill program, with no rewrite of ours applied, and were
+stacked by the compiler's own routine. Two comparisons settle where the difference comes from. The build our harness
+uses is the module's own program: rebuilt by the module's own builder, in the same checkout and without opening the
+device, 22 of its 38 files are byte-identical and the remaining 16 are identical in size with their differences
+confined to header identifiers and a timestamp, which do not reproduce between builds. And the keys and values do not
+depend on our host path: the in-tree build loaded by the module's own path, the split build loaded by that path, and
+the split build loaded through our turn harness with its specification patch, its weight arenas and its template
+produce keys and values bit-identical to one another, with a maximum absolute difference of zero, each reproducing
+the error above to the digit. The difference is therefore the shipped program's own. We claim no cause for its step at
+the tenth layer, and we report this model's prefill results as measured, taken on that program and producing its own
+keys and values. The comparative claims elsewhere in the paper are untouched, because they compare a rewrite with the
+shipped program on one build.
 
 \end{document}
