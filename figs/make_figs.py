@@ -300,6 +300,41 @@ def fig_order():
     plt.close(fig)
 
 
+def fig_turns():
+    """Whole-turn speedup against the faster shipped split, by append size, per model and cached context.
+
+    A turn is its append plus 250 decoded tokens and excludes the KV handoff on both models. The shaded band
+    spans the 25th to 90th percentile of the new tokens per agent step in the traces, with the median marked."""
+    d = json.loads((DATA / "turns.json").read_text())
+    pct = d["append_percentiles"]["claude"]
+    fig, ax = plt.subplots(figsize=(COLUMN, 1.8))
+    ax.axvspan(pct[0], pct[2], color=GRAY, alpha=0.3, linewidth=0, zorder=0,
+               label="Traces, 25th--90th percentile")
+    ax.axvline(pct[1], color=INK, linewidth=0.5, linestyle=(0, (1, 1.5)), zorder=1, label="Median step")
+    styles = {"Llama-3.2-1B": (MAGENTA, "o"), "Qwen3-4B": (BLUE, "s")}
+    dashes = {"4096": (0, (1, 1.5)), "16384": (0, ()), "28672": (0, (4, 2))}
+    for model, ctxs in d["models"].items():
+        color, marker = styles[model]
+        for L, cells in sorted(ctxs.items(), key=lambda kv: int(kv[0])):
+            pts = sorted((int(n), v["bvb"]) for n, v in cells.items())
+            ax.plot([a for a, _ in pts], [b for _, b in pts], marker=marker, color=color,
+                    linestyle=dashes[L], markersize=2.5, label=None)
+    ax.axhline(1.0, color="black", linewidth=0.5, zorder=1)
+    ax.set_xscale("log")
+    ax.set_xticks([512, 1024, 4096], ["512", "1k", "4k"])
+    ax.set_xlim(380, 9000)
+    ax.set_ylim(0.98, 1.42)
+    ax.set_xlabel("New tokens in the step")
+    ax.set_ylabel("Turn speedup")
+    handles = [plt.Line2D([], [], color=c, marker=m, markersize=2.5, linestyle="-") for c, m in styles.values()]
+    handles += [plt.Line2D([], [], color=INK, linestyle=dashes[L]) for L in ("4096", "16384", "28672")]
+    labels = list(styles) + ["4k context", "16k context", "28k context"]
+    ax.legend(handles, labels, ncol=3, loc="lower center", bbox_to_anchor=(0.5, 1.0),
+              handlelength=1.5, columnspacing=0.9)
+    fig.savefig(OUT / "turns.pdf")
+    plt.close(fig)
+
+
 def params_rows():
     p = json.loads((DATA / "component-model.json").read_text())["params"]
     us = lambda v: f"{v * 1000:.0f}\\us"  # noqa: E731  (parameters are stored in ms)
@@ -338,4 +373,5 @@ if __name__ == "__main__":
     fig_accuracy()
     fig_bound()
     fig_order()
+    fig_turns()
     params_rows()

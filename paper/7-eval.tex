@@ -96,7 +96,12 @@ Appendix~D records three disclosures from these holds, one of them an observatio
 % DECISION: not quoted - the 1B's 16,384 + 4,096 shipped-S2 run entered the slow state (append 12.8-13.1 s), so that cell's against-default and order ratios are excluded (its best-vs-best is unaffected, since the minimum takes the S4 arm); Qwen's 16k with-handoff system ratios are rotation-order artifacts. There are no S1 arms in this harness.
 % COMMENT: Qwen3-4B's handoff at 16k is 2.5 s after each decoder bring-up and 35-140 s afterwards (kv_stack page faults, 0.5-0.66M per call), so turns with handoff at 16k are not quoted for it.
 % COMMENT: the existing S2 append at 16k + 4k ran in its slow state (12.8-13.1 s), so order and system ratios at that cell are not quoted; the comparison of faster splits uses the existing S4 turn there.
-\E{Figure: turn speedup over the cached context and the append, with the traces' 25th, 50th, and 90th percentiles of the append marked.}
+\begin{figure}[t]
+    \centering
+    \includegraphics{fig/turns.pdf}
+    \caption{Whole-turn speedup against the faster of the two shipped splits, by the number of new tokens in the step and the length of the cached context. A turn is its append and 250 decoded tokens, and excludes the handoff of the KV cache on both models, which Section~\ref{subsec:overheads} prices separately. The shaded band spans the 25th to the 90th percentile of the new tokens per step in coding-agent traces and the dotted line is their median~\citep{zhu2026tracelab}.}
+    \label{fig:turns}
+\end{figure}
 
 \subsection{Model Accuracy}
 \label{subsec:accuracy}

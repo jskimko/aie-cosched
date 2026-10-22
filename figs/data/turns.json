@@ -1,0 +1,92 @@
+{
+ "about": "Whole-turn speedup, best-vs-best: min over the two shipped splits divided by min over the two composed ones, where a turn = median(append) + median(decode) over its reps and EXCLUDES the KV handoff on both models (metric decision). Also vs_default: the shipped default split with the census decode over the composed S4 with the renamed decode.",
+ "source": "amd-npu c61445da turn-w3-1b.json and 171082f6 turn-w3-qwen.json, per-rep wall times; ratios re-derived in aie-cosched-paper-0 from those files",
+ "excluded": {
+  "16384:4096 vs_default (1B)": "the shipped-S2 arm entered its slow state (append 12.8-13.1 s); best-vs-best is unaffected because the minimum takes the S4 arm"
+ },
+ "append_percentiles": {
+  "claude": [
+   384,
+   857,
+   5342
+  ],
+  "codex": [
+   406,
+   886,
+   8310
+  ],
+  "note": "TraceLab Table 8, new tokens per step"
+ },
+ "models": {
+  "Llama-3.2-1B": {
+   "4096": {
+    "4096": {
+     "bvb": 1.2293160426981011,
+     "vs_default": 1.4600588008799853
+    },
+    "512": {
+     "bvb": 1.0955603350184144,
+     "vs_default": 1.1179928123420464
+    },
+    "1024": {
+     "bvb": 1.1125084017870035,
+     "vs_default": 1.1573571407093544
+    }
+   },
+   "16384": {
+    "4096": {
+     "bvb": 1.3157485954999681,
+     "vs_default": 2.1730431270265833
+    },
+    "512": {
+     "bvb": 1.256081931816449,
+     "vs_default": 1.373726604077188
+    },
+    "1024": {
+     "bvb": 1.2553450103776982,
+     "vs_default": 1.4995400057086177
+    }
+   },
+   "28672": {
+    "512": {
+     "bvb": 1.3359346548622393,
+     "vs_default": 1.4352789421269923
+    },
+    "1024": {
+     "bvb": 1.326367228880478,
+     "vs_default": 1.513207345322647
+    }
+   }
+  },
+  "Qwen3-4B": {
+   "4096": {
+    "4096": {
+     "bvb": 1.1827314490422585,
+     "vs_default": 1.5189880586489666
+    },
+    "512": {
+     "bvb": 1.0601134764454057,
+     "vs_default": 1.0837773945722855
+    },
+    "1024": {
+     "bvb": 1.0756254757675485,
+     "vs_default": 1.1275066060764336
+    }
+   },
+   "16384": {
+    "4096": {
+     "bvb": 1.2176411532313445,
+     "vs_default": 1.662669504605446
+    },
+    "512": {
+     "bvb": 1.1457330363890357,
+     "vs_default": 1.2162868151742787
+    },
+    "1024": {
+     "bvb": 1.1495383096886078,
+     "vs_default": 1.2844454002119
+    }
+   }
+  }
+ }
+}
