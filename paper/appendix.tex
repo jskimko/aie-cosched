@@ -185,6 +185,14 @@ differ from the reference by 0.6--1.8\% in layers 0--9 and 5.0--9.1\% in layers 
 layers 0--31 and by 6.8\% and 13.0\% in the last two. The divergence lands on a near tie: with the reference's keys and
 values the correct token leads by 0.875, and with the split path's the other leads by 0.25.
 
+Two further measurements bound what this result is. The two floating-point forwards available for this model, the
+one used above and the stack's other, agree with each other to 0.3--1.1\% on keys and 0.2--1.7\% on values, and give
+the same first token with the same five leading candidates in the same order, so the difference reported here is five
+to nine times the disagreement between the instruments and is not an artifact of which one served as the oracle. It
+is also not of a different order from this stack's usual quantization error: on Llama-3.2-1B the shipped prefill
+differs from its own forward by up to 3.0\% on keys and 7.5\% on values without changing a single decoded token. What
+distinguishes this case is that the larger difference fell on a near tie.
+
 The keys and values that fail came from the shipped prefill program, with no rewrite of ours applied, running on an
 out-of-tree split build, and were stacked by the compiler's own routine. This check therefore does not separate the
 split build from the shipped prefill's own numerics, and no in-tree build of that model's fused prefill exists on our
