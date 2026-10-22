@@ -1,4 +1,4 @@
-\section{What an Ordering Costs}
+\section{False Dependences in a Compiled Schedule}
 \label{sec:order}
 
 % VALUE: on XDNA 2 each engine runs its program in order and nothing schedules across engines, so the order of the work and the waits between engines are in the compiled program; the section shows this from measured command semantics, states the execution model, reads a stream into a happens-before graph with a cause per wait, and extends the reading to closed binaries
@@ -73,6 +73,159 @@ Durations remain measured inputs, because the program fixes the order of each en
 % SOURCE: operations, locations, and static control (vault lab-cosched-passes (30), item 1); unsupported loops: 22 in the decode census build, all outside the attention herd (lab-cosched-passes (33), Limits); the host's static control (outline v9 section 1); the decode kernels' early return on the pad block branches on a runtime parameter, so it stays static per context length (lab-decode-long-context (10)).
 
 % MOVED 2026-10-22: the formal setup follows the semantics it rests on, as a Problem Definition section does
+
+% VALUE: the method proper: recovering the graph from a stream a stack emitted, classifying each wait, what the
+% stream establishes about legality, and what a census of those streams finds
+\subsection{Reading a Stream}
+\label{subsec:reading}
+
+\begin{table}[t]
+    \centering
+    \caption{Ordering Mechanisms}
+    \label{tab:mech}
+    % VALUE: the 11 mechanisms that create a direct happens-before edge, in attribution order, with the granularity of each
+    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}rlr}
+        \toprule
+        \# & Mechanism & Granularity \\
+        \midrule
+        1 & CP synchronization and mask-poll & stream \\
+        2 & CP in-order issue (completes at issue) & stream \\
+        3 & Channel task queue (FIFO, depth 4) & stream \\
+        4 & Dispatch order on one context & stream \\
+        5 & Configuration and control-packet writes & stream \\
+        6 & BD chaining and repeat & data movement \\
+        7 & Locks on DMA BDs & data movement \\
+        8 & Stream-switch back-pressure & data movement \\
+        9 & Cascade and neighbor memory & data movement \\
+        10 & Core locks & core loop \\
+        11 & Core program order & core loop \\
+        \bottomrule
+    \end{tabular*}
+\end{table}
+
+% VALUE: happens-before is completion before start, not issue order; each direct edge comes from one of 11 mechanisms at the stream, data-movement, or loop granularity and is attributed to exactly one, and edges no mechanism explains are counted, so the count measures the model's coverage
+From these operations, the analysis builds a \emph{happens-before} graph, in which an edge from $a$ to $b$ means that $b$ cannot start until $a$ has completed.
+Issue order alone does not create such an edge, because a queue push is issued in order but its transfer completes later.
+Each direct edge comes from one of the 11 ordering mechanisms of Table~\ref{tab:mech}, at the granularity of the CP's stream, of data movement, or of a core loop, and an edge that two mechanisms imply is attributed to the first in the table.
+An operation whose ordering effect no mechanism describes, such as an unknown opcode or a write outside the known register map, takes edges to its neighbors on the CP, and counting these per stream is how the model's coverage is to be measured.
+Edges of mechanism 2 never stall, because their instructions complete at issue, so they are attributed but reported apart from the blocking edges.
+% SOURCE: the mechanism table, attribution order, granularities, UNATTRIBUTED, and issue edges (vault lab-cosched-passes (30), item 2); the library AIECoschedDeps (mlir-aie f1725dae1f1, pinned).
+
+% VALUE: each direct edge is classed by the pairs of operations it alone orders: a true dependence if one is read after write, a name dependence if one is write after read or write, an order dependence otherwise; classes say whether renaming or reordering can remove the wait; a wait gating several operations is classed per gated operation, pairs ordered by two disjoint paths are counted as redundant, and data-dependent loops as control
+For each direct edge, the analysis computes the pairs of operations that the edge alone orders, namely those ordered with it and not without it.
+The edge is a true dependence if one of these pairs reads a location after the other writes it, a name dependence if none does but one writes after the other reads or writes, and an order dependence otherwise.
+The first two follow the conflicts that Bernstein's conditions exclude between pieces of work that run in parallel~\citep{bernstein1966analysis}, and the name class covers the anti and output dependences of compilers~\citep{kuck1981dependence}.
+Renaming the conflicting locations can therefore remove a name dependence, reordering can remove an order dependence, and a true dependence stays.
+A synchronization that gates several operations contributes one edge per gated operation, so each operation's conflicts are classed on their own.
+A pair that two disjoint paths order is lost by no single edge, so each edge on those paths may be classed as an order dependence alone, and such pairs are counted as redundant instead of being attributed to either path.
+A loop with data-dependent control is counted as control.
+% DECISION: this subsection states the classification the passes assume and the counts it defines, not what the committed library computes. Verified against mlir-aie f1725dae1f1 on 2026-10-21: AIECoschedDeps classifies each core loop's buffers and reports its lock edges and loop-carried distances, so the class of a wait at loop granularity is computed; the edge-level attribution, the unattributed and redundant counters, and the order class itself are not implemented there, and the order class is unreachable in that library. The stream-granularity instances this paper removes were identified by reading the designs and confirmed by measurement, and the graph of a compiled stream is built by the prefill reader rather than by the library. Every sentence here is written in that register until the attribution pass exists. The registered census of Section~\ref{subsec:census} is a DIFFERENT quantity and does not depend on this: it counts instances that the frozen scheduling pass proposes, removes and confirms, and it never classifies edges. The coverage counters owed with the attribution pass are the unattributed and redundant counts, which were never part of that census (pass-0, 2026-10-22).
+Loop-carried edges are classed in the same way on the loop's iterations, with their distance recorded.
+% SOURCE: classification by Lost(e), REDUNDANT, CONTROL, loop-carried distance (vault lab-cosched-passes (30), item 3).
+
+% VALUE: the recovered order is the method and is checked through its consequences, not against a trace: removed false waits leave outputs bit-identical, measured gains stay within their bounds, and what the analysis leaves out is counted; the CP's own timer records show the issue and wait order inside each command without changing the array's configuration, and they cannot see core loops or the gaps between commands
+We check the recovered order through its consequences rather than against a hardware trace.
+Every wait that the analysis classes as false and that our passes remove leaves the outputs bit-identical (Section~\ref{sec:method}), each measured gain is compared with its bound (Section~\ref{subsec:tests}), and the operations that the analysis leaves out are counted per stream.
+To show how the CP executes the order, we insert the runtime's record-timer instruction after each synchronization and after each run of issue instructions, so that the firmware writes an identifier and a 1.8~GHz device timer into a buffer that the host reads after the run.
+The array's configuration is left unchanged.
+On one 128-token prefill chunk of Llama-3.2-1B, 1{,}468 records per run leave the logits bit-identical and add no measurable device time.
+For each command, they show when each column group's work was issued and how long each synchronization blocked the CP (Figure~\E{timeline}).
+Between commands the timer advances at less than a tenth of its rate, so the records time intervals within a command, whereas the host's clock times the gaps between commands.
+Order inside a core's loop is invisible to the CP, so the decode loop's order rests on its removal (Section~\ref{subsec:rings}).
+% SOURCE: record-timer instruction TXN opcode 0x83 (12 bytes: header, size, 32-bit id; aiebu 48b69735 xaie_txn.h), XRT 2.25.0 ML Timeline (XDP 67165d6 clientDev/ml_timeline.cpp; Strix Halo listed as a client device with a debug buffer); feasibility check: split-1b-S4-L20480, 108 commands, 1,468 records per run, 5 runs with and 5 without, logits sha equal in all 10, summed start-to-wait with / without records 0.93-0.95, per-command fit of the timer 1,752-1,767 MHz against the 1,800 MHz H clock at the top DPM level (xdna-driver bc5dd96 npu4_dpm_clk_table), 110-125 M timer cycles per host second between commands (amd-npu b98e3044; vault lab-flm-streams (39), decisions log D13).
+% DECISION: T-rec was withdrawn by the author (outline v9 revision 31, D13); recovery is the method in every verb row, and the timer records are a figure that governs no verb.
+
+\subsection{Closed Binaries}
+\label{subsec:closed}
+
+% VALUE: a closed stack ships binaries only, so its streams are recorded at the runtime's boundary without the device and lifted with a byte-identical round trip; each issue is attributed to the column group its data reaches through the configuration's decoded routes; FastFlowLM's prefill then issues one group per command, and serial issue predicts its time where overlap does not
+FastFlowLM ships its engines as binaries, so we record their instruction streams at the runtime's boundary, either with a recording library that never opens the device or with an interposer during a device run, and lift each stream into MLIR-AIE's runtime-sequence form.
+Every stream recorded offline round-trips through the lifter byte for byte, so the analysis reads exactly what the engine dispatches.
+Because FastFlowLM's attention reads through shim tiles of the GEMM columns, attributing an issue to its column would mix the groups, so the analysis decodes the configuration's stream routes and attributes each issue to the group whose compute tiles its data reaches.
+Under this attribution, the one capture we analyse, a 1{,}009-token prefill of Gemma-4-E2B, changes column group only at the boundary between two commands, once into attention and once out of it in every layer, so it issues serially, one group per command.
+The sum of its commands' times measured alone, each less the dispatch floor and plus the boundary cost between commands, matches its measured time within 10.0\%, whereas full overlap would place it 36.5\% lower, a separation far wider than the batch-to-batch variation of the read cap this machine shows.
+A census of which columns carry any instruction, over all 218 recorded streams and over the capture itself, agrees with this attribution without establishing it, since it counts addressed columns rather than the programs they serve; Appendix~A gives the counts.
+Since FastFlowLM's closed libraries build these streams and their buffers, we measure removals on MLIR-AIR's fused prefill, which reimplements FastFlowLM's designs~\citep{wang2026mlirair}.
+Its decoded configuration places the GEMMs on columns 1--6 and attention on columns 0 and 7, as FastFlowLM's fused prefill does, so the two share the column groups whose turns our passes remove.
+Appendix~A states how the attribution was chosen, and what the rule registered before it labels the same capture.
+% SOURCE: recording libhrx (FastFlowLM 44d01787, gemma4e-flash), every prompt length 1-1,024 recorded with 0 /dev/accel opens; 8 buckets, 218 distinct streams, round trip and identity 218 / 218 (vault lab-cosched-passes (14)); lifter fix mlir-aie 91f64387ffb, 375 / 375 MLIR-AIR streams byte-identical (lab-cosched-passes (3)).
+% SOURCE: device capture through an XRT interposer, gemma4e-flash:e2b, 1,009 tokens; route maps from the frozen cdo_routes decoder: shim 3 and shim 6 MM2S0 reach only columns 0 and 7; 70 group transitions, all between commands (35 GEMM -> attention, 35 attention -> GEMM) (vault lab-flm-streams (11), (13)).
+% SOURCE: ops-per-column census over the 218 FLM streams, recomputed here from the committed artifact (aie-cosched 0400fc9 passes/results/bprime/column_ops.json, from bprime_column_ops.py 879bf80; parsed by aie-cosched-pass-0, counts re-derived independently in this workspace): column sets {1,2,3,4,5,6} 200, {0,3} 8, {6,7} 8, {} 1, all eight 1. Every {0,3} stream carries the bulk of its ops on column 0 (e.g. 1,420 against 384) and every {6,7} on column 7, which matches the frozen route map above (shim 3 and shim 6 MM2S0 reach only columns 0 and 7), so the 16 are attention commands plus their feeding shim. The peer's first message said 192 of 218 and corrected it to 200; 192 is the count among proposal streams only. The one empty stream (186fd90831c87d8c) was earlier reported as "not analysed: one column" and in fact has no ops.
+% SOURCE: closed-stack check: T = 1.444 s, serial prediction 1.300 s (error 0.100), overlap prediction 0.917 s (error 0.365), tolerance 0.2075, of which 0.102 is one slow floor repetition; without it the tolerance is 0.106 and the serial prediction still passes (vault lab-flm-streams (12) RESULT, amd-npu 52c8401d, 3d0d1036).
+% SOURCE: MLIR-AIR's llms README: "reimplement AMD NPU LLM designs originally developed by the FastFlowLM team" (mlir-air 740cae0f, a3e26261); fused_prefill/device.py "laid out like FastFlowLM's fused_prefill"; FastFlowLM's Gemma4-E2B fused_prefill.xclbin decoded with tools/xclbin_layout.py: attention programs on columns 0 and 7, a GEMM program on the 24 cores of columns 1-6 (vault lab-flm-streams (5)); coverage ruling D13(b).
+% DECISION: the serial label is scoped to this one capture (Gemma-4-E2B, 1,009 tokens, the engine's cap); the attribution by routes was ruled after the capture, and the label under the first attribution by tile column was MIXED-majority; both disclosures go to the appendix (outline v9 section 2, C2).
+
+% MOVED from the former findings section
+\subsection{Textbook Classes on a Grid}
+\label{subsec:grid}
+
+% VALUE: the waits are false dependences in the textbook sense, of two causes (order, name) at two granularities (the CP's stream, an engine's loop); the analysis's classes are these columns, a DMA chain is a loop on a DMA engine, and the grid places every known instance, with two cells empty; the classes are cited, the claim is where lowering reintroduces them
+The expert designs lose end-to-end time on the NPU because work waits on other work that it does not consume.
+Such a wait is a \emph{false dependence}, which is an ordering that the lowered program imposes although no data flows between the two pieces of work, namely a name or order dependence in the classes of Section~\ref{subsec:reading}.
+A false dependence has one of two causes.
+An \emph{order} dependence is a wait placed where the written program order put it rather than where data requires it, and reordering removes it.
+A \emph{name} dependence arises where two pieces of work share a buffer, lock, or channel that they need not share, as in the anti and output dependences of compilers~\citep{kuck1981dependence}, and renaming the storage removes it~\citep{tomasulo1967,lam1988software}.
+These are the analysis's classes of Section~\ref{subsec:reading}, and every blocking edge falls into exactly one of them or is a true dependence.
+We find false dependences at two granularities, in the CP's instruction stream and inside an engine's loop, where a BD chain with locks counts as a loop on its DMA engine.
+% DECISION: false dependences and the name class are textbook and cited; the paper claims their analysis on this platform, never the classes.
+
+\begin{table}[t]
+    \centering
+    \caption{Known Instances by Cause and Granularity}
+    \label{tab:grid}
+    % VALUE: the grid with each known instance; two cells are empty in the existing designs
+    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}>{\raggedright\arraybackslash}p{0.17\linewidth}>{\raggedright\arraybackslash}p{0.36\linewidth}>{\raggedright\arraybackslash}p{0.36\linewidth}}
+        \toprule
+        & Order & Name \\
+        \midrule
+        Stream & column groups take turns in prefill; attention's two columns take turns & none found; realizable (\S\ref{subsec:synthetic}) \\
+        Loop & none found; realizable (\S\ref{subsec:synthetic}) & decode attention's keys, values, and scores, each in one buffer \\
+        \bottomrule
+    \end{tabular*}
+\end{table}
+
+% VALUE: the instances per cell, and why two cells are empty in the existing designs; DMA-only instances stay visible through an engine label
+Table~\ref{tab:grid} places each instance we know of in the MLIR-AIR designs, which are the designs our passes rewrite.
+Two of the four cells hold no instance in those designs, and neither is empty by construction: we write a design for each and measure the behaviour its class predicts (Section~\ref{subsec:synthetic}), so those cells are empty in what these stacks happen to emit rather than in what the platform allows.
+In its prefill, order dependences in the instruction stream hold back one column group behind another and one column of an operator behind the other, and the one captured prefill of the production engine shares the first of these.
+In its decode, the attention loop holds name dependences on its keys, its values, and the one buffer through which its two cores pass scores, while its running maximum and accumulator carry true dependences across blocks.
+The census extends the same reading to IRON and to the production engine's streams, which no instance in this table covers (Section~\ref{subsec:census}).
+No name dependence appears in the stream, because the existing prefill already gives each chunk its own buffers, and rings added nothing beyond reordering there, within 0.1\%.
+No order dependence is known in decode attention's loop, where acquires that cover a pair of blocks arose only in a hand edit's unrolled loop, and loops with nested control are not analysed, so the census tests this cell.
+The loop row carries an engine label, so an instance confined to a DMA engine stays visible.
+% SOURCE: the grid and its instances (vault paper-cosched-direction-converged, Clarification (xiii), ruled on lab-cosched-passes (30)); the score buffer shared_l10 is name x loop in the existing build; the pair-level order edge of the hand edit's arms (b) and (c) came from the pair unroll (lab-cosched-passes (30), item 5; outline v9 section 1); rings beyond reorder in the stream: R-ship = pair within 0.1% (amd-npu 71081d1).
+
+\subsection{Census}
+\label{subsec:census}
+
+% VALUE: the census: frozen passes over a fixed population of MLIR-AIR, IRON, and FastFlowLM streams, counting confirmed instances per cell, with its residuals
+Table~\ref{tab:grid} records what we found by reading designs. To ask how far a pass can find such instances by itself, we also ran a census with the procedure fixed before the scan: a frozen scheduling pass over a frozen population of 277 instruction streams, 27 from MLIR-AIR, 32 from IRON and 218 from the production engine, with the instances of Table~\ref{tab:grid} excluded so that the scan could not rediscover them.
+At stream granularity the census confirms no instance: the frozen pass proposes no candidate reordering on any of the 277 streams, so there is nothing for the device to confirm, and the count is zero before any run.
+That zero is a property of the pass and its registered rules, not a statement that the streams hold no such dependence.
+Its largest cause is the rule by which the pass groups columns into lanes: columns that patch a common argument are treated as one lane, which makes 199 of the streams single-lane, so no reordering across their columns is ever proposed, although in each of them at least one column's issue sits behind waits that the same rule assigns to other columns.
+Of the remainder, 61 streams issue nothing after their first wait, so any order dependence lies between commands rather than inside one, and 16 reuse buffer descriptors in a way that makes the move illegal.
+A separate characterization, which proposes reorderings without requiring that they pay, accepts at least one on 193 of the 218 production streams, each worth a factor of about 1.00, and none on IRON's, where queue room cannot be proved from the stream alone.
+We did not run the corresponding census at loop granularity, and by its own design that census could only ever report instances found, never their absence.
+% TODO (re-run): restore only if the final census again lacks a pre-committed candidate count. Development-phase
+% artefact: "We also did not commit a predicted candidate count before the scan, which a later registration did do."
+The counts for the other two cells of Table~\ref{tab:grid} come from reading designs, as stated, and the analysis's own residual counters are not implemented.
+% SOURCE: population and procedure, vault lab-cosched-passes (41) and its addendum, with prex_scan.json (aie-cosched tools/oracle_results/2026-10-21-d3) verified by this workspace; the lane rule is (35), registered before the census results. Breakdown: 199 single-lane by the lane rule (193 production + 6 IRON gemm + 1 other), 61 single-phase, 16 with descriptor reuse. The characterization is B-prime (vault (46)): 193 of 218 with at least one accepted reordering at 1.000-1.0069, IRON 0 of 84 accepted (all queue-overflow), MLIR-AIR none proposed.
+% DECISION: kS and kL are not named in the text, and the loop-granularity census is reported as not run rather than as zero, since under its registration only a found instance was reportable. The claim "no instance found" applies to stream granularity alone. pass-0 corrected an earlier reading of mine that treated both cells as zero (2026-10-22).
+% DECISION: the census counts confirmed instances that the frozen pass proposes and removes; it is a different quantity from the analysis's edge-level coverage counters, which Section~\ref{subsec:reading} notes are unimplemented. The two must not be conflated in the text.
+
+% MOVED from the former bound section; its heading prose is kept as the lead-in
+% \section{Bounding and Pricing Removals}
+% \label{sec:bound}
+% Since the order is in the program and the durations are measured, the worth of removing a dependence can be bounded from the program alone, before the removal is measured.
+% We state the scheduling problem that the semantics of Section~\ref{subsec:semantics} define, with a lower bound on any schedule (Section~\ref{subsec:formulation}), and bound what removing one dependence can gain (Section~\ref{subsec:removal}).
+% Removals must be priced together, since one removal can gain nothing while another dependence remains (Section~\ref{subsec:joint}).
+% An event model prices whole schedules from probes of each operator alone (Section~\ref{subsec:pricing}), and Section~\ref{subsec:tests} states how each prediction is tested.
+
+\section{What a Removal Is Worth}
+\label{sec:bound}
+% VALUE: the quantity that decides whether a rewrite is attempted at all: a lower bound computable from the
+% program and probes before anything runs, its necessary-but-not-sufficient condition, and the model that prices
+% a whole schedule
 \subsection{Problem Formulation}
 \label{subsec:formulation}
 
@@ -249,152 +402,3 @@ Both $B$ and $C$ are measured, $B$ by streaming further positions with no furthe
 % VALUE: every prediction is tested as registered before its run: the bound against every measured removal, the event model's times, the joint prediction, and the composite test with its expected outcome stated beforehand; counts reported in full
 \E{The tests and their outcomes: whether the bound holds on every measured removal, the event model's time predictions, the joint prediction of the decode chain, and the composite test with its expected failure stated before the runs; k of n reported in full.}
 % DECISION: the outcomes and the verbs they allow follow outline v9 section 3's rows; a test not completed is reported as its least favourable outcome.
-
-\section{Reading a Compiled Design}
-\label{sec:method}
-% VALUE: the method proper: recovering the graph from a stream a stack emitted, classifying each wait, what the
-% stream establishes about legality, and what a census of those streams finds
-\subsection{Reading a Stream}
-\label{subsec:reading}
-
-\begin{table}[t]
-    \centering
-    \caption{Ordering Mechanisms}
-    \label{tab:mech}
-    % VALUE: the 11 mechanisms that create a direct happens-before edge, in attribution order, with the granularity of each
-    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}rlr}
-        \toprule
-        \# & Mechanism & Granularity \\
-        \midrule
-        1 & CP synchronization and mask-poll & stream \\
-        2 & CP in-order issue (completes at issue) & stream \\
-        3 & Channel task queue (FIFO, depth 4) & stream \\
-        4 & Dispatch order on one context & stream \\
-        5 & Configuration and control-packet writes & stream \\
-        6 & BD chaining and repeat & data movement \\
-        7 & Locks on DMA BDs & data movement \\
-        8 & Stream-switch back-pressure & data movement \\
-        9 & Cascade and neighbor memory & data movement \\
-        10 & Core locks & core loop \\
-        11 & Core program order & core loop \\
-        \bottomrule
-    \end{tabular*}
-\end{table}
-
-% VALUE: happens-before is completion before start, not issue order; each direct edge comes from one of 11 mechanisms at the stream, data-movement, or loop granularity and is attributed to exactly one, and edges no mechanism explains are counted, so the count measures the model's coverage
-From these operations, the analysis builds a \emph{happens-before} graph, in which an edge from $a$ to $b$ means that $b$ cannot start until $a$ has completed.
-Issue order alone does not create such an edge, because a queue push is issued in order but its transfer completes later.
-Each direct edge comes from one of the 11 ordering mechanisms of Table~\ref{tab:mech}, at the granularity of the CP's stream, of data movement, or of a core loop, and an edge that two mechanisms imply is attributed to the first in the table.
-An operation whose ordering effect no mechanism describes, such as an unknown opcode or a write outside the known register map, takes edges to its neighbors on the CP, and counting these per stream is how the model's coverage is to be measured.
-Edges of mechanism 2 never stall, because their instructions complete at issue, so they are attributed but reported apart from the blocking edges.
-% SOURCE: the mechanism table, attribution order, granularities, UNATTRIBUTED, and issue edges (vault lab-cosched-passes (30), item 2); the library AIECoschedDeps (mlir-aie f1725dae1f1, pinned).
-
-% VALUE: each direct edge is classed by the pairs of operations it alone orders: a true dependence if one is read after write, a name dependence if one is write after read or write, an order dependence otherwise; classes say whether renaming or reordering can remove the wait; a wait gating several operations is classed per gated operation, pairs ordered by two disjoint paths are counted as redundant, and data-dependent loops as control
-For each direct edge, the analysis computes the pairs of operations that the edge alone orders, namely those ordered with it and not without it.
-The edge is a true dependence if one of these pairs reads a location after the other writes it, a name dependence if none does but one writes after the other reads or writes, and an order dependence otherwise.
-The first two follow the conflicts that Bernstein's conditions exclude between pieces of work that run in parallel~\citep{bernstein1966analysis}, and the name class covers the anti and output dependences of compilers~\citep{kuck1981dependence}.
-Renaming the conflicting locations can therefore remove a name dependence, reordering can remove an order dependence, and a true dependence stays.
-A synchronization that gates several operations contributes one edge per gated operation, so each operation's conflicts are classed on their own.
-A pair that two disjoint paths order is lost by no single edge, so each edge on those paths may be classed as an order dependence alone, and such pairs are counted as redundant instead of being attributed to either path.
-A loop with data-dependent control is counted as control.
-% DECISION: this subsection states the classification the passes assume and the counts it defines, not what the committed library computes. Verified against mlir-aie f1725dae1f1 on 2026-10-21: AIECoschedDeps classifies each core loop's buffers and reports its lock edges and loop-carried distances, so the class of a wait at loop granularity is computed; the edge-level attribution, the unattributed and redundant counters, and the order class itself are not implemented there, and the order class is unreachable in that library. The stream-granularity instances this paper removes were identified by reading the designs and confirmed by measurement, and the graph of a compiled stream is built by the prefill reader rather than by the library. Every sentence here is written in that register until the attribution pass exists. The registered census of Section~\ref{subsec:census} is a DIFFERENT quantity and does not depend on this: it counts instances that the frozen scheduling pass proposes, removes and confirms, and it never classifies edges. The coverage counters owed with the attribution pass are the unattributed and redundant counts, which were never part of that census (pass-0, 2026-10-22).
-Loop-carried edges are classed in the same way on the loop's iterations, with their distance recorded.
-% SOURCE: classification by Lost(e), REDUNDANT, CONTROL, loop-carried distance (vault lab-cosched-passes (30), item 3).
-
-% VALUE: the recovered order is the method and is checked through its consequences, not against a trace: removed false waits leave outputs bit-identical, measured gains stay within their bounds, and what the analysis leaves out is counted; the CP's own timer records show the issue and wait order inside each command without changing the array's configuration, and they cannot see core loops or the gaps between commands
-We check the recovered order through its consequences rather than against a hardware trace.
-Every wait that the analysis classes as false and that our passes remove leaves the outputs bit-identical (Section~\ref{sec:method}), each measured gain is compared with its bound (Section~\ref{subsec:tests}), and the operations that the analysis leaves out are counted per stream.
-To show how the CP executes the order, we insert the runtime's record-timer instruction after each synchronization and after each run of issue instructions, so that the firmware writes an identifier and a 1.8~GHz device timer into a buffer that the host reads after the run.
-The array's configuration is left unchanged.
-On one 128-token prefill chunk of Llama-3.2-1B, 1{,}468 records per run leave the logits bit-identical and add no measurable device time.
-For each command, they show when each column group's work was issued and how long each synchronization blocked the CP (Figure~\E{timeline}).
-Between commands the timer advances at less than a tenth of its rate, so the records time intervals within a command, whereas the host's clock times the gaps between commands.
-Order inside a core's loop is invisible to the CP, so the decode loop's order rests on its removal (Section~\ref{subsec:rings}).
-% SOURCE: record-timer instruction TXN opcode 0x83 (12 bytes: header, size, 32-bit id; aiebu 48b69735 xaie_txn.h), XRT 2.25.0 ML Timeline (XDP 67165d6 clientDev/ml_timeline.cpp; Strix Halo listed as a client device with a debug buffer); feasibility check: split-1b-S4-L20480, 108 commands, 1,468 records per run, 5 runs with and 5 without, logits sha equal in all 10, summed start-to-wait with / without records 0.93-0.95, per-command fit of the timer 1,752-1,767 MHz against the 1,800 MHz H clock at the top DPM level (xdna-driver bc5dd96 npu4_dpm_clk_table), 110-125 M timer cycles per host second between commands (amd-npu b98e3044; vault lab-flm-streams (39), decisions log D13).
-% DECISION: T-rec was withdrawn by the author (outline v9 revision 31, D13); recovery is the method in every verb row, and the timer records are a figure that governs no verb.
-
-\subsection{Closed Binaries}
-\label{subsec:closed}
-
-% VALUE: a closed stack ships binaries only, so its streams are recorded at the runtime's boundary without the device and lifted with a byte-identical round trip; each issue is attributed to the column group its data reaches through the configuration's decoded routes; FastFlowLM's prefill then issues one group per command, and serial issue predicts its time where overlap does not
-FastFlowLM ships its engines as binaries, so we record their instruction streams at the runtime's boundary, either with a recording library that never opens the device or with an interposer during a device run, and lift each stream into MLIR-AIE's runtime-sequence form.
-Every stream recorded offline round-trips through the lifter byte for byte, so the analysis reads exactly what the engine dispatches.
-Because FastFlowLM's attention reads through shim tiles of the GEMM columns, attributing an issue to its column would mix the groups, so the analysis decodes the configuration's stream routes and attributes each issue to the group whose compute tiles its data reaches.
-Under this attribution, the one capture we analyse, a 1{,}009-token prefill of Gemma-4-E2B, changes column group only at the boundary between two commands, once into attention and once out of it in every layer, so it issues serially, one group per command.
-The sum of its commands' times measured alone, each less the dispatch floor and plus the boundary cost between commands, matches its measured time within 10.0\%, whereas full overlap would place it 36.5\% lower, a separation far wider than the batch-to-batch variation of the read cap this machine shows.
-A census of which columns carry any instruction, over all 218 recorded streams and over the capture itself, agrees with this attribution without establishing it, since it counts addressed columns rather than the programs they serve; Appendix~A gives the counts.
-Since FastFlowLM's closed libraries build these streams and their buffers, we measure removals on MLIR-AIR's fused prefill, which reimplements FastFlowLM's designs~\citep{wang2026mlirair}.
-Its decoded configuration places the GEMMs on columns 1--6 and attention on columns 0 and 7, as FastFlowLM's fused prefill does, so the two share the column groups whose turns our passes remove.
-Appendix~A states how the attribution was chosen, and what the rule registered before it labels the same capture.
-% SOURCE: recording libhrx (FastFlowLM 44d01787, gemma4e-flash), every prompt length 1-1,024 recorded with 0 /dev/accel opens; 8 buckets, 218 distinct streams, round trip and identity 218 / 218 (vault lab-cosched-passes (14)); lifter fix mlir-aie 91f64387ffb, 375 / 375 MLIR-AIR streams byte-identical (lab-cosched-passes (3)).
-% SOURCE: device capture through an XRT interposer, gemma4e-flash:e2b, 1,009 tokens; route maps from the frozen cdo_routes decoder: shim 3 and shim 6 MM2S0 reach only columns 0 and 7; 70 group transitions, all between commands (35 GEMM -> attention, 35 attention -> GEMM) (vault lab-flm-streams (11), (13)).
-% SOURCE: ops-per-column census over the 218 FLM streams, recomputed here from the committed artifact (aie-cosched 0400fc9 passes/results/bprime/column_ops.json, from bprime_column_ops.py 879bf80; parsed by aie-cosched-pass-0, counts re-derived independently in this workspace): column sets {1,2,3,4,5,6} 200, {0,3} 8, {6,7} 8, {} 1, all eight 1. Every {0,3} stream carries the bulk of its ops on column 0 (e.g. 1,420 against 384) and every {6,7} on column 7, which matches the frozen route map above (shim 3 and shim 6 MM2S0 reach only columns 0 and 7), so the 16 are attention commands plus their feeding shim. The peer's first message said 192 of 218 and corrected it to 200; 192 is the count among proposal streams only. The one empty stream (186fd90831c87d8c) was earlier reported as "not analysed: one column" and in fact has no ops.
-% SOURCE: closed-stack check: T = 1.444 s, serial prediction 1.300 s (error 0.100), overlap prediction 0.917 s (error 0.365), tolerance 0.2075, of which 0.102 is one slow floor repetition; without it the tolerance is 0.106 and the serial prediction still passes (vault lab-flm-streams (12) RESULT, amd-npu 52c8401d, 3d0d1036).
-% SOURCE: MLIR-AIR's llms README: "reimplement AMD NPU LLM designs originally developed by the FastFlowLM team" (mlir-air 740cae0f, a3e26261); fused_prefill/device.py "laid out like FastFlowLM's fused_prefill"; FastFlowLM's Gemma4-E2B fused_prefill.xclbin decoded with tools/xclbin_layout.py: attention programs on columns 0 and 7, a GEMM program on the 24 cores of columns 1-6 (vault lab-flm-streams (5)); coverage ruling D13(b).
-% DECISION: the serial label is scoped to this one capture (Gemma-4-E2B, 1,009 tokens, the engine's cap); the attribution by routes was ruled after the capture, and the label under the first attribution by tile column was MIXED-majority; both disclosures go to the appendix (outline v9 section 2, C2).
-
-% MOVED from the former findings section
-\subsection{Textbook Classes on a Grid}
-\label{subsec:grid}
-
-% VALUE: the waits are false dependences in the textbook sense, of two causes (order, name) at two granularities (the CP's stream, an engine's loop); the analysis's classes are these columns, a DMA chain is a loop on a DMA engine, and the grid places every known instance, with two cells empty; the classes are cited, the claim is where lowering reintroduces them
-The expert designs lose end-to-end time on the NPU because work waits on other work that it does not consume.
-Such a wait is a \emph{false dependence}, which is an ordering that the lowered program imposes although no data flows between the two pieces of work, namely a name or order dependence in the classes of Section~\ref{subsec:reading}.
-A false dependence has one of two causes.
-An \emph{order} dependence is a wait placed where the written program order put it rather than where data requires it, and reordering removes it.
-A \emph{name} dependence arises where two pieces of work share a buffer, lock, or channel that they need not share, as in the anti and output dependences of compilers~\citep{kuck1981dependence}, and renaming the storage removes it~\citep{tomasulo1967,lam1988software}.
-These are the analysis's classes of Section~\ref{subsec:reading}, and every blocking edge falls into exactly one of them or is a true dependence.
-We find false dependences at two granularities, in the CP's instruction stream and inside an engine's loop, where a BD chain with locks counts as a loop on its DMA engine.
-% DECISION: false dependences and the name class are textbook and cited; the paper claims their analysis on this platform, never the classes.
-
-\begin{table}[t]
-    \centering
-    \caption{Known Instances by Cause and Granularity}
-    \label{tab:grid}
-    % VALUE: the grid with each known instance; two cells are empty in the existing designs
-    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}>{\raggedright\arraybackslash}p{0.17\linewidth}>{\raggedright\arraybackslash}p{0.36\linewidth}>{\raggedright\arraybackslash}p{0.36\linewidth}}
-        \toprule
-        & Order & Name \\
-        \midrule
-        Stream & column groups take turns in prefill; attention's two columns take turns & none found; realizable (\S\ref{subsec:synthetic}) \\
-        Loop & none found; realizable (\S\ref{subsec:synthetic}) & decode attention's keys, values, and scores, each in one buffer \\
-        \bottomrule
-    \end{tabular*}
-\end{table}
-
-% VALUE: the instances per cell, and why two cells are empty in the existing designs; DMA-only instances stay visible through an engine label
-Table~\ref{tab:grid} places each instance we know of in the MLIR-AIR designs, which are the designs our passes rewrite.
-Two of the four cells hold no instance in those designs, and neither is empty by construction: we write a design for each and measure the behaviour its class predicts (Section~\ref{subsec:synthetic}), so those cells are empty in what these stacks happen to emit rather than in what the platform allows.
-In its prefill, order dependences in the instruction stream hold back one column group behind another and one column of an operator behind the other, and the one captured prefill of the production engine shares the first of these.
-In its decode, the attention loop holds name dependences on its keys, its values, and the one buffer through which its two cores pass scores, while its running maximum and accumulator carry true dependences across blocks.
-The census extends the same reading to IRON and to the production engine's streams, which no instance in this table covers (Section~\ref{subsec:census}).
-No name dependence appears in the stream, because the existing prefill already gives each chunk its own buffers, and rings added nothing beyond reordering there, within 0.1\%.
-No order dependence is known in decode attention's loop, where acquires that cover a pair of blocks arose only in a hand edit's unrolled loop, and loops with nested control are not analysed, so the census tests this cell.
-The loop row carries an engine label, so an instance confined to a DMA engine stays visible.
-% SOURCE: the grid and its instances (vault paper-cosched-direction-converged, Clarification (xiii), ruled on lab-cosched-passes (30)); the score buffer shared_l10 is name x loop in the existing build; the pair-level order edge of the hand edit's arms (b) and (c) came from the pair unroll (lab-cosched-passes (30), item 5; outline v9 section 1); rings beyond reorder in the stream: R-ship = pair within 0.1% (amd-npu 71081d1).
-
-\subsection{Census}
-\label{subsec:census}
-
-% VALUE: the census: frozen passes over a fixed population of MLIR-AIR, IRON, and FastFlowLM streams, counting confirmed instances per cell, with its residuals
-Table~\ref{tab:grid} records what we found by reading designs. To ask how far a pass can find such instances by itself, we also ran a census with the procedure fixed before the scan: a frozen scheduling pass over a frozen population of 277 instruction streams, 27 from MLIR-AIR, 32 from IRON and 218 from the production engine, with the instances of Table~\ref{tab:grid} excluded so that the scan could not rediscover them.
-At stream granularity the census confirms no instance: the frozen pass proposes no candidate reordering on any of the 277 streams, so there is nothing for the device to confirm, and the count is zero before any run.
-That zero is a property of the pass and its registered rules, not a statement that the streams hold no such dependence.
-Its largest cause is the rule by which the pass groups columns into lanes: columns that patch a common argument are treated as one lane, which makes 199 of the streams single-lane, so no reordering across their columns is ever proposed, although in each of them at least one column's issue sits behind waits that the same rule assigns to other columns.
-Of the remainder, 61 streams issue nothing after their first wait, so any order dependence lies between commands rather than inside one, and 16 reuse buffer descriptors in a way that makes the move illegal.
-A separate characterization, which proposes reorderings without requiring that they pay, accepts at least one on 193 of the 218 production streams, each worth a factor of about 1.00, and none on IRON's, where queue room cannot be proved from the stream alone.
-We did not run the corresponding census at loop granularity, and by its own design that census could only ever report instances found, never their absence.
-% TODO (re-run): restore only if the final census again lacks a pre-committed candidate count. Development-phase
-% artefact: "We also did not commit a predicted candidate count before the scan, which a later registration did do."
-The counts for the other two cells of Table~\ref{tab:grid} come from reading designs, as stated, and the analysis's own residual counters are not implemented.
-% SOURCE: population and procedure, vault lab-cosched-passes (41) and its addendum, with prex_scan.json (aie-cosched tools/oracle_results/2026-10-21-d3) verified by this workspace; the lane rule is (35), registered before the census results. Breakdown: 199 single-lane by the lane rule (193 production + 6 IRON gemm + 1 other), 61 single-phase, 16 with descriptor reuse. The characterization is B-prime (vault (46)): 193 of 218 with at least one accepted reordering at 1.000-1.0069, IRON 0 of 84 accepted (all queue-overflow), MLIR-AIR none proposed.
-% DECISION: kS and kL are not named in the text, and the loop-granularity census is reported as not run rather than as zero, since under its registration only a found instance was reportable. The claim "no instance found" applies to stream granularity alone. pass-0 corrected an earlier reading of mine that treated both cells as zero (2026-10-22).
-% DECISION: the census counts confirmed instances that the frozen pass proposes and removes; it is a different quantity from the analysis's edge-level coverage counters, which Section~\ref{subsec:reading} notes are unimplemented. The two must not be conflated in the text.
-
-% MOVED from the former bound section; its heading prose is kept as the lead-in
-% \section{Bounding and Pricing Removals}
-% \label{sec:bound}
-% Since the order is in the program and the durations are measured, the worth of removing a dependence can be bounded from the program alone, before the removal is measured.
-% We state the scheduling problem that the semantics of Section~\ref{subsec:semantics} define, with a lower bound on any schedule (Section~\ref{subsec:formulation}), and bound what removing one dependence can gain (Section~\ref{subsec:removal}).
-% Removals must be priced together, since one removal can gain nothing while another dependence remains (Section~\ref{subsec:joint}).
-% An event model prices whole schedules from probes of each operator alone (Section~\ref{subsec:pricing}), and Section~\ref{subsec:tests} states how each prediction is tested.
