@@ -1,4 +1,4 @@
-\section{The Scheduling Problem}
+\section{What an Ordering Costs}
 \label{sec:order}
 
 % VALUE: on XDNA 2 each engine runs its program in order and nothing schedules across engines, so the order of the work and the waits between engines are in the compiled program; the section shows this from measured command semantics, states the execution model, reads a stream into a happens-before graph with a cause per wait, and extends the reading to closed binaries
@@ -140,9 +140,9 @@ After a cut, the next longest path or cycle bounds what remains, so the gain is 
 And the groups share the DRAM read cap, so a set that does cut every critical path can still gain nothing when that cap binds, which Section~\ref{subsec:tests} reports for a model whose composed prefill already reads at 93--96\% of it.
 % VALUE: the test says which candidate sets cannot pay, from the graph alone, and says nothing about how much a set that can pay is worth; the magnitude needs the durations and the capacity, which the event model supplies
 We therefore use the condition as a test of which candidate sets cannot pay, and leave the magnitude to the event model of Section~\ref{subsec:pricing}.
-% SOURCE: the acyclic condition is the minimum cut of a critical subnetwork in project crashing (Kelley 1961; Fulkerson 1961), the cyclic one the iteration bound and maximum cycle mean (Ghamarian 2006; Stuijk 2008); both are cited, never claimed (Section~\ref{subsec:related}).
+% SOURCE: the acyclic condition is the minimum cut of a critical subnetwork in project crashing (Kelley 1961; Fulkerson 1961), the cyclic one the iteration bound and maximum cycle mean (Ghamarian 2006; Stuijk 2008); both are cited, never claimed (Section~\ref{sec:related}).
 % DECISION: the condition is stated as necessary only, after review r5 showed that a longest-path or cycle criterion is valid on an uncapacitated graph and this machine has a shared DRAM cap, a shared command processor and a per-command boundary cost; the capacity half is the measured regime of this section, and the 8B at cap and the loss at 512-token appends are the two negative instances inside the paper.
-The bound applies Amdahl's law to an ordering rather than to a component, and it needs only the program's order and the measured durations of its operations, not a timing trace (Section~\ref{subsec:related}).
+The bound applies Amdahl's law to an ordering rather than to a component, and it needs only the program's order and the measured durations of its operations, not a timing trace (Section~\ref{sec:related}).
 What the ordering case adds is the typed resources: a removal frees work onto a column group, onto the CP, or onto a DRAM read rate that every group shares, and only the first of those is private, so the share of a phase a removal can recover is not read off the program's order alone.
 
 % VALUE: the DRAM cap makes the allowed overlap depend on which group holds the critical path: co-running costs a bandwidth-bound group a fixed fraction of its partner's duration and a compute-bound group almost nothing, so one regime prices a removal lower than the other
