@@ -6,6 +6,7 @@ Outputs (into FIGS_OUT, default paper/fig):
   pairs.pdf        one attention and one GEMM operator: queued, in sequence in one command, and interleaved in one command
   outstanding.pdf  per column group, the CP's blocked time and the time its work was outstanding, existing against composed
   accuracy.pdf     predicted against measured TTFT, with the tolerance committed before the runs
+  bound.pdf        distance to the lower bound per cell, measured and as predicted before the runs
   params-rows.tex  rows of the event model's parameter table
 """
 import json
@@ -213,6 +214,43 @@ def fig_accuracy():
     plt.close(fig)
 
 
+def fig_bound():
+    """Distance to the lower bound per cell, measured and as predicted before the runs.
+
+    The registered claim was that the distance stays within 1.30; the cells that leave it are the cells the
+    model had already placed above it."""
+    d = json.loads((DATA / "bound.json").read_text())
+    cells = d["cells"]
+    # Short labels must stay distinct: two of the four models are 4B.
+    names = {"llama32_1b_q4nx": "Llama 1B", "qwen3_4b_q4nx": "Qwen 4B",
+             "gemma3_4b_q4nx": "Gemma 4B", "llama31_8b_q4nx": "Llama 8B"}
+    short = {"append:2048:4096": "2k+4k", "append:8192:4096": "8k+4k", "append:12288:2048": "12k+2k"}
+    order = list(names)
+    cells = sorted(cells, key=lambda c: (order.index(c["model"]), list(short).index(c["cell"])))
+    y = list(range(len(cells)))[::-1]
+    fig, ax = plt.subplots(figsize=(COLUMN, 2.3))
+    ax.axvline(d["claim_hi"], color="black", linewidth=0.5, linestyle=(0, (4, 2)), zorder=1,
+               label="Registered range, upper edge")
+    for yi, c in zip(y, cells):
+        ax.plot([c["r_pred"]], [yi], marker="|", markersize=5, color=INK, markeredgewidth=0.8, zorder=3,
+                label="Predicted before the runs" if yi == y[0] else None)
+        ax.plot([c["r_meas"]], [yi], marker="o", markersize=3,
+                color=MAGENTA if c["in_range"] else ORANGE, zorder=4,
+                label=("Measured, inside the range" if c["in_range"] else "Measured, outside") if yi in (y[0], y[2]) else None)
+        ax.plot([min(c["r_pred"], c["r_meas"]), max(c["r_pred"], c["r_meas"])], [yi, yi],
+                color=GRAY, linewidth=0.8, zorder=2)
+    labels = [f"{names[c['model']]} {short[c['cell']]}" for c in cells]
+    assert len(set(labels)) == len(labels), "model short names collide"
+    ax.set_yticks(y, labels)
+    ax.set_ylim(-0.8, len(cells) - 0.2)
+    ax.set_xlim(1.0, 1.75)
+    ax.set_xlabel("Measured TTFT / lower bound")
+    ax.tick_params(left=False)
+    ax.legend(ncol=2, loc="lower center", bbox_to_anchor=(0.5, 1.0), handlelength=1.4, columnspacing=1.0)
+    fig.savefig(OUT / "bound.pdf")
+    plt.close(fig)
+
+
 def params_rows():
     p = json.loads((DATA / "component-model.json").read_text())["params"]
     us = lambda v: f"{v * 1000:.0f}\\us"  # noqa: E731  (parameters are stored in ms)
@@ -249,4 +287,5 @@ if __name__ == "__main__":
     fig_pairs()
     fig_outstanding()
     fig_accuracy()
+    fig_bound()
     params_rows()

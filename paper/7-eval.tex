@@ -125,7 +125,12 @@ Four of the baseline arms varied by more than 5\% across their repetitions, and 
 \subsection{Distance to the Bound}
 \label{subsec:bound-eval}
 % VALUE: at each configuration's faster split the composer lies within 1.09-1.30x of the lower bound, whose binding term is a group's busy time rather than the CP; the bound is not strict where attention is extrapolated (16k + 4k)
-\E{The gap to the lower bound per configuration, with its binding term.}
+\begin{figure}[t]
+    \centering
+    \includegraphics{fig/bound.pdf}
+    \caption{Distance to the lower bound, as measured and as the event model predicted it before the runs, on twelve cells measured after the bound was committed. The model places every cell to within 0.09, and never below what it measures. Our registered claim that the distance stays within $1.30\times$ fails on five cells, each of which the model had already put above that edge.}
+    \label{fig:bound}
+\end{figure}
 
 % VALUE: which group binds the bound flips with the workload, and that flip is what moves the faster split; the overlap cost of the bound appears only where the GEMMs bind; the rest of the distance to the bound is host work the schedule does not hide
 Which group binds the lower bound flips with the workload.
