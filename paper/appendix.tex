@@ -122,8 +122,7 @@ four more matrix multiplications.
 \textbf{What we cannot.} The remaining 149\ms{} and 105\ms{} are unexplained. The hypothesis that per-request setup
 explains them is contradicted by the capture: the constructions are spread through the window rather than batched at
 its start, and both the timeable setup, from submission to the first command, and the host idle time scale with prompt
-length, from 29--40\ms{} to 51--53\ms{} and from 166--185\ms{} to 316--321\ms{} respectively. The 100\ms{} figure also
-assumes that the open stack pays no equivalent dequantization pass, which we have not established. Interposer overhead
+length, from 29--40\ms{} to 51--53\ms{} and from 166--185\ms{} to 316--321\ms{} respectively. The open stack has no equivalent pass. It keeps its weights in four-bit form in memory and dequantizes one weight tile at a time in a core's local memory inside each matrix multiplication's own loop, so that cost is already inside the device time our probes and our measured times contain, with no extra command and no second pass over memory. The exception is a model whose output projection is not tied to its embedding, where that one matrix is dequantized in place. Interposer overhead
 is not visible: the engine's own reported time-to-first-token is 0.7--6.2\% below our reference measurement of it.
 
 \section{Registered Predictions: Flagged Arms}
