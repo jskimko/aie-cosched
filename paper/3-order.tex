@@ -103,7 +103,7 @@ Durations remain measured inputs, because the program fixes the order of each en
 From these operations, the analysis builds a \emph{happens-before} graph, in which an edge from $a$ to $b$ means that $b$ cannot start until $a$ has completed.
 Issue order alone does not create such an edge, because a queue push is issued in order but its transfer completes later.
 Each direct edge comes from one of the 11 ordering mechanisms of Table~\ref{tab:mech}, at the granularity of the CP's stream, of data movement, or of a core loop, and an edge that two mechanisms imply is attributed to the first in the table.
-An operation whose ordering effect no mechanism describes, such as an unknown opcode or a write outside the known register map, receives edges to its neighbors on the CP, which are counted as unattributed per stream, so the count measures the model's coverage.
+An operation whose ordering effect no mechanism describes, such as an unknown opcode or a write outside the known register map, takes edges to its neighbors on the CP, and counting these per stream is how the model's coverage is to be measured.
 Edges of mechanism 2 never stall, because their instructions complete at issue, so they are attributed but reported apart from the blocking edges.
 % SOURCE: the mechanism table, attribution order, granularities, UNATTRIBUTED, and issue edges (vault lab-cosched-passes (30), item 2); the library AIECoschedDeps (mlir-aie f1725dae1f1, pinned).
 
@@ -113,8 +113,9 @@ The edge is a true dependence if one of these pairs reads a location after the o
 The first two follow the conflicts that Bernstein's conditions exclude between pieces of work that run in parallel~\citep{bernstein1966analysis}, and the name class covers the anti and output dependences of compilers~\citep{kuck1981dependence}.
 Renaming the conflicting locations can therefore remove a name dependence, reordering can remove an order dependence, and a true dependence stays.
 A synchronization that gates several operations contributes one edge per gated operation, so each operation's conflicts are classed on their own.
-A pair that two disjoint paths order is lost by no single edge, so each edge on those paths may be classed as an order dependence alone, and the analysis counts such pairs as redundant instead of attributing them to either path.
-It counts a loop with data-dependent control as control.
+A pair that two disjoint paths order is lost by no single edge, so each edge on those paths may be classed as an order dependence alone, and such pairs are counted as redundant instead of being attributed to either path.
+A loop with data-dependent control is counted as control.
+% DECISION: this subsection states the classification the passes assume and the counts it defines, not what the committed library computes. Verified against mlir-aie f1725dae1f1 on 2026-10-21: AIECoschedDeps classifies each core loop's buffers and reports its lock edges and loop-carried distances, so the class of a wait at loop granularity is computed; the edge-level attribution, the unattributed and redundant counters, and the order class itself are not implemented there, and the order class is unreachable in that library. The stream-granularity instances this paper removes were identified by reading the designs and confirmed by measurement, and the graph of a compiled stream is built by the prefill reader rather than by the library. Every sentence here is written in that register until the attribution pass exists, and the census's coverage counts are owed with it.
 Loop-carried edges are classed in the same way on the loop's iterations, with their distance recorded.
 % SOURCE: classification by Lost(e), REDUNDANT, CONTROL, loop-carried distance (vault lab-cosched-passes (30), item 3).
 

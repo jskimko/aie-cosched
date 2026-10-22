@@ -2,7 +2,8 @@
 \label{sec:method}
 
 % VALUE: the passes and their legality checkers are the implementation: the composer reorders and renames across the operators of the open prefill, the stream pass reorders within one operator's stream, the loop pass renames inside decode attention's loop, and each output is checked for legality from the instructions and run bit-identically; the event model makes each choice before anything runs
-Our passes remove the false dependences that the analysis finds, and legality checkers accept each rewrite before it runs.
+Our passes remove false dependences of the classes of Section~\ref{subsec:grid}, and legality checkers accept each rewrite before it runs.
+In decode's loop the class and the buffers come from the analysis of Section~\ref{subsec:reading}; in the CP's stream they were identified by reading the designs, and the analysis supplies the graph against which each rewrite is checked.
 For the open prefill, a composer takes an existing design's per-operator instruction streams, its map of operators to columns, the dependency graph of its host program, and the probes, and emits a sequence of composed commands (Figure~\ref{fig:order}d).
 The composed commands must do the same work as the existing ones, which the composer guarantees by keeping every instruction and checking legality from the instructions themselves (Section~\ref{subsec:compose}).
 No group may wait at the CP for work it does not consume, which is an order dependence in the stream row of Table~\ref{tab:grid}, so the composer reorders issue across operators and a stream pass reorders issue within one operator's stream (Section~\ref{subsec:order}).
