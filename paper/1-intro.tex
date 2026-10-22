@@ -31,8 +31,8 @@ This matters more on a client part than in a datacentre: with a prefix cached, p
 \begin{figure}[t]
     \centering
     % VALUE: the same operators under three compositions, one per command (groups take turns), packed in one command in turn (a wait on attention holds back the GEMMs), and issued first with synchronizations in predicted completion order (ours; both groups busy), plus the composer's inputs and outputs
-    \figph{Schematic: CP instruction order and column activity for one attention operator (columns 0 and 7) and three GEMMs (columns 1--6): (a) one operator per command; (b) one command, operators in turn; (c) one command, synchronizations in predicted completion order (ours). (d) The composer: per-operator streams, column map, dependency graph, and probes in; composed commands, buffer rings, and the split per regime out.}
-    \caption{CP instruction order and the activity of the column groups for one attention operator and three GEMMs: (a) one operator per command, (b) one command with the operators in turn, and (c) one command with synchronizations in predicted completion order. (d) The composer's inputs and outputs.}
+    \includegraphics{fig/order.pdf}
+    \caption{CP instruction order and the activity of the column groups for one attention operator and three GEMMs, with illustrative durations. An issue returns at once and a synchronization blocks the CP, so packing the operators into one command (b) runs them exactly as one command each does (a): the CP is blocked on one group while the other is idle. Issuing every group's work before waiting on any (c) lets the groups run together. The measured form of the same effect is Figure~\ref{fig:outstanding}.}
     \label{fig:order}
 \end{figure}
 Expert designs fix the split of the array by hand and issue one operator per command, so the column groups execute one after another (Figure~\ref{fig:order}a).

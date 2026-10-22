@@ -251,6 +251,55 @@ def fig_bound():
     plt.close(fig)
 
 
+def fig_order():
+    """Schematic: the same operators under three issue orders, with what the CP is doing beneath each.
+
+    Durations are illustrative, not measured; the figure shows the mechanism, and the measured version of the
+    same effect is Figure~\\ref{fig:outstanding}. An issue returns at once, so it is drawn narrow; a
+    synchronization blocks the CP until the transfer it names completes."""
+    A, G, ISS = 3.0, 2.0, 0.22  # attention, each of three GEMMs, and the width of an issue
+    serial_attn = [(0.0, A)]
+    serial_gemm = [(A + i * G, G) for i in range(3)]
+    # CP lane: (start, width, kind), kind 0 = issue (returns at once), 1 = blocked on a synchronization.
+    serial_cp, t = [], 0.0
+    for dur in (A, G, G, G):
+        serial_cp += [(t, ISS, 0), (t + ISS, dur - ISS, 1)]
+        t += dur
+    ours_cp = [(i * ISS, ISS, 0) for i in range(4)]
+    ours_cp += [(4 * ISS, max(A, 3 * G) - 4 * ISS, 1)]
+    panels = [
+        ("(a) One operator per command", serial_attn, serial_gemm, serial_cp, A + 3 * G),
+        ("(b) One command, operators in turn", serial_attn, serial_gemm, serial_cp, A + 3 * G),
+        ("(c) One command, synchronizations in predicted completion order",
+         serial_attn, [(i * G, G) for i in range(3)], ours_cp, max(A, 3 * G)),
+    ]
+    fig, axes = plt.subplots(3, 1, figsize=(COLUMN, 2.6))
+    span = max(p[4] for p in panels)
+    for ax, (title, attn, gemm, cp, end) in zip(axes, panels):
+        for color, bars, y in ((MAGENTA, attn, 1.0), (BLUE, gemm, 0.0)):
+            ax.broken_barh([(t0, d) for t0, d in bars], (y - 0.32, 0.64),
+                           facecolors=color, edgecolor=INK, linewidth=0.4)
+        for t0, d, kind in cp:
+            ax.broken_barh([(t0, d)], (-1.32, 0.5), facecolors=INK if kind == 0 else GRAY,
+                           edgecolor=INK, linewidth=0.3)
+        ax.axvline(end, color="black", linewidth=0.5, linestyle=(0, (4, 2)))
+        ax.set_yticks([1.0, 0.0, -1.07], ["Attn.", "GEMMs", "CP"])
+        ax.set_ylim(-1.75, 1.6)
+        ax.set_xlim(-0.1, span + 0.5)
+        ax.set_title(title, fontsize=7, pad=2, loc="left")
+        ax.tick_params(left=False, right=False, top=False, bottom=False)
+        ax.set_xticks([])
+        for side in ("top", "right", "bottom"):
+            ax.spines[side].set_visible(False)
+    handles = [plt.Rectangle((0, 0), 1, 1, facecolor=INK, edgecolor=INK, linewidth=0.3),
+               plt.Rectangle((0, 0), 1, 1, facecolor=GRAY, edgecolor=INK, linewidth=0.3)]
+    axes[0].legend(handles, ["CP issuing", "CP blocked on a synchronization"], ncol=2,
+                   loc="lower center", bbox_to_anchor=(0.5, 1.28), handlelength=1.2, columnspacing=1.0)
+    axes[-1].set_xlabel("Time (illustrative)", labelpad=1)
+    fig.savefig(OUT / "order.pdf")
+    plt.close(fig)
+
+
 def params_rows():
     p = json.loads((DATA / "component-model.json").read_text())["params"]
     us = lambda v: f"{v * 1000:.0f}\\us"  # noqa: E731  (parameters are stored in ms)
@@ -288,4 +337,5 @@ if __name__ == "__main__":
     fig_outstanding()
     fig_accuracy()
     fig_bound()
+    fig_order()
     params_rows()
