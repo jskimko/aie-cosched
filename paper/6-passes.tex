@@ -116,6 +116,11 @@ Which group binds the lower bound decides the direction: the GEMMs bind for prom
 % VALUE: the chosen splits stay resident, so a conversation switches between them at a turn boundary by a suspend and resume; its cached context, laid out by the attention groups of the split that computed it, moves with it
 A deployment keeps each chosen split resident in its own hardware context, with its own copy of the weights, and switches between them at a turn boundary by suspending one context and resuming the other.
 The KV cache of a cached context is laid out by the attention groups of the split that computed it, so a conversation that changes split also moves its cache to the new layout.
+% VALUE: the price of making the partition a per-regime choice: each split is its own configuration, so a deployment either holds two of them with two copies of the weights or pays a switch and a cache relayout; the weights are the larger of the two costs on a large model
+Making the partition a choice therefore costs either memory or a switch.
+Each split is its own configuration, so holding both resident holds the weights twice, which on the largest model we evaluate is \E{4.5\,GB} of weight arenas for each; releasing one instead costs a suspend and a resume, \E{7--8\ms}, and the cache relayout above.
+Neither cost applies within one regime, where a single split serves every turn.
+% SOURCE: weight arenas 645 MB (Llama-3.2-1B), 2,340 (Qwen3-4B), 4,451 (Llama-3.1-8B), one copy per resident split (vault lab-metric-fields (1)); warm switch 7.1 ms (1B) and 7.7 ms (Qwen3-4B), suspend and resume only, without moving a cached context (lab-split-sweep (5)).
 \E{How the cache is moved, and the rule that decides between moving it and staying on one split.}
 % SOURCE: switch = suspend + resume + first prefill in one process, both splits' weights resident (vault lab-split-sweep (5)).
 % DECISION: the relayout and its decision rule enter once measured (vault paper-cosched-plan, regime switching); until then this sentence stays a placeholder.
