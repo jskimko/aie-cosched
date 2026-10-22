@@ -50,7 +50,7 @@ Because the two stacks differ in kernels, quantization path, tokenization, and p
 \subsection{Removing Each Dependence}
 \label{subsec:ablation}
 % VALUE: a factorial of order and split on every model: packing alone gives nothing, the order's gain splits into its part inside the attention operator and its part across groups, and on the four-column split, where the existing stream has nothing to alternate, reordering alone gives 1.33x at 16k + 4k on both models; each side on its own faster split
-\E{Figure: TTFT by schedule (existing, packed in turn, attention columns alternated, composed) and split, per model and regime.}
+\E{Figure: TTFT by schedule (existing, attention columns alternated, composed) and split, per model and regime. The packed-into-one-command arm is not plotted: the only whole-model measurement of it predates the composer this paper evaluates, and Section~\ref{subsec:semantics} establishes at operator-pair scale that packing alone creates no overlap.}
 
 % VALUE: where the waits block: the CP's timer records (Section 3.3) show, per column group, how long the CP blocked on each group's synchronizations in the existing stream and in the composed one, so the removed waits are seen as blocking time that disappears, not only as a shorter TTFT
 \begin{figure}[t]

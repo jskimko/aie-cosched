@@ -89,6 +89,20 @@ corroborates the attribution rather than establishing it; and because the paper'
 columns, the fact that the column set changes exactly 70 times is a re-derivation of that count under the same rule,
 not a second measurement of it.
 
+\section{Other Round-Trip Populations}
+\label{app:roundtrip}
+
+% VALUE: the lead contribution's number will be audited, so the populations beside it are stated rather than left for
+% a reviewer to find
+The 625 streams quoted in the introduction are the streams each toolchain emits for a design. Three further
+populations round-trip byte-identically and are not counted there, to keep that number tied to one kind of object.
+The open compiler also dispatches streams that differ from its on-disk files, either stripped to a column group or
+interpolated from a template: 539 of those re-emit byte for byte, and none of them is among the 375, so that toolchain
+has 914 distinct streams verified across two gates. Our own composer's output re-emits on 2{,}684 streams, which we
+exclude from a toolchain count because it is our output rather than a stack's. The production engine's streams at
+other prompt lengths, 37 and 53 in two further gates, overlap the 218 already counted. Each gate carries two negative
+controls, a modified stream and a truncated one, which fail as designed.
+
 \section{The Production-Engine Comparison}
 \label{app:flm}
 
