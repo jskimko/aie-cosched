@@ -5,6 +5,7 @@ Outputs (into FIGS_OUT, default paper/fig):
   busy.pdf         TTFT of the existing Llama-3.2-1B prefill split into device-busy time per operator class and the rest
   pairs.pdf        one attention and one GEMM operator: queued, in sequence in one command, and interleaved in one command
   outstanding.pdf  per column group, the CP's blocked time and the time its work was outstanding, existing against composed
+  accuracy.pdf     predicted against measured TTFT, with the tolerance committed before the runs
   params-rows.tex  rows of the event model's parameter table
 """
 import json
@@ -174,6 +175,44 @@ def fig_outstanding():
     plt.close(fig)
 
 
+def fig_accuracy():
+    """Predicted against measured TTFT, for the cells the registration scored and for the arms reported beside them.
+
+    The band is the tolerance committed before the runs. Existing schedules are drawn in ink and the composed
+    one in color, as elsewhere."""
+    d = json.loads((DATA / "accuracy.json").read_text())
+    tol = d["tolerance"]
+    fig, ax = plt.subplots(figsize=(COLUMN, 1.85))
+    lo, hi = 1.0, 17.0  # seconds
+    ax.plot([lo, hi], [lo, hi], color="black", linewidth=0.5, zorder=1)
+    ax.fill_between([lo, hi], [lo * (1 - tol), hi * (1 - tol)], [lo * (1 + tol), hi * (1 + tol)],
+                    color=GRAY, alpha=0.35, linewidth=0, zorder=0,
+                    label=rf"Committed tolerance, $\pm${tol * 100:.1f}\%")
+    style = {"ship": (INK, "^", "Existing"), "shipar": (INK, "s", "Existing, alternated"),
+             "comp": (MAGENTA, "o", "Composed")}
+    for sched, (color, marker, label) in style.items():
+        for rows, claimed in ((d["reported"], False), (d["claimed"], True)):
+            pts = [(r["meas"] / 1000, r["pred"] / 1000) for r in rows if r["sched"] == sched]
+            if not pts:
+                continue
+            ax.plot([a for a, _ in pts], [b for _, b in pts], linestyle="none", marker=marker,
+                    color=color, markerfacecolor=color if claimed else "none",
+                    markeredgecolor=color, markeredgewidth=0.7,
+                    label=label if not claimed else None)
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlim(lo, hi)
+    ax.set_ylim(lo, hi)
+    ticks = [1, 2, 5, 10]
+    ax.set_xticks(ticks, [str(t) for t in ticks])
+    ax.set_yticks(ticks, [str(t) for t in ticks])
+    ax.set_xlabel("Measured TTFT (s)")
+    ax.set_ylabel("Predicted TTFT (s)")
+    ax.legend(ncol=2, loc="lower center", bbox_to_anchor=(0.5, 1.0), handlelength=1.6, columnspacing=1.0)
+    fig.savefig(OUT / "accuracy.pdf")
+    plt.close(fig)
+
+
 def params_rows():
     p = json.loads((DATA / "component-model.json").read_text())["params"]
     us = lambda v: f"{v * 1000:.0f}\\us"  # noqa: E731  (parameters are stored in ms)
@@ -209,4 +248,5 @@ if __name__ == "__main__":
     fig_busy()
     fig_pairs()
     fig_outstanding()
+    fig_accuracy()
     params_rows()
