@@ -32,14 +32,21 @@
 
 \hyphenation{tool-chain}
 
-% VALUE: the setting and the contribution, method-first
-% DECISION: working title from the vault's paper-ch3-outline (Narrative), with "Modules" made "Operators" to match the paper's term; the author confirms it.
-\mlsystitlerunning{One Command Processor, Many Columns}
+% VALUE: the acronym is recoverable from the subtitle word for word (OPerator Concurrency from Command ORDer),
+% and the subtitle states the paper's thesis: concurrency follows from the order of the commands.
+% DECISION: settled by the author with three converging reviews (venue fit, durability in use, accuracy).
+% "in Compiled Designs" was cut because "design" is FPGA/AIE vocabulary an ML reader does not parse, because it
+% invites the "nothing is recompiled" reading that the split builds contradict, and because it leans
+% post-compilation when aie-cosched-schedule is itself a compiler pass. "for Edge LLM Inference" was cut because
+% it narrows the line below "AMD AI Engines", which is the architecture family the legality conditions are stated
+% over; because truncation eats the trailing scope first and would leave an unscoped claim; and because the draft's
+% own word for the setting is "client", with "edge" reserved for the models.
+\mlsystitlerunning{OPCORD}
 
 \begin{document}
 
 \twocolumn[
-\mlsystitle{One Command Processor, Many Columns: Composing Concurrent Operators on AMD AI Engines}
+\mlsystitle{OPCORD: Operator Concurrency from Command Order on AMD AI Engines}
 
 %% The style file omits the author block in the review version.
 \begin{mlsysauthorlist}
