@@ -56,6 +56,7 @@ When issue costs are negligible, the estimates are exact, and the host work is h
 Within one operator's stream, a stream pass on the lifted runtime sequence reorders issue as well.
 In its full mode, it interleaves the columns' segments round-robin by index, which is how the alternated attention streams were produced by hand, so it emits that alternation rather than discovering it.
 On all 42 attention streams of the population, the pass's output is byte-identical to the hand-alternated stream.
+Reproducing a hand edit is the point rather than the limit: a hand edit reaches the streams someone reads, whereas a pass that must accept or refuse every stream has to carry the condition under which the rewrite is legal, which is what lets it reach the streams nobody has read.
 A legality checker accepts each rewrite before it runs, by checking every pair of instructions that the rewrite inverts against the routes, BDs, and buffer ranges decoded from the configuration.
 % SOURCE: aie-cosched-schedule (mlir-aie 573e0140174, identical in f1725dae1f1), proposal format /2 frozen at aie-cosched 8dee63f; 42 / 42 decoded order and bytes equal to the hand versions (vault lab-cosched-passes (35), (40)); the pairwise inversion rule of legality.py (lab-cosched-passes (14)).
 % DECISION: the pass emits the alternation and the checker accepts it; it is never said to discover it, and full mode is never called a predicted-completion rule (Ruling D3, vault decisions log).
@@ -115,7 +116,7 @@ The composer relies on four properties of the platform rather than on MLIR-AIR: 
 \label{subsec:impl}
 
 % VALUE: the composer is a small Python layer that replaces the host program's dispatch loop on the engine's own hardware context; it changes no kernel, compiler, driver, or firmware
-The composer is about 900 lines of Python that replace the dispatch loop of the design's host program and submit to the engine's own hardware context, with no change to a kernel, the compiler, the driver, or the firmware.
+The composer replaces the dispatch loop of the design's host program and submit to the engine's own hardware context, with no change to a kernel, the compiler, the driver, or the firmware.
 % SOURCE: amd-npu a0ee2edf44e0 (tag composer-v1.1), prefill-overlap/txn.py (111 lines), merged.py (616), component_model.py (180).
 
 \textbf{Argument Arenas.}
