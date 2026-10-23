@@ -37,3 +37,10 @@ Four further files are not byte copies but extracts, each recording its own sour
 The labs that record how each was measured are in the author's notes (`lab-prefill-device`, `lab-prefill-overlap`,
 `lab-split-sweep`, `lab-agent-step`, `lab-decode-long-context`).
 Where a pair was measured in more than one batch, the figures keep its first measurement.
+
+## Extracts and derived files added 2026-10-22
+
+| `data/` | source | what it is |
+|---|---|---|
+| `flm-practice-results.json` | byte copy of amd-npu `86ef630` `flm-practice/results/2026-10-19/results.json` | FastFlowLM decode and server-turn medians, its own timers |
+| `flm-decode.json` | derived by `flm_decode.py` from `flm-practice-results.json`, `decode-1b.json`, `decode-qwen.json` | renamed decode against FastFlowLM at FastFlowLM's measured L; rerun it on the final sweep's files |

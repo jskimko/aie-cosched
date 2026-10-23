@@ -1,0 +1,55 @@
+{
+ "about": "Decode per token: MLIR-AIR's design after our loop pass (R) against FastFlowLM on the same weights.",
+ "inputs": [
+  "figs/data/flm-practice-results.json",
+  "figs/data/decode-1b.json",
+  "figs/data/decode-qwen.json"
+ ],
+ "rows": [
+  {
+   "model": "llama32_1b_q4nx",
+   "L": 16387,
+   "flm_ms_tok": 27.675828125,
+   "flm_reps": 5,
+   "ours_R_ms_tok": 27.816262950743045,
+   "ours_source": "fit",
+   "shipped_fit_ms_tok": 35.430121086014594,
+   "ratio_ours_over_flm": 1.0050742772757788,
+   "ratio_shipped_over_flm": 1.280182870264685
+  },
+  {
+   "model": "llama32_1b_q4nx",
+   "L": 30723,
+   "flm_ms_tok": 38.6419140625,
+   "flm_reps": 5,
+   "ours_R_ms_tok": 37.61160168394646,
+   "ours_source": "fit",
+   "shipped_fit_ms_tok": 51.946070902493176,
+   "ratio_ours_over_flm": 0.9733369217454628,
+   "ratio_shipped_over_flm": 1.344293422382619
+  },
+  {
+   "model": "qwen3_4b_q4nx",
+   "L": 16365,
+   "flm_ms_tok": 100.5246015625,
+   "flm_reps": 5,
+   "ours_R_ms_tok": 101.21650035964481,
+   "ours_source": "fit",
+   "shipped_fit_ms_tok": 117.50714386308064,
+   "ratio_ours_over_flm": 1.0068828802739858,
+   "ratio_shipped_over_flm": 1.1689391655038985
+  },
+  {
+   "model": "qwen3_4b_q4nx",
+   "L": 30701,
+   "flm_ms_tok": 146.38210937500003,
+   "flm_reps": 5,
+   "ours_R_ms_tok": 145.6498533024723,
+   "ours_source": "extrapolated beyond our window",
+   "shipped_fit_ms_tok": 176.0746503498868,
+   "ratio_ours_over_flm": 0.9949976395636448,
+   "ratio_shipped_over_flm": 1.20284269096588
+  }
+ ],
+ "cross_batch": true
+}

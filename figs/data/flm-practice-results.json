@@ -1,0 +1,896 @@
+{
+ "brackets": {
+  "r8x2": [
+   53.977750591384485,
+   54.939525589043186,
+   53.24724763563064,
+   52.920161633573926
+  ],
+  "r1x1": [
+   13.7169201129943,
+   13.711291519383822,
+   13.565687790345832,
+   13.475569293956871
+  ],
+  "cap_GBps": 53.61249911350757,
+  "cap_spread": 0.03766591725548725
+ },
+ "models": {
+  "llama3_2_1b": {
+   "kvid": {
+    "n_maps": [
+     95,
+     95
+    ],
+    "accel_total": [
+     2158084096,
+     2158084096
+    ],
+    "scaling": [],
+    "vmrss_kb": [
+     2786036,
+     2786248
+    ],
+    "drm_20480": {
+     "drm-driver": "amdxdna_accel_driver",
+     "drm-client-id": "70438",
+     "drm-pdev": "0000:c6:00.1",
+     "drm-engine-amdxdna_accel_driver": "662981017 ns",
+     "drm-total-memory": "2110100 KiB",
+     "drm-shared-memory": "0"
+    },
+    "drm_32768": {
+     "drm-driver": "amdxdna_accel_driver",
+     "drm-client-id": "70439",
+     "drm-pdev": "0000:c6:00.1",
+     "drm-engine-amdxdna_accel_driver": "821699603 ns",
+     "drm-total-memory": "2110100 KiB",
+     "drm-shared-memory": "0"
+    },
+    "usage_capacity": [
+     20480,
+     32768
+    ],
+    "observed": false,
+    "kv_B_per_pos": 32768,
+    "kv_basis": "bf16 assumed"
+   },
+   "decode": {
+    "16384": {
+     "n_valid": 5,
+     "n_attempts": 5,
+     "ms_tok": [
+      27.68415625,
+      27.5541328125,
+      27.62319140625,
+      27.675828125,
+      27.721585937500002
+     ],
+     "median_ms": 27.675828125,
+     "rep_spread": 0.006050519039346778,
+     "client_median_ms": 27.874748581780295,
+     "L_actual": 16387,
+     "floor_ms": 24.50256081550636,
+     "band": 0.04371643629483403,
+     "ratio": 1.1295075781420139,
+     "label": "UNRESOLVED",
+     "predicted_ms": 21.5,
+     "flag_rep_spread_over_5pct": false
+    },
+    "30720": {
+     "n_valid": 5,
+     "n_attempts": 5,
+     "ms_tok": [
+      38.5725078125,
+      38.531421875,
+      38.7928984375,
+      38.6419140625,
+      38.674171875000006
+     ],
+     "median_ms": 38.6419140625,
+     "rep_spread": 0.006766656591520916,
+     "client_median_ms": 38.82416993019433,
+     "L_actual": 30723,
+     "floor_ms": 33.26473485640356,
+     "band": 0.04443257384700817,
+     "ratio": 1.161648040464129,
+     "label": "GAP",
+     "predicted_ms": 27.13,
+     "flag_rep_spread_over_5pct": false
+    }
+   },
+   "decode_label": "GAP",
+   "server": {
+    "4096": {
+     "t2_ms": [
+      524.8959050513804,
+      498.6191731877625,
+      495.3407619614154,
+      545.3328690491617,
+      525.6660559680313
+     ],
+     "scratch_ms": [
+      2476.2915559113026,
+      2461.1172911245376,
+      2469.616294139996,
+      2479.172880994156,
+      2469.878666102886
+     ],
+     "t2_median": 524.8959050513804,
+     "scratch_median": 2469.878666102886,
+     "ratio": 0.21251890315712987,
+     "band": 0.1025522598379261,
+     "cached": [
+      4115,
+      4116,
+      4116,
+      4115,
+      4116
+     ],
+     "t2_prompt": [
+      4605,
+      4606,
+      4606,
+      4605,
+      4606
+     ],
+     "t2_server_ttft_s": [
+      0.519081344,
+      0.494299392,
+      0.491054048,
+      0.540106688,
+      0.520624192
+     ],
+     "overlap_reps": {
+      "4": {
+       "t2": 525.6660559680313,
+       "t2_others_range": [
+        495.3407619614154,
+        545.3328690491617
+       ],
+       "t2_inside": true,
+       "scratch": 2469.878666102886,
+       "scratch_others_range": [
+        2461.1172911245376,
+        2479.172880994156
+       ],
+       "scratch_inside": true
+      }
+     }
+    },
+    "16384": {
+     "t2_ms": [
+      826.0046918876469,
+      819.2831969354302,
+      809.8400279413909,
+      831.7739719059318,
+      790.915786055848
+     ],
+     "scratch_ms": [
+      12301.241752924398,
+      12274.711773963645,
+      12411.105002043769,
+      12518.457857891917,
+      12280.629143118858
+     ],
+     "t2_median": 819.2831969354302,
+     "scratch_median": 12301.241752924398,
+     "ratio": 0.0666016661887537,
+     "band": 0.06968540472970317,
+     "cached": [
+      16404,
+      16404,
+      16404,
+      16404,
+      16404
+     ],
+     "t2_prompt": [
+      16893,
+      16894,
+      16894,
+      16894,
+      16894
+     ],
+     "t2_server_ttft_s": [
+      0.81248928,
+      0.804066752,
+      0.79587488,
+      0.816860032,
+      0.776571968
+     ],
+     "overlap_reps": {
+      "4": {
+       "t2": 790.915786055848,
+       "t2_others_range": [
+        809.8400279413909,
+        831.7739719059318
+       ],
+       "t2_inside": false,
+       "scratch": 12280.629143118858,
+       "scratch_others_range": [
+        12274.711773963645,
+        12518.457857891917
+       ],
+       "scratch_inside": true
+      }
+     }
+    }
+   },
+   "server_label": "UNRESOLVED",
+   "t_start": "2026-10-19 15:01:30",
+   "t_end": "2026-10-19 15:09:38",
+   "request_windows": [
+    {
+     "name": "warm-up",
+     "start": "15:01:34",
+     "end": "15:01:36",
+     "overlaps": false
+    },
+    {
+     "name": "decode L16384 rep0 attempt0",
+     "start": "15:01:36",
+     "end": "15:01:57",
+     "overlaps": false
+    },
+    {
+     "name": "decode L30720 rep0 attempt0",
+     "start": "15:01:57",
+     "end": "15:02:39",
+     "overlaps": false
+    },
+    {
+     "name": "decode L30720 rep1 attempt0",
+     "start": "15:02:39",
+     "end": "15:03:20",
+     "overlaps": false
+    },
+    {
+     "name": "decode L16384 rep1 attempt0",
+     "start": "15:03:20",
+     "end": "15:03:40",
+     "overlaps": false
+    },
+    {
+     "name": "decode L16384 rep2 attempt0",
+     "start": "15:03:40",
+     "end": "15:04:01",
+     "overlaps": false
+    },
+    {
+     "name": "decode L30720 rep2 attempt0",
+     "start": "15:04:01",
+     "end": "15:04:43",
+     "overlaps": false
+    },
+    {
+     "name": "decode L30720 rep3 attempt0",
+     "start": "15:04:43",
+     "end": "15:05:25",
+     "overlaps": false
+    },
+    {
+     "name": "decode L16384 rep3 attempt0",
+     "start": "15:05:25",
+     "end": "15:05:44",
+     "overlaps": false
+    },
+    {
+     "name": "decode L16384 rep4 attempt0",
+     "start": "15:05:44",
+     "end": "15:06:05",
+     "overlaps": false
+    },
+    {
+     "name": "decode L30720 rep4 attempt0",
+     "start": "15:06:05",
+     "end": "15:06:46",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep0 scratch",
+     "start": "15:06:46",
+     "end": "15:06:49",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep0 turn1",
+     "start": "15:06:49",
+     "end": "15:06:52",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep0 turn2",
+     "start": "15:06:52",
+     "end": "15:06:53",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep0 scratch",
+     "start": "15:06:53",
+     "end": "15:07:07",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep0 turn1",
+     "start": "15:07:07",
+     "end": "15:07:19",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep0 turn2",
+     "start": "15:07:19",
+     "end": "15:07:20",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep1 scratch",
+     "start": "15:07:20",
+     "end": "15:07:23",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep1 turn1",
+     "start": "15:07:23",
+     "end": "15:07:26",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep1 turn2",
+     "start": "15:07:26",
+     "end": "15:07:27",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep1 scratch",
+     "start": "15:07:27",
+     "end": "15:07:41",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep1 turn1",
+     "start": "15:07:41",
+     "end": "15:07:53",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep1 turn2",
+     "start": "15:07:53",
+     "end": "15:07:54",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep2 scratch",
+     "start": "15:07:54",
+     "end": "15:07:57",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep2 turn1",
+     "start": "15:07:57",
+     "end": "15:08:00",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep2 turn2",
+     "start": "15:08:00",
+     "end": "15:08:01",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep2 scratch",
+     "start": "15:08:01",
+     "end": "15:08:15",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep2 turn1",
+     "start": "15:08:15",
+     "end": "15:08:27",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep2 turn2",
+     "start": "15:08:27",
+     "end": "15:08:29",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep3 scratch",
+     "start": "15:08:29",
+     "end": "15:08:32",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep3 turn1",
+     "start": "15:08:32",
+     "end": "15:08:34",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep3 turn2",
+     "start": "15:08:34",
+     "end": "15:08:36",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep3 scratch",
+     "start": "15:08:36",
+     "end": "15:08:49",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep3 turn1",
+     "start": "15:08:49",
+     "end": "15:09:02",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep3 turn2",
+     "start": "15:09:02",
+     "end": "15:09:03",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep4 scratch",
+     "start": "15:09:03",
+     "end": "15:09:06",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep4 turn1",
+     "start": "15:09:06",
+     "end": "15:09:08",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep4 turn2",
+     "start": "15:09:08",
+     "end": "15:09:10",
+     "overlaps": true
+    },
+    {
+     "name": "server L16384 rep4 scratch",
+     "start": "15:09:10",
+     "end": "15:09:24",
+     "overlaps": true
+    },
+    {
+     "name": "server L16384 rep4 turn1",
+     "start": "15:09:24",
+     "end": "15:09:36",
+     "overlaps": true
+    },
+    {
+     "name": "server L16384 rep4 turn2",
+     "start": "15:09:36",
+     "end": "15:09:38",
+     "overlaps": true
+    }
+   ],
+   "n_requests_logged": 41,
+   "n_requests_expected": 41
+  },
+  "qwen3_4b": {
+   "kvid": {
+    "n_maps": [
+     214,
+     214
+    ],
+    "accel_total": [
+     7847751680,
+     7847751680
+    ],
+    "scaling": [],
+    "vmrss_kb": [
+     8616056,
+     8612044
+    ],
+    "drm_20480": {
+     "drm-driver": "amdxdna_accel_driver",
+     "drm-client-id": "70444",
+     "drm-pdev": "0000:c6:00.1",
+     "drm-engine-amdxdna_accel_driver": "3304446575 ns",
+     "drm-total-memory": "7668316 KiB",
+     "drm-shared-memory": "0"
+    },
+    "drm_32768": {
+     "drm-driver": "amdxdna_accel_driver",
+     "drm-client-id": "70445",
+     "drm-pdev": "0000:c6:00.1",
+     "drm-engine-amdxdna_accel_driver": "3352562525 ns",
+     "drm-total-memory": "7668316 KiB",
+     "drm-shared-memory": "0"
+    },
+    "usage_capacity": [
+     20480,
+     32768
+    ],
+    "observed": false,
+    "kv_B_per_pos": 147456,
+    "kv_basis": "bf16 assumed"
+   },
+   "decode": {
+    "16384": {
+     "n_valid": 5,
+     "n_attempts": 5,
+     "ms_tok": [
+      100.4913203125,
+      100.5246015625,
+      100.509015625,
+      100.6143125,
+      100.58678125
+     ],
+     "median_ms": 100.5246015625,
+     "rep_spread": 0.0012235033572705494,
+     "client_median_ms": 100.7576934947614,
+     "L_actual": 16365,
+     "floor_ms": 92.26023576195851,
+     "band": 0.0388894206127578,
+     "ratio": 1.0895766820048505,
+     "label": "UNRESOLVED",
+     "predicted_ms": 92.23,
+     "flag_rep_spread_over_5pct": false
+    },
+    "30720": {
+     "n_valid": 5,
+     "n_attempts": 5,
+     "ms_tok": [
+      146.554765625,
+      146.34109375,
+      146.500359375,
+      146.38210937500003,
+      146.28357812500002
+     ],
+     "median_ms": 146.38210937500003,
+     "rep_spread": 0.0018526000284996773,
+     "client_median_ms": 147.15113689367638,
+     "L_actual": 30701,
+     "floor_ms": 131.69001894599592,
+     "band": 0.03951851728398693,
+     "ratio": 1.1115657097371148,
+     "label": "UNRESOLVED",
+     "predicted_ms": 112.13,
+     "flag_rep_spread_over_5pct": false
+    }
+   },
+   "decode_label": "UNRESOLVED",
+   "server": {
+    "4096": {
+     "t2_ms": [
+      2065.8532090019435,
+      2081.150314072147,
+      2030.3905420005322,
+      2097.033201949671,
+      2061.0620509833097
+     ],
+     "scratch_ms": [
+      7569.896542001516,
+      7661.838254891336,
+      7556.762011023238,
+      7628.791996045038,
+      7570.328905014321
+     ],
+     "t2_median": 2065.8532090019435,
+     "scratch_median": 7570.328905014321,
+     "ratio": 0.27288817103225127,
+     "band": 0.04613915622944585,
+     "cached": [
+      4077,
+      4076,
+      4077,
+      4077,
+      4077
+     ],
+     "t2_prompt": [
+      4567,
+      4566,
+      4567,
+      4567,
+      4567
+     ],
+     "t2_server_ttft_s": [
+      1.994768384,
+      2.010702336,
+      1.96044992,
+      2.026156032,
+      1.989790336
+     ]
+    },
+    "16384": {
+     "t2_ms": [
+      3230.118988081813,
+      3196.5877870097756,
+      3225.162445101887,
+      3194.8524271138012,
+      3226.5248810872436
+     ],
+     "scratch_ms": [
+      37684.50742820278,
+      37738.76700899564,
+      37797.36382397823,
+      37749.536046991125,
+      37774.12170707248
+     ],
+     "t2_median": 3225.162445101887,
+     "scratch_median": 37749.536046991125,
+     "ratio": 0.08543581677632175,
+     "band": 0.013924427089780431,
+     "cached": [
+      16365,
+      16365,
+      16364,
+      16365,
+      16365
+     ],
+     "t2_prompt": [
+      16866,
+      16855,
+      16854,
+      16855,
+      16855
+     ],
+     "t2_server_ttft_s": [
+      3.109992704,
+      3.07609344,
+      3.105380352,
+      3.073738496,
+      3.105827584
+     ]
+    }
+   },
+   "server_label": "CACHES",
+   "t_start": "2026-10-19 15:12:15",
+   "t_end": "2026-10-19 15:37:03",
+   "request_windows": [
+    {
+     "name": "warm-up",
+     "start": "15:12:26",
+     "end": "15:12:30",
+     "overlaps": false
+    },
+    {
+     "name": "decode L16384 rep0 attempt0",
+     "start": "15:12:30",
+     "end": "15:13:34",
+     "overlaps": false
+    },
+    {
+     "name": "decode L30720 rep0 attempt0",
+     "start": "15:13:34",
+     "end": "15:15:45",
+     "overlaps": false
+    },
+    {
+     "name": "decode L30720 rep1 attempt0",
+     "start": "15:15:45",
+     "end": "15:17:55",
+     "overlaps": false
+    },
+    {
+     "name": "decode L16384 rep1 attempt0",
+     "start": "15:17:55",
+     "end": "15:18:57",
+     "overlaps": false
+    },
+    {
+     "name": "decode L16384 rep2 attempt0",
+     "start": "15:18:57",
+     "end": "15:20:00",
+     "overlaps": false
+    },
+    {
+     "name": "decode L30720 rep2 attempt0",
+     "start": "15:20:00",
+     "end": "15:22:11",
+     "overlaps": false
+    },
+    {
+     "name": "decode L30720 rep3 attempt0",
+     "start": "15:22:11",
+     "end": "15:24:21",
+     "overlaps": false
+    },
+    {
+     "name": "decode L16384 rep3 attempt0",
+     "start": "15:24:21",
+     "end": "15:25:23",
+     "overlaps": false
+    },
+    {
+     "name": "decode L16384 rep4 attempt0",
+     "start": "15:25:23",
+     "end": "15:26:26",
+     "overlaps": false
+    },
+    {
+     "name": "decode L30720 rep4 attempt0",
+     "start": "15:26:26",
+     "end": "15:28:36",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep0 scratch",
+     "start": "15:28:36",
+     "end": "15:28:44",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep0 turn1",
+     "start": "15:28:44",
+     "end": "15:28:51",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep0 turn2",
+     "start": "15:28:51",
+     "end": "15:28:55",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep0 scratch",
+     "start": "15:28:55",
+     "end": "15:29:35",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep0 turn1",
+     "start": "15:29:35",
+     "end": "15:30:12",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep0 turn2",
+     "start": "15:30:12",
+     "end": "15:30:17",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep1 scratch",
+     "start": "15:30:17",
+     "end": "15:30:26",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep1 turn1",
+     "start": "15:30:26",
+     "end": "15:30:33",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep1 turn2",
+     "start": "15:30:33",
+     "end": "15:30:37",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep1 scratch",
+     "start": "15:30:37",
+     "end": "15:31:17",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep1 turn1",
+     "start": "15:31:17",
+     "end": "15:31:54",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep1 turn2",
+     "start": "15:31:54",
+     "end": "15:31:58",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep2 scratch",
+     "start": "15:31:58",
+     "end": "15:32:07",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep2 turn1",
+     "start": "15:32:07",
+     "end": "15:32:14",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep2 turn2",
+     "start": "15:32:14",
+     "end": "15:32:18",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep2 scratch",
+     "start": "15:32:18",
+     "end": "15:32:58",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep2 turn1",
+     "start": "15:32:58",
+     "end": "15:33:35",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep2 turn2",
+     "start": "15:33:35",
+     "end": "15:33:40",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep3 scratch",
+     "start": "15:33:40",
+     "end": "15:33:48",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep3 turn1",
+     "start": "15:33:48",
+     "end": "15:33:55",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep3 turn2",
+     "start": "15:33:55",
+     "end": "15:33:59",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep3 scratch",
+     "start": "15:33:59",
+     "end": "15:34:39",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep3 turn1",
+     "start": "15:34:39",
+     "end": "15:35:16",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep3 turn2",
+     "start": "15:35:16",
+     "end": "15:35:21",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep4 scratch",
+     "start": "15:35:21",
+     "end": "15:35:30",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep4 turn1",
+     "start": "15:35:30",
+     "end": "15:35:37",
+     "overlaps": false
+    },
+    {
+     "name": "server L4096 rep4 turn2",
+     "start": "15:35:37",
+     "end": "15:35:41",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep4 scratch",
+     "start": "15:35:41",
+     "end": "15:36:21",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep4 turn1",
+     "start": "15:36:21",
+     "end": "15:36:58",
+     "overlaps": false
+    },
+    {
+     "name": "server L16384 rep4 turn2",
+     "start": "15:36:58",
+     "end": "15:37:03",
+     "overlaps": false
+    }
+   ],
+   "n_requests_logged": 41,
+   "n_requests_expected": 41
+  }
+ }
+}
