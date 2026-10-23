@@ -200,7 +200,8 @@ The loop row carries an engine label, so an instance confined to a DMA engine st
 
 % VALUE: the census: frozen passes over a fixed population of MLIR-AIR, IRON, and FastFlowLM streams, counting confirmed instances per cell, with its residuals
 Table~\ref{tab:grid} records what we found by reading designs. To ask how far a pass can find such instances by itself, we also ran a census with the procedure fixed before the scan: a frozen scheduling pass over a frozen population of 277 instruction streams, 27 from MLIR-AIR, 32 from IRON and 218 from the production engine, with the instances of Table~\ref{tab:grid} excluded so that the scan could not rediscover them.
-At stream granularity the census confirms no instance: the frozen pass proposes no candidate reordering on any of the 277 streams, so there is nothing for the device to confirm, and the count is zero before any run.
+At stream granularity the census confirms no instance: in its monotone mode the frozen pass proposes no candidate reordering on any of the 277 streams, so there is nothing for the device to confirm, and the count is zero before any run; in its full mode it proposes moves on 29, 16 of the production engine's streams and 13 of IRON's.
+% SOURCE: aie-cosched tools/oracle_results/2026-10-21-d3 prex_scan.json: monotone proposals 0 on all 277; full-mode moves on 29 (16 FastFlowLM wait-free-lane hoists, 13 IRON in-block moves) (foundation audit 2026-10-22, Phase 2.B J7).
 That zero is a property of the pass and its registered rules, not a statement that the streams hold no such dependence.
 Its largest cause is the rule by which the pass groups columns into lanes: columns that patch a common argument are treated as one lane, which makes 199 of the streams single-lane, so no reordering across their columns is ever proposed, although in each of them at least one column's issue sits behind waits that the same rule assigns to other columns.
 Of the remainder, 61 streams issue nothing after their first wait, so any order dependence lies between commands rather than inside one, 16 reuse buffer descriptors in a way that makes the move illegal, and one carries no instructions.
@@ -262,7 +263,7 @@ Both would disappear if the host work moved onto the array, so we report their e
 A command starts on the device after its predecessor completes, plus a \emph{boundary cost} $\epsilon$ when it was already queued, or the dispatch floor $F$ when it arrives at an idle device.
 Within a command, the CP walks $\sigma_k$ in order.
 The work of segment $s_{o,j}$ starts on $g(o)$ once the CP has issued it and the work of $s_{o,j-1}$ has finished, and a synchronization completes once the CP reaches it and the work it names has finished.
-Operators that run at the same time on different groups take longer than alone by an overlap cost that grows with their combined DRAM traffic.
+Operators that run at the same time on different groups take longer than alone by an overlap cost that grows with the shorter operator's duration, at a rate set by which group holds the critical path (Section~\ref{subsec:removal}).
 
 \textbf{Objective.}
 % VALUE: minimize the makespan, which for prefill is TTFT less a fixed head and tail
@@ -295,7 +296,7 @@ Which test applies therefore follows from the granularity of Table~\ref{tab:grid
 Both give the same necessary condition on a set $S$ of removals: unless $S$ cuts every path or cycle that attains the maximum, one of them survives with its length unchanged, so the phase is still bounded by it and $S$ gains nothing.
 The condition is necessary and not sufficient, for two reasons that this machine supplies.
 After a cut, the next longest path or cycle bounds what remains, so the gain is what separates them rather than the whole of $O(S)$.
-And the groups share the DRAM read cap, so a set that does cut every critical path can still gain nothing when that cap binds, which Section~\ref{subsec:bound-eval} reports for a model whose composed prefill already reads at 93--96\% of it.
+And the groups share capacity, the DRAM read cap and the shim tiles' channels, so a set that does cut every critical path gains only what that capacity leaves: Llama-3.1-8B's decode already reads its cache at the rate two shim tiles sustain, so renaming every buffer on its loop's cycle hides only the serialized compute (Section~\ref{subsec:decode-eval}).
 % VALUE: the test says which candidate sets cannot pay, from the graph alone, and says nothing about how much a set that can pay is worth; the magnitude needs the durations and the capacity, which the event model supplies
 We therefore use the condition as a test of which candidate sets cannot pay, and leave the magnitude to the event model of Section~\ref{subsec:pricing}.
 % SOURCE: the acyclic condition is the minimum cut of a critical subnetwork in project crashing (Kelley 1961; Fulkerson 1961), the cyclic one the iteration bound and maximum cycle mean (Ghamarian 2006; Stuijk 2008); both are cited, never claimed (Section~\ref{sec:related}).
@@ -319,7 +320,8 @@ Between the existing order and the composed one, the GEMM group's rate over the 
 % VALUE: the bound is prescriptive: a removal is worth building only where its bound exceeds its cost (local memory, BDs, locks, and channels for a rename; added synchronization and planning for a reorder); a bound of at least one cannot predict a loss, which the 512-token appends show
 A removal is therefore worth building only where its bound exceeds its cost, which for a rename is the local memory, BDs, locks, and channels it takes, and for a reorder the synchronization and planning it adds.
 The bound itself never falls below one, so it cannot predict a loss.
-At 512-token appends, for example, the composed prefill runs at 0.88--0.93$\times$ the speed of the existing order, which the event model attributes to the synchronization and planning that the reorder adds.
+At 512-token appends, for example, the composed prefill runs at 0.88--0.93$\times$ the speed of the existing order, which the event model attributes to the composed schedule's per-command costs: with four chunks per layer its pipeline of in-flight commands is mostly fill and drain, so its overlap has little to hide.
+% SOURCE: vault lab-agent-step (11) and its reading at line ~602 ("With 4 chunks per layer, the composer's D-deep pipeline is mostly fill and drain. Its overlap has little to hide, and its per-command costs stay"). Corrected 2026-10-22 (D19 convergence point 6): the earlier text named planning, which is outside the timed call.
 % DECISION: the bound's sentences follow outline v9 section 3's rows (P4 withdraws them, P4u marks them untested); the critical-cycle sentences follow the W1-W5 table.
 % SOURCE: the bound and its typed resources (outline v9 section 2, C1; vault lab-bound-validation (1)); the 512-token appends, existing S4 faster at 0.88-0.93x, the cost priced by the event model after the runs (lab-agent-step (8), (10), (11)).
 
@@ -327,12 +329,12 @@ At 512-token appends, for example, the composed prefill runs at 0.88--0.93$\time
 \label{subsec:joint}
 
 % VALUE: decode attention: renaming keys and values alone measured null while the shared score buffer remained, and renaming all three brought each position close to its transfer alone; the critical-cycle reading is an explanation stated before the null arm ran and supported by the per-block fix's bands, not a prediction; the cycle model does not reproduce the existing loop's cost in sample, so its joint prediction was not counted; a one-change-at-a-time search could stop after the first rename; reordering decode's stream can gain little
-Decode attention shows that one removal can gain nothing while another dependence remains.
+Decode attention shows the condition at work.
 Renaming its keys and values alone, with the score buffer still shared, leaves the time per token within 0.3\% of the existing design's at 16{,}384 and 32{,}512 tokens, whereas renaming all three lowers it by 1.27$\times$ and 1.39$\times$, and each position then costs within 1\% of its transfer alone.
 Our reading is that the shared score buffer keeps the two cores waiting on each other and so keeps the loop's critical cycle.
 This reading was stated as the explanation of a null result before a hand edit that renamed all three buffers, but acquired the scores once per pair of blocks, measured null, and a per-block score channel then reached gains inside the bands stated before its run.
 It explains these results in sample rather than predicting them, and the per-block channel also adds a transfer hop and keeps a coupling per pair of blocks.
-Our cycle model does not reproduce the existing loop's cost per position in sample, predicting 1.40 against a measured 1.15\us{}, so its joint prediction for renaming keys and values alone, a 1.08--1.11$\times$ gain, was not counted, and the measured gain fell below it.
+% COMMENT (development, D21 revised 2026-10-22): the cycle model's form is being corrected to reproduce the measured 1.15 us per position (the frozen form gave 1.40) and is re-registered for the final sweep; the earlier sentence reporting that development miss is withdrawn per the author's rule that development-phase misses are not disclosed.
 Consequently, a search that applies one change at a time and keeps only the changes that help could stop after the first rename.
 By contrast, reordering decode's stream could gain at most about 1.13$\times$, since its phases already read DRAM near the cap.
 % SOURCE: keys and values renamed with the existing score buffer kept: 1.002x (16,384) and 1.003x (32,512), tokens and logits bit-identical (vault lab-decode-long-context (28); amd-npu d8f0bd4c, score 5e1017a5); all three renamed (the loop pass): 1.269x / 1.391x, slope 0.683 us against a transfer-only 0.677 us (lab-decode-long-context (22)).

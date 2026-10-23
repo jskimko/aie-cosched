@@ -252,4 +252,11 @@ the tenth layer, and we report this model's prefill results as measured, taken o
 keys and values. The comparative claims elsewhere in the paper are untouched, because they compare a rewrite with the
 shipped program on one build.
 
+\section{Choosing the Split Before Reordering}
+\label{app:split-first}
+
+% DECISION: relocated from the introduction's list of reasons the loss survived (decisions log D19g, 2026-10-22): under the stronger baseline the existing program's faster split agrees with the composed one in 8 of 8 W1 cells and 11 of 12 Table 4 cells, so it is a narrow finding rather than a reason; kept whole, not deleted.
+Tuning the array's partition before reordering issue rarely leads somewhere other than the partition the reordered program wants. Without the hand alternation, the split that is fastest for the shipped program is not the one the reordered program wants at three of the configurations we measure; interleaving the shipped program's own attention columns by hand removes those three, but on Llama-3.1-8B, for a 4{,}096-token append to a 4{,}096-token context, the interleaved program still runs fastest with four attention columns where the reordered one wants two.
+% SOURCE: the un-alternated shipped program prefers S4 while every reordered version prefers S2 at 1B scratch 2,048 / 4,096 and Qwen3-4B scratch 4,096 (5-rep w1 files, vault paper-cosched-claims-v2, lab-split-sweep (18)); Llama-3.1-8B 4k + 4k: shipped S4 10,909 ms, shipped + Ar S2 11,440.1 ms, shipped + Ar S4 = shipped S4 (the alternation is a no-op on S4), composer S2 7,395.4 ms (lab-split-sweep (14), (20)). Corrected in the 2026-10-22 foundation audit (B14): the earlier clause said the two agree once alternated.
+
 \end{document}
