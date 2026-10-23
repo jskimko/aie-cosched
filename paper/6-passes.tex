@@ -1,14 +1,13 @@
 \section{OPCORD}
 \label{sec:method}
 
-% VALUE: design opener: the existing designs leave false dependences in the CP's order and in decode's loop; OPCORD removes them in steps, each answering a property of the platform: a blocking in-order CP (reorder issue, by the composer across operators and the stream pass within one), one buffer per role in decode's loop (the loop pass's rings), a faster split that changes with the regime (split chosen per regime by the event model), designs it did not compile (checkers that refuse with a reason)
+% VALUE: design opener: OPCORD removes the false dependences of §3.3 in steps, each answering a property of the platform: a blocking in-order CP (reorder issue, by the composer across operators and the stream pass within one), one buffer per role in decode's loop (the loop pass's rings), a faster split that changes with the regime, from scratch or append (split chosen per regime by the event model), designs it did not compile (checkers that refuse with a reason)
 % DECISION: the opener follows the FPGA'27 design opener, each property of the platform followed by the mechanism that answers it, with one subsection per property (STYLE.md, Paper structure, Design; contract §6).
 % DECISION: the legality conditions themselves live in Section~\ref{sec:order}; this section states only how OPCORD acts on them, namely checkers that accept a rewrite or refuse it with a reason (contract §6).
-The existing designs leave work waiting on work whose results it does not consume (Section~\ref{sec:motivation}).
-OPCORD removes these waits in steps, each in response to a property of the platform.
+OPCORD removes the false dependences of Section~\ref{subsec:losses} in steps, each in response to a property of the platform.
 A synchronization blocks the in-order CP and every issue behind it, so our composer issues every column group's work before the CP waits on any group, and our stream pass does the same within one operator (Section~\ref{subsec:order}).
 Because decode attention's loop keeps one buffer per role, each block's transfer waits for the previous block's compute, which our loop pass removes by renaming those buffers into rings (Section~\ref{subsec:rings}).
-The faster split of the columns changes between prompts computed from scratch and appends to a cached context, so the composer chooses the split per regime with the event model (Section~\ref{subsec:split}).
+The faster split of the columns changes between the two \emph{regimes} of prefill, namely prompts computed from scratch and appends to a cached context, so the composer chooses the split per regime with the event model (Section~\ref{subsec:split}).
 Since OPCORD rewrites designs it did not compile, a checker tests each rewrite against the legality conditions of Section~\ref{sec:order} and refuses, with a reason, any rewrite it cannot show legal (Section~\ref{subsec:checkers}).
 
 \subsection{Reordering Issue}
@@ -22,14 +21,14 @@ Since OPCORD rewrites designs it did not compile, a checker tests each rewrite a
 The existing host program runs a layer stage by stage, so no GEMM is ready to run beside attention.
 Our \emph{composer} instead list-schedules the host program's dependency graph chunk by chunk, from the design's per-operator streams and probes, and emits commands that we call the \emph{composed schedule}.
 Each command pairs the ready attention operator of the lowest layer and chunk with ready GEMMs whose estimated work matches it, and an append to a cached context plans only its new chunks.
-A command concatenates its operators' segments (Section~\ref{sec:order}), keeping each operator's segments in their own order and every instruction once, so composing changes when work is issued and awaited, never what the work is.
+A command concatenates its operators' segments under the conditions of Section~\ref{subsec:legality}, so composing changes when work is issued and awaited, never what the work is.
 % SOURCE: merged.plan (amd-npu a0ee2ed prefill-overlap/merged.py, now opcord/compose/merged.py at aie-cosched opcord-runtime 446fa1c): qkv(L, c) after down(L-1, c); attn(L, c) after qkv(L, 0..c); o after attn; gate and up after o; down after gate and up; GEMMs added in the same order until their estimated work reaches the attention operator's; an optional cap on the GEMMs per attention command.
 % SOURCE: txn.segments and txn.compose (a0ee2ed prefill-overlap/txn.py, now opcord/compose/txn.py); compose asserts each stream's segment order, every op kept once, and equal headers.
 % SOURCE: append = Merged.prefill(ids, start=L) on the same plan rules; attention estimates linear in the absolute chunk index (vault lab-agent-step (1)).
 
 % VALUE: within a command, the composer opens every group's work and then places each synchronization at its predicted completion, followed by the issue it gates, so no synchronization holds back another group's work; attention's two columns count as two groups; the order is fixed at build time and runs without the host; its price is the shared DRAM read rate, priced in Section 5
-If the operators were packed into one command in turn, the GEMM group would still idle while the CP walks attention's synchronizations (Figure~\ref{fig:order}).
-To mitigate this, the composer issues the opening segments of every group first, and then places each synchronization in order of its \emph{predicted completion}, estimated from the probes, followed by the issue it gates.
+Because packing the operators into one command in turn would still leave the GEMM group idle while the CP walks attention's synchronizations (Figure~\ref{fig:order}b), the composer issues the opening segments of every group first.
+It then places each synchronization in order of its \emph{predicted completion}, estimated from the probes, followed by the issue it gates.
 Attention's two columns count as two groups, so their segments alternate as well.
 The estimates fix this order when the command is built, and the CP executes it without the host.
 Running both groups at once costs the GEMMs a share of attention's time under the shared DRAM read rate (Section~\ref{subsec:removal}), so a design already near the cap gains little.
@@ -39,7 +38,7 @@ Running both groups at once costs the GEMMs a share of attention's time under th
 % VALUE: within one operator's stream, the stream pass (an MLIR-AIE pass on the runtime sequence, compiled or lifted) applies the same reorder: monotone mode only hoists issues; full mode interleaves the columns' segments round-robin by index, the rule that produced the hand-alternated streams, so it emits that alternation byte for byte rather than discovering it
 Our \emph{stream pass} applies the same reorder within one operator's stream, as an MLIR-AIE pass on its runtime sequence, whether compiled or lifted from a recording.
 Its monotone mode only moves each segment's issue to just before the first wait of another column, whereas its full mode also interleaves the columns' segments round-robin by index.
-Full mode is the rule by which we alternated attention's streams by hand, so the pass emits that alternation rather than discovering it, byte for byte on all 42 such streams.
+Full mode is the rule by which we alternated attention's streams by hand for the alternated baseline, so the pass emits that alternation, byte for byte on all 42 such streams.
 % SOURCE: aie-cosched-schedule (mlir-aie 573e0140174, identical in f1725dae1f1; in place on cosched-flag), proposal format /2 at aie-cosched 8dee63f; 42 / 42 decoded order and bytes equal to the hand versions (vault lab-cosched-passes (35), (40)); in place and byte-identical to the Python-applied moves and to the hand template on 42 / 42 (decisions log D24, P4); monotone and full mode as built (lab-cosched-passes, "Scan and monotone" and "Full mode").
 % DECISION: the pass emits the alternation and the checker accepts it; it is never said to discover it, and full mode is never called a predicted-completion rule (Ruling D3, vault decisions log).
 
@@ -47,10 +46,9 @@ Full mode is the rule by which we alternated attention's streams by hand, so the
 \label{subsec:rings}
 
 % VALUE: decode attention's keys, values, and scores each sit in one buffer, so each block waits for the previous; only the running maximum and accumulator carry; the loop pass renames every other buffer into a two-slot ring that each core acquires once per block, so the cores pipeline across blocks; it classes buffers by their conflicts across iterations and leaves the carried state, which is why the compiler's transformation declines the loop and ours does not; kernels, arithmetic order, tokens, and logits unchanged
-Decode attention's loop keeps its keys, its values, and the scores passed between its two cores in one buffer each (Section~\ref{subsec:losses}).
-Only the running maximum and the accumulator carry data across blocks, so our \emph{loop pass} renames each of the other buffers into a \emph{ring} of two slots.
+Of the buffers in decode attention's loop (Section~\ref{subsec:losses}), only the running maximum and the accumulator carry data across blocks, so our \emph{loop pass} renames each of the others, namely the keys, the values, and the scores passed between the two cores, into a \emph{ring} of two slots.
 Each core acquires and releases a slot once per block, so the first core computes block $b+1$ while the second folds block $b$.
-MLIR-AIR's double-buffering transformation declines this loop because of the carried state, whereas our pass classes every buffer of the lowered loop by its conflicts across iterations and leaves the carried state in place.
+Whereas MLIR-AIR's double-buffering transformation declines the whole loop for its carried state, our pass classes every buffer of the lowered loop by its conflicts across iterations and leaves the carried state in place.
 The kernels and the order of their arithmetic are unchanged, so the decoded tokens and every step's logits stay bit-identical.
 % SOURCE: aie-cosched-rename (mlir-aie 41b4947f09e; on cosched-flag through the aiecc flag), classes and rings in vault lab-cosched-passes (33): 12 buffers renamed on the 1B census build (K, V, score per attention pair); the class rule renames only buffers whose every cross-iteration conflict is WAR or WAW (lab-cosched-passes (57), P6 plan); tokens and every step's logits bit-identical across the existing design, the hand edit, and the pass, 1B P = 0 to 32,517 and Qwen3-4B P = 2,048 to 28,800 (vault lab-decode-long-context (22), amd-npu a6bc94b and 455740b).
 % SOURCE: single buffering, the build's own comment ("air-label-scf-for-to-ping-pong declines it, because the running max and accumulator are live across blocks") (vault lab-decode-long-context (5)).
@@ -65,10 +63,10 @@ The composer replaces that naming with rings sized from the plan's live interval
 \subsection{Partitioning per Regime}
 \label{subsec:split}
 
-% VALUE: the split is a hand-fixed build parameter of the existing design; the legal splits follow from the KV heads; each split is its own configuration built from the unchanged source, with outputs bit-identical to the default split
-The existing design fixes the split of columns between attention and the GEMMs by hand, as a parameter of its build.
-Since each attention group serves an equal share of the KV heads, a model with 8 KV heads admits attention on 1, 2, or 4 columns.
-We build each split as its own configuration from the unchanged source, and its outputs are bit-identical to those of the default split.
+% VALUE: the split is a hand-fixed build parameter of the existing design; the legal splits S1, S2 (default), S4 follow from the KV heads; each split is its own configuration built from the unchanged source, with outputs bit-identical to the default split, so the existing program and the composer each run on any of them
+The existing design fixes its split by hand, as a parameter of its build.
+Since each attention group serves an equal share of the KV heads, an LLM with 8 KV heads admits attention on 1, 2, or 4 columns, which we call the splits $S_1$, $S_2$, and $S_4$, with $S_2$ the default.
+We build each split as its own configuration from the unchanged source, with outputs bit-identical to those of the default split, so the existing program and the composed schedule can each run on any of them.
 % SOURCE: mlir-air a3e26261 fused_prefill/device.py: Attn(col=...) per group in Config.attn, GCOL0, GNC = 1, 6 as module constants; spec() splits kv_heads evenly, so 1, 2, or 4 attention columns with 8 KV heads (vault lab-split-sweep (1)).
 % SOURCE: out-of-tree split modules; logits bit-identical to the default split in every configuration on both models (vault lab-split-sweep (2), (4), (5)).
 
@@ -90,20 +88,20 @@ A per-regime split therefore costs either a second copy of the weights or a swit
 \subsection{Legality Checkers}
 \label{subsec:checkers}
 
-% VALUE: each rewriter carries a checker that tests the legality conditions of Section 4 on the facts its rewrite touches; the composer's checks stop the composition rather than drop an operator; the stream pass checks every inverted pair against routes, BDs, and ranges and leaves the stream unchanged on a finding; the loop pass refuses a buffer it cannot show renamable and confirms its own output; a stream-pass refusal says illegal or not shown legal
-Each of OPCORD's three rewriters carries a checker that tests the legality conditions of Section~\ref{sec:order} on the facts its rewrite touches.
-The composer confirms that each operator writes only its own group's registers, that interleaved operators patch disjoint argument ranges, that no ring slot is reused early, and that each split fits a shim BD's fields.
+% VALUE: the composer and both passes each carry a checker that tests the legality conditions of Section 4 (pointed to, not restated) on the facts its rewrite touches; the composer's checks stop the composition rather than drop an operator; the stream pass checks every inverted pair and leaves the stream unchanged on a finding, saying whether illegal or not shown legal; the loop pass refuses a buffer it cannot show renamable and confirms its own output
+The composer and both passes each carry a checker that tests the legality conditions of Section~\ref{subsec:legality} on the facts its rewrite touches.
+The composer checks that every two operators it interleaves meet the condition between whole operators, that no ring slot is reused early, and that each split fits a shim BD's fields.
 A check that does not hold stops the composition with its reason rather than dropping an operator.
-The stream pass checks every pair of instructions that its rewrite inverts against the routes, BDs, and buffer ranges it derives from the configuration, and on any finding it leaves the stream unchanged and names the condition and the pair.
-The loop pass refuses a buffer that does not use one pair of locks, would exceed the tile's BDs or local memory, or is used outside its block loop, and it re-checks each ring and the carried state on its output.
-The stream pass's refusals also state whether the rewrite was shown illegal or could not be shown legal, so a reader can tell a hazard from a gap in what the stream reveals.
+The stream pass checks every pair of instructions that its rewrite inverts, from the routes, BDs, and buffer ranges it derives from the configuration.
+On any finding it leaves the stream unchanged and names the condition, the pair, and whether the rewrite was shown illegal or could not be shown legal, so a reader can tell a hazard from a gap in what the stream reveals.
+The loop pass refuses a buffer that fails the rename conditions or is used outside its block loop, and it re-checks each ring and the carried state on its output.
 % SOURCE: composer checks: own-group register writes (shim BDs and DMA queues, own cores' locks, own cores' runtime parameters), disjoint argument slots or byte ranges, segment order and every op once, assert_no_hazard on ring slots, BD iteration wrap 6 bits and stride 20 bits per GEMM, check_posted for commands in flight; each turns red on a defeated input (lab-prefill-overlap (3), (4), (9); lab-split-sweep (5), (35)); checks fail rather than drop, 26 / 26 (decisions log D24 N1).
 % SOURCE: stream checker in C++ inside aie-cosched-schedule, route facts from the device IR (mlir-aie cosched-flag e20940fac7e); findings RANGE-OVERLAP, RANGE-UNKNOWN, BD-REUSE, PUSH-BEFORE-BD-WRITE, QUEUE-OVERFLOW, NOT-PERMUTATION, CHANNEL-ORDER, BD-ORDER, SKELETON-MOVED and the route codes; any finding refuses the whole rewrite and the IR is unchanged; outcomes DECIDED (shown illegal) against RESOURCE-UNPROVEN, RANGE-UNKNOWN, TOOL-FAILED, PASS-ERROR (not shown legal) (vault lab-cosched-passes (57) steps 3-5, and the checker's reason list).
 % SOURCE: loop pass input checks (one free / full lock pair, free lock starting at 1, BD and L1 budgets, every BD block ending in a next_bd, use inside a block loop, supported loop control) and output check (ring as made, carried state's users unchanged, budgets), mlir-aie aie-cosched-pass-0 e9fc225b2b6 / ba7ea1aa552, cherry-picked to cosched-flag (lab-cosched-passes (56), (57) step 2).
 
-% VALUE: the passes' checkers are checked: an independent implementation of the stream checker agrees on every verdict, and every refused rename, forced, yields a design an independent check of the loop refuses (the composer's checks are tested by defeated inputs only); a pass that must accept or refuse every stream carries its legality condition, which is why reproducing a hand edit is the point and why the passes can judge designs nobody has read; verdicts on unexamined designs are judgments, not gains
+% VALUE: the passes' checkers are checked: an independent implementation of the stream checker agrees on every verdict, and every refused rename, forced, yields a design an independent check of the loop refuses (the composer's checks are tested by defeated inputs only); a pass that must accept or refuse every stream applies its legality condition to designs nobody has read; verdicts on unexamined designs are judgments, not gains
 A second, independent implementation of the stream pass's checker agrees with it on every verdict over our prefill builds, and every rename the loop pass refuses, when forced, yields a design that an independent check of the loop refuses too (Appendix~\ref{app:checkers}).
-A hand edit reaches only the streams someone reads, whereas a pass that accepts or refuses every stream carries the condition under which its rewrite is legal, so reproducing a hand edit is the point rather than the limit.
+A hand edit reaches only the streams someone reads, whereas a pass that accepts or refuses every stream applies the condition under which its rewrite is legal to designs nobody has read.
 Section~\ref{subsec:census} reports the verdicts on designs we never examined, as judgments rather than gains.
 % SOURCE: configured agreement C++ / Python on every prefill build (110 operators with no differing facts; Gemma3's differences all the oracle's TOOL-FAILED condition, counted apart), 0 DISAGREE; the 42 hand-alternated streams 162 / 162 AGREE; 10 negative controls with identical codes; every forced loop-pass refusal REFUSED by loopcheck with READS-DIFFER (decisions log, "P6 steps 1-5 done"; vault lab-cosched-passes (57) step 5 and forced refusals).
 % DECISION: designs never examined are judged by the passes, and no gain is claimed on them (contract, No overclaim).
@@ -111,12 +109,13 @@ Section~\ref{subsec:census} reports the verdicts on designs we never examined, a
 \subsection{Implementation}
 \label{subsec:impl}
 
-% VALUE: each part runs where its inputs exist: the analysis and both passes with their checkers in MLIR-AIE (C++), the loop pass as an opt-in step of the compiler driver that leaves every output byte-identical when off; the composer, the event model, and the split switch as a Python runtime package replacing the host program's dispatch loop on the engine's own hardware context; no kernel, driver, or firmware change, and every reconfiguration point stays where the stack put it
+% VALUE: each part runs where its inputs exist: the analysis and both passes with their checkers in MLIR-AIE (C++), the loop pass as an opt-in step of the compiler driver that leaves every output byte-identical when off; the composer, the event model, and the split switch as a Python runtime package replacing the host program's dispatch loop on the design's own hardware context; no kernel, driver, or firmware change, and every reconfiguration point stays where the stack put it
 Each part of OPCORD runs where its inputs exist, so what rewrites compiled code runs in the compiler and what depends on the prompt or on measured costs runs on the host.
 The analysis of Section~\ref{sec:order} and both passes, with their checkers, are about 6{,}700 lines of C++ in MLIR-AIE~\citep{mlir-aie-repo}.
 The loop pass is an opt-in step of the compiler's driver, and switched off, it leaves every instruction stream and configuration the compiler emits byte-identical to the existing build.
-The composer, with the event model and the switch between splits, is a runtime package of about 2{,}700 lines of Python that replaces the dispatch loop of the design's host program and submits to the engine's own hardware context.
-OPCORD thus changes no kernel, driver, or firmware, and it leaves every reconfiguration point where the stack put it, so the gains we report say nothing about moving those points.
+The composer, with the event model and the switch between splits, is a runtime package of about 2{,}700 lines of Python that replaces the dispatch loop of the design's host program and submits to the design's own hardware context.
+OPCORD thus changes no kernel, driver, or firmware.
+It also leaves every reconfiguration point where the stack put it, so the gains we report say nothing about moving those points.
 Appendix~\ref{app:opcord} details the host boundaries and the loop pass's changes to the lowered design.
 % SOURCE: mlir-aie cosched-flag 2b6f1c3ce93 against its base 35fa6b1: lib and include, 15 files, 6,703 lines inserted (AIECoschedDeps, AIECoschedStream, AIECoschedRoutes, AIECoschedCycles, AIECoschedSetTest, AIECoschedSchedule, AIECoschedRename, AIEXPasses.td, the lifter in AIEToConfiguration.cpp); the aiecc opt-in flag in tools/aiecc (35 lines).
 % SOURCE: aie-cosched opcord-runtime 446fa1c (checkout npu-gap-0/opcord-pin), opcord/ without tests: 2,718 lines of Python (compose 1,254, model 922, plan 286, switch 224, package files 32); 65,550 / 65,550 commands byte-identical to the pre-package composer (decisions log D24 N6).

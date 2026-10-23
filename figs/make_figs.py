@@ -148,7 +148,7 @@ def fig_outstanding():
     record timers. Where a group's outstanding time equals the time the CP spent blocked on it, the CP was
     blocked for as long as that group had work, so the two groups took turns."""
     d = json.loads((DATA / "timeline-1b.json").read_text())
-    arms = (("shipar", "Existing order"), ("comp", "Composed order"))
+    arms = (("shipar", "Alternated baseline"), ("comp", "Composed"))
     fig, axes = plt.subplots(1, 2, figsize=(COLUMN, 1.45), sharex=True)
     for ax, (arm, title) in zip(axes, arms):
         pg = d["per_group"][arm]
@@ -191,8 +191,8 @@ def fig_accuracy():
     ax.plot([lo, hi], [lo, hi], color="black", linewidth=0.5, zorder=1)
     ax.fill_between([lo, hi], [lo * (1 - tol), hi * (1 - tol)], [lo * (1 + tol), hi * (1 + tol)],
                     color=GRAY, alpha=0.35, linewidth=0, zorder=0,
-                    label=rf"Committed tolerance, $\pm${tol * 100:.1f}\%")
-    style = {"ship": (INK, "^", "Existing"), "shipar": (INK, "s", "Existing, alternated"),
+                    label=rf"Band, $\pm${tol * 100:.1f}\%")
+    style = {"ship": (INK, "^", "Existing"), "shipar": (INK, "s", "Alternated"),
              "comp": (MAGENTA, "o", "Composed")}
     for sched, (color, marker, label) in style.items():
         for rows, claimed in ((d["reported"], False), (d["claimed"], True)):
@@ -218,10 +218,7 @@ def fig_accuracy():
 
 
 def fig_bound():
-    """Distance to the lower bound per cell, measured and as predicted before the runs.
-
-    The registered claim was that the distance stays within 1.30; the cells that leave it are the cells the
-    model had already placed above it."""
+    """Distance to the lower bound per append, measured and as the event model prices it."""
     d = json.loads((DATA / "bound.json").read_text())
     cells = d["cells"]
     # Short labels must stay distinct: two of the four models are 4B.
@@ -232,14 +229,11 @@ def fig_bound():
     cells = sorted(cells, key=lambda c: (order.index(c["model"]), list(short).index(c["cell"])))
     y = list(range(len(cells)))[::-1]
     fig, ax = plt.subplots(figsize=(COLUMN, 2.3))
-    ax.axvline(d["claim_hi"], color="black", linewidth=0.5, linestyle=(0, (4, 2)), zorder=1,
-               label="Registered range, upper edge")
     for yi, c in zip(y, cells):
         ax.plot([c["r_pred"]], [yi], marker="|", markersize=5, color=INK, markeredgewidth=0.8, zorder=3,
-                label="Predicted before the runs" if yi == y[0] else None)
-        ax.plot([c["r_meas"]], [yi], marker="o", markersize=3,
-                color=MAGENTA if c["in_range"] else ORANGE, zorder=4,
-                label=("Measured, inside the range" if c["in_range"] else "Measured, outside") if yi in (y[0], y[2]) else None)
+                label="Event model" if yi == y[0] else None)
+        ax.plot([c["r_meas"]], [yi], marker="o", markersize=3, color=MAGENTA, zorder=4,
+                label="Measured" if yi == y[0] else None)
         ax.plot([min(c["r_pred"], c["r_meas"]), max(c["r_pred"], c["r_meas"])], [yi, yi],
                 color=GRAY, linewidth=0.8, zorder=2)
     labels = [f"{names[c['model']]} {short[c['cell']]}" for c in cells]
@@ -273,7 +267,7 @@ def fig_order():
     panels = [
         ("(a) One operator per command", serial_attn, serial_gemm, serial_cp, A + 3 * G),
         ("(b) One command, operators in turn", serial_attn, serial_gemm, serial_cp, A + 3 * G),
-        ("(c) One command, synchronizations in predicted completion order",
+        ("(c) One command, every group's work issued before any wait",
          serial_attn, [(i * G, G) for i in range(3)], ours_cp, max(A, 3 * G)),
     ]
     fig, axes = plt.subplots(3, 1, figsize=(COLUMN, 2.6))
@@ -386,7 +380,7 @@ def fig_decode():
             keep.append((p, v))
         x = [p for p, _ in keep]
         ax.plot(x, [v["census_ms_tok"] for _, v in keep], color=INK, marker=marker, linestyle=(0, (4, 2)),
-                markerfacecolor="white", label="Baseline")
+                markerfacecolor="white", label="Existing")
         ax.plot(x, [v["R_ms_tok"] for _, v in keep], color=color, marker=marker, label="Renamed")
         for p, v in keep[-1:]:
             ax.annotate(f"${v['census_ms_tok'] / v['R_ms_tok']:.2f}\\times$",
@@ -416,7 +410,7 @@ def fig_schedules():
     cell = "append:8192:4096"
     models = [("llama32_1b_q4nx", "Llama-3.2-1B"), ("qwen3_4b_q4nx", "Qwen3-4B"),
               ("gemma3_4b_q4nx", "Gemma3-4B"), ("llama31_8b_q4nx", "Llama-3.1-8B")]
-    series = [("ship", "Shipped", INK, "^", (0, (1, 1.5))),
+    series = [("ship", "Existing", INK, "^", (0, (1, 1.5))),
               ("shipar", "Alternated", GRAY, "s", (0, (4, 2))),
               ("comp", "Composed", MAGENTA, "o", (0, ()))]
     fig, axes = plt.subplots(2, 2, figsize=(COLUMN, 2.6))
@@ -449,7 +443,7 @@ def fig_timeline():
     Llama-3.2-1B, a 4,096-token prompt, the median-TTFT run of each arm, from the CP's own record timers: the existing
     program (attention's columns alternated) and the composed schedule. Intervals are merged at 1 ms."""
     d = json.loads((DATA / "fig1-intervals-1b.json").read_text())["arms"]
-    arms = (("shipar", "Existing program"), ("comp", "OPCORD"))
+    arms = (("shipar", "Alternated baseline"), ("comp", "OPCORD"))
     rows = (("A", "Attention", ORANGE), ("G", "GEMMs", BLUE))
     fig, axes = plt.subplots(2, 1, figsize=(COLUMN, 1.25), sharex=True)
     base = d["shipar"]["ttft_ms"]

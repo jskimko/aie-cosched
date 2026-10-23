@@ -4,8 +4,8 @@
 % VALUE: the one disclosure in the paper that a reviewer should be able to audit in full: the attribution rule was
 % settled after the capture, the earlier rule labels the same capture differently, and the evidence that the later
 % rule is the physically right one comes from waits and argument slots rather than from the rule itself
-Section~3.4 of the paper attributes each issue in a recorded command stream to the column group whose compute tiles its
-data reaches, rather than to the column the instruction addresses. This appendix states how that rule was chosen,
+Because FastFlowLM's attention reads through shim tiles of the GEMM columns, the analysis attributes each issue to the column group whose compute tiles its data reaches through the decoded routes, not to the column the instruction addresses (Appendix~\ref{app:capture}).
+This appendix states how that rule was chosen,
 because it was settled after the capture it is applied to and the earlier rule gives a different label.
 
 \textbf{Why the addressed column is not the group.} In the production engine's fused prefill, each attention command
@@ -411,20 +411,21 @@ Nested control is analysed when it resolves from the dispatch: a switch on a run
 \subsection{Attribution Choices}
 \label{app:attribution-choices}
 
-% VALUE: how the analysis attributes and counts edges where a choice is needed: an edge two mechanisms imply goes to the first in Table mech; issue edges never stall and are reported apart; pairs ordered by two disjoint paths are counted as redundant; data-dependent loops are counted as control; loop-carried edges keep their distance
+% VALUE: how the analysis attributes and counts edges where a choice is needed: an edge two mechanisms imply goes to the first in Table mech; issue edges never stall and are reported apart; pairs ordered by two disjoint paths are counted as redundant; data-dependent loops are counted as control; loop-carried edges keep their distance; a wait gating several operations gives one edge per gated operation; operations no mechanism explains are counted per stream
 % [Note: these sentences are verbatim from the body of Section~\ref{subsec:reading}, each made a full sentence where it was a clause: "an edge that two mechanisms imply is attributed to the first in the table" and "with their distance recorded".]
 An edge that two mechanisms of Table~\ref{tab:mech} imply is attributed to the first in the table.
 Edges of mechanism 2 never stall, because their instructions complete at issue, so they are attributed but reported apart from the blocking edges.
 A pair that two disjoint paths order is lost by no single edge, so each edge on those paths may be classed as an order dependence alone, and such pairs are counted as redundant instead of being attributed to either path.
 A loop with data-dependent control is counted as control.
 Loop-carried edges are classed with their distance recorded.
+A synchronization that gates several operations contributes one edge per gated operation.
+An operation whose ordering effect no mechanism describes, such as an unknown opcode or a write outside the known register map, takes edges to its neighbors on the CP and is counted per stream, which measures what the analysis does not cover.
 % SOURCE: the attribution order, UNATTRIBUTED, and issue edges (vault lab-cosched-passes (30), item 2); classification by Lost(e), REDUNDANT, CONTROL, loop-carried distance (lab-cosched-passes (30), item 3); computed by aie-cosched-stream-deps (mlir-aie 0489d325082, lab-cosched-passes (53)).
 
 \subsection{Checking the Recovered Order and the CP's Record Timers}
 \label{app:timer}
 
 % VALUE: the recovered order is checked through its consequences, not against a trace: removed false waits leave outputs bit-identical, measured gains stay within their bounds, and what the analysis leaves out is counted; the CP's own timer records show the issue and wait order inside each command without changing the array's configuration, and they cannot see core loops or the gaps between commands
-% [Note: the evaluation's fidelity subsection may lift the first two sentences; Figure outstanding in the evaluation rests on the record-timer method described here. "Appendix~H" in the original is written as its label.]
 We check the recovered order through its consequences rather than against a hardware trace.
 Every wait that the analysis classes as false and that our passes remove leaves the outputs bit-identical (Section~\ref{sec:method}), each measured gain is compared with its bound (Appendix~\ref{subsec:tests}), and the operations that the analysis leaves out are counted per stream.
 To show how the CP executes the order, we insert the runtime's record-timer instruction after each synchronization and after each run of issue instructions, so that the firmware writes an identifier and a 1.8~GHz device timer into a buffer that the host reads after the run.
@@ -435,6 +436,20 @@ Between commands the timer advances at less than a tenth of its rate, so the rec
 Order inside a core's loop is invisible to the CP, so the decode loop's order rests on its removal (Section~\ref{subsec:rings}).
 % SOURCE: record-timer instruction TXN opcode 0x83 (12 bytes: header, size, 32-bit id; aiebu 48b69735 xaie_txn.h), XRT 2.25.0 ML Timeline (XDP 67165d6 clientDev/ml_timeline.cpp; Strix Halo listed as a client device with a debug buffer); feasibility check: split-1b-S4-L20480, 108 commands, 1,468 records per run, 5 runs with and 5 without, logits sha equal in all 10, summed start-to-wait with / without records 0.93-0.95, per-command fit of the timer 1,752-1,767 MHz against the 1,800 MHz H clock at the top DPM level (xdna-driver bc5dd96 npu4_dpm_clk_table), 110-125 M timer cycles per host second between commands (amd-npu b98e3044; vault lab-decode-long-context (39), decisions log D13).
 % DECISION: T-rec was withdrawn by the author (outline v9 revision 31, D13); recovery is the method in every verb row, and the timer records are a figure that governs no verb.
+
+% VALUE: the CP's own records show the removed waits as blocking time that disappears: in the alternated baseline the CP blocks on each group for as long as it has work, so the groups take turns; in the composed order it blocks on attention for about a third of attention's outstanding time
+On a whole prefill, the CP's own records show the removed waits directly (Figure~\ref{fig:outstanding}).
+In the alternated baseline, the CP blocks on each group for as long as that group has work outstanding, whereas in the composed order attention's work is outstanding $2.8\times$ as long as the CP blocks on it.
+% SOURCE: measured (amd-npu 57621ff4, verified from the bare): Llama-3.2-1B, 108 commands, 521,550 records per run, 5 reps, cycles at 1,800 MHz; logits identical with and without records and TTFT within 1.1%. Existing order with attention alternated: the CP blocks 895.0 ms on the GEMM group and 615.5 ms on attention, each group's outstanding time equal to its blocked time. Composed: attention's work is outstanding 626.1 ms while the CP blocks on it 224.8 ms (626.1 / 224.8 = 2.79), and the GEMM group is outstanding 954.1 ms against 812.9 blocked (vault lab-decode-long-context (41)).
+
+\begin{figure}[t]
+    \centering
+    % VALUE: per column group, CP blocking time against outstanding time, alternated baseline and composed
+    \includegraphics{fig/outstanding.pdf}
+    \caption{Per column group, how long the CP was blocked on that group's synchronizations and how long that group's work was outstanding, on a 4{,}096-token prefill of Llama-3.2-1B, from the CP's own record timers. The alternated baseline is the existing program with attention's columns alternated by hand. In it the two quantities are equal for both groups, so the CP was blocked for as long as either group had work and the groups took turns; in the composed order attention's work is outstanding for 626\,ms while the CP blocks on it for 225.}
+    \label{fig:outstanding}
+\end{figure}
+% DECISION: the figure is Llama-3.2-1B only. Qwen3-4B faulted at the driver's debug-buffer sync on teardown in both runs that enabled the records, at two buffer sizes, and wrote none (decisions log D15); its gates still hold (logits identical, TTFT within 0.5%). Absolute times are quoted at 1,800 MHz; a queue-robust fit of the same records gives 1,864-1,941 MHz, so the millisecond values carry 4-8% of scale uncertainty, which does not affect the ratios between arms.
 
 \subsection{The Captured Prefill of the Closed Stack}
 \label{app:capture}

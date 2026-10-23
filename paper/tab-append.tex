@@ -15,7 +15,7 @@
 % DECISION: the model is a spanning row rather than a column, so the table fits one column at \small; a
 % full-width table* for twelve short rows would cost more page than the phase is worth.
 \begin{table}[t]
-\caption{Time from a tool result to the first new token, on appends of $N$ tokens to a cached context of $L$. Each arm is at its own faster split, and $S_k$ is the split the composed schedule takes, $k$ being attention's columns. The baseline is the existing program with attention's two columns alternated by hand, which matches the existing program within 0.1\% except on Llama-3.1-8B at $2{,}048 + 4{,}096$, where the existing program takes $1.04\times$ as long. The bound comes from the same per-operator probes, at the composed schedule's split.}
+\caption{Time from a tool result to the first new token, on appends of $N$ tokens to a cached context of $L$. Each schedule runs at its own faster split, and $S_k$ is the split the composed schedule takes, $k$ being attention's columns. The baseline is the alternated baseline, namely the existing program with attention's two columns alternated by hand, which matches the existing program within 0.1\% except on Llama-3.1-8B at $2{,}048 + 4{,}096$, where the existing program takes $1.04\times$ as long. The bound comes from the same per-operator probes, at the composed schedule's split.}
 \label{tab:append}
 \vskip 0.1in
 \centering

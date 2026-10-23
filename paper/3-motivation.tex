@@ -39,13 +39,13 @@ Nor does a second hardware context, because the driver allocates every context a
 
 % VALUE: one command that issues all of one group's work before any synchronization runs the pair at the longer one's time; the cost appears near the DRAM read cap; because the CP is in order, the order inside a command is itself a scheduling decision, so serial execution is a property of composition, not of the array
 In contrast, one command that issues all of the GEMM's work, then the attention operator's stream, and only then the GEMM's synchronizations runs the two in 1.00--1.06$\times$ the longer one's time on nine pairs that cover three GEMM shapes and attention chunks 0 to 15 (Figure~\ref{fig:order}c).
-On six further pairs, the overlap hides 90--96\% of the shorter operator's work beyond the dispatch floor that merging already saves.
-The small excess appears where the pair's DRAM reads approach the read cap that the column groups share (Section~\ref{subsec:removal}).
+On six further pairs, the overlap hides 90--96\% of the shorter operator's work beyond the dispatch floor that one command already saves.
+The small excess appears where the pair's DRAM reads approach the \emph{read cap}, which is the highest DRAM read rate that the column groups together sustain, 53.9--55.3\,GB/s in these runs (Section~\ref{subsec:removal}).
 Because a synchronization on one group delays every later issue to the other (Section~\ref{subsec:platform}), the order of instructions within a command, and not only which operators share it, is a scheduling decision.
 The serial execution of the existing prefill is therefore a property of how its commands are composed, not of the array.
 % SOURCE: interleaved / max(A, G) = 0.998-1.058 over 10 pair runs = 9 pairs (c8 + lm measured twice, 1.054 and 1.058; the figure keeps each pair's first measurement); GEMM shapes up, LM head chunk, down; attention chunks 0, 4, 8, 12, 15 (lab-prefill-overlap (3)).
 % SOURCE: hidden fraction of the shorter operator's work, (in-sequence - interleaved) / (min(A, G) - F) = 0.90-0.96 on 2+qkv, 6+o, 11+gate, 14+qkv, 6+gate, 11+o (lab-prefill-overlap (5)a).
-% SOURCE: DRAM rate during the interleaved command 52.2 GB/s against a same-batch 8x2 cap of 53.9-55.3 GB/s for c8 + lm, the costliest overlap (1.054-1.058) (lab-prefill-overlap (3)).
+% SOURCE: DRAM rate during the interleaved command 52.2 GB/s against a same-batch 8x2 cap of 53.9-55.3 GB/s for c8 + lm, the costliest overlap (1.054-1.058) (lab-prefill-overlap (3)); the cap is the 8x2 bracket's read of 256 MiB (7-eval Setup SOURCE).
 
 \subsection{The Idle Array}
 \label{subsec:idle}
@@ -81,7 +81,7 @@ It is an \emph{order} dependence where the instruction order alone places the wa
 
 \textbf{Column Groups in Prefill.}
 % VALUE: one operator per command and no overlap across commands make the prefill's column groups take turns, an order dependence in the CP's stream between operators
-The existing prefill issues one operator per command, about 1{,}500 commands for a 2{,}048-token prompt, and queued commands never overlap, so its column groups take turns although neither consumes the other's current work (Section~\ref{subsec:idle}).
+The existing prefill issues one operator per command, about 1{,}500 commands for a 2{,}048-token prompt, so its column groups take turns although neither consumes the other's current work (Sections~\ref{subsec:semantics} and~\ref{subsec:idle}).
 This order dependence sits in the CP's stream, between operators.
 % SOURCE: commands = 16 layers x chunks x 6 + 11 LM-head commands = 1,547 at 2,048 tokens (vault lab-prefill-census (1)).
 
@@ -94,11 +94,11 @@ Each column's half alone takes the same time within 1\%, so the loss comes from 
 % SOURCE: (alternated - F) / (existing - F) = 0.666-0.668 on 7 pairs, chunks 2-14 at 2,048 tokens; column 7 alone / column 0 alone = 0.994-1.010 (amd-npu 17f7ec3 ovl4/, vault lab-prefill-overlap (5)c); at absolute chunks 16-255: Qwen3-4B 0.66-0.68; Llama-3.2-1B 0.66 / 0.57 / 0.41 / 0.43 / 0.68 / 0.67 / 0.66, lower at its mid-range chunks (vault lab-agent-step (4)).
 
 \textbf{Transfers in Decode.}
-% VALUE: a name dependence inside decode attention's loop: attention grows to most of the time per token, reads KV at half the cap although the transfer alone reaches 88% and the CP already issues the next weights before the KV wait; the single-buffered loop makes each block's transfer wait for the previous block's compute (+41% per position), and MLIR-AIR's double-buffering pass declines the loop because the running max and accumulator live across blocks
+% VALUE: a name dependence inside decode attention's loop: attention grows to most of the time per token and reads KV at half the cap; neither the transfer alone nor the CP's order limits it (the measurement chain in the appendix); the loop's keys, values, and scores sit in one buffer each, so each block's transfer waits for the previous block's compute (+41% per position), and MLIR-AIR's double-buffering pass declines the loop because the running max and accumulator live across blocks
 In decode, attention reads the KV cache at only 51\% of the DRAM read cap, although its share of the time per token grows to 70\% at a 32{,}704-token context.
-Neither the transfer nor the CP's order is the limit, since a build that streams the same positions with no further compute reads them at 88\% of the cap, and each layer issues the next projection's weights before it waits on the KV cache (Appendix~\ref{app:decode-chain}).
-Instead, the KV loop holds its keys and values in one buffer each, so each block's transfer waits for the compute on the previous block, which adds 41\% to the time per position.
-MLIR-AIR's double-buffering transformation declines the whole loop because its running maximum and accumulator live across blocks, so the key and value buffers, whose waits are name dependences, stay single.
+Neither the transfer alone nor the CP's order is the limit (Appendix~\ref{app:decode-chain}).
+Instead, the KV loop holds its keys, its values, and the scores passed between its two cores in one buffer each, so each block's transfer waits for the compute on the previous block, which adds 41\% to the time per position.
+MLIR-AIR's double-buffering transformation declines the whole loop because its running maximum and accumulator live across blocks, so these three buffers, whose waits are name dependences, stay single.
 % SOURCE: per-token time = 15.94 ms + 1.156 us x L, max residual 0.2% over L = 2,048-32,704 (Llama-3.2-1B, one 32k-window build, median of 3); 32 KiB per position / 1.156 us = 28.4 GB/s against a same-batch 8x2 cap of 55.2 GB/s; attention 13/23/37/54/70% of per-token time at 2k/4k/8k/16k/32k (vault lab-decode-long-context (5)).
 % SOURCE: bytes-only discriminator: ELF window 32,768 vs 2,048 at the same small L, 20.81 ms / 30,720 positions = 0.677 us = 48.4 GB/s = 88% of the 55.2 GB/s cap and 104% of the two-shim probe; serialized compute 1.156 - 0.677 = 0.478 us = 41% of the per-position time (vault lab-decode-long-context (7)).
 % SOURCE: per layer, the QKV weight streams are awaited, then the KV readbacks start, and the next projection's weight streams are issued before any KV await; weight progress during attention is bounded by buffering and back-pressure (vault lab-decode-long-context (2), amended in (4)).

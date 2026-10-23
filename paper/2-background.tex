@@ -54,10 +54,10 @@ All three reach the array through the same commands and instruction streams, so 
 \subsection{LLM Inference on the NPU}
 \label{subsec:prefill}
 
-% VALUE: prefill and TTFT; the decoder layer's operators; the existing expert prefill puts GEMMs and attention on disjoint column groups of one configuration, so its operators differ only in their streams; it runs a layer stage by stage over 128-token chunks with host work between commands
-\emph{Prefill} processes a prompt to produce the first output token, and its latency is the time-to-first-token (TTFT).
+% VALUE: prefill and TTFT; the decoder layer's operators; the existing expert prefill puts GEMMs and attention on disjoint column groups of one configuration (its default split), so its operators differ only in their streams; it runs a layer stage by stage over 128-token chunks with host work between commands
+\emph{Prefill} processes a prompt to produce the first output token, and its latency is the TTFT.
 Each decoder layer applies a QKV projection, attention, an output projection, and a gated feed-forward network of gate, up, and down projections.
-MLIR-AIR's open expert prefill~\citep{wang2026mlirair}, which reimplements designs of FastFlowLM~\citep{fastflowlm-repo}, places every operator of a layer in one configuration, with the GEMMs on columns 1--6 and attention on columns 0 and 7.
+MLIR-AIR's open expert prefill~\citep{wang2026mlirair}, which reimplements designs of FastFlowLM~\citep{fastflowlm-repo}, places every operator of a layer in one configuration, with the GEMMs on columns 1--6 and attention on columns 0 and 7, which is its default split (Section~\ref{subsec:split}).
 Its cores loop indefinitely and take their work from runtime parameters, so its operators differ only in their instruction streams, each of which keeps only its own operator's columns.
 The host runs each layer stage by stage over chunks of 128 tokens, finishing every chunk's QKV projection before any attention and every attention before the remaining projections, and its CPU computes the normalizations, rotary embedding, and residual additions between commands.
 % SOURCE: mlir-air a3e26261 programming_examples/llms/shared/fused_prefill/: device.py (column map cols(cfg); "one PDI serves every op and shape and the ops differ only in their insts"), engine.py (strip_columns), dense.py (_mix_all, stage-major order), hostops.py; README.md: "Some of the LLM implementations in this directory reimplement AMD NPU LLM designs originally developed by the FastFlowLM team".
@@ -67,7 +67,8 @@ An agent's \emph{turn} appends new tokens, such as a tool's output, to a context
 The prefill design serves such an \emph{append} unchanged, because it takes absolute token positions.
 \emph{Decode} generates one token per step with a separate design, namely MLIR-AIR's fused decode, in which every layer's attention reads the KV cache of the whole context.
 A median step of a coding agent appends 875 tokens to a cached prefix of 119K tokens and generates 214~\citep{zhu2026tracelab}.
-With the prefix cached, prefill takes only 1.4--9.0\% of an agent's LLM time on GPU servers~\citep{yuan2026agentic}, but 6--54\% of a Llama-3.2-1B turn on the NPU (Section~\ref{subsec:turns}), so there the time from a tool's output to the first new token is a large part of each turn.
+With the prefix cached, prefill takes only 1.4--9.0\% of an agent's LLM time on GPU servers~\citep{yuan2026agentic}, but 6--54\% of the existing program's Llama-3.2-1B turn that we measure on the NPU.
+There, the time from a tool's output to the first new token is a large part of each turn.
 % SOURCE: the engine's RoPE, KV append, and attention take absolute positions, and only prefill() starts at 0 (vault lab-decode-long-context (2), lab-agent-step (1)); appends are bit-identical to a full prefill of L + N tokens (lab-agent-step (2)).
 % SOURCE: TraceLab Section 1 (medians over ~4,300 Claude Code and Codex sessions, ~350,000 steps) and Table 8; Yuan et al. Section on prefill versus decode time and Fig. 9 (Qwen3.6-27B and Gemma4-31B on two H100 NVL GPUs with vLLM, no context thrashing); both PDFs read 2026-10-15.
 % SOURCE: measured whole turns (append + 250 decode tokens), prefill share of the existing turn: Llama-3.2-1B 6.4-54.4% as append / (append + decode), without the KV handoff (6.0-52.6% with the steady handoff in the denominator; re-derived from amd-npu 7034cfb turn-g2-1b.json in the 2026-10-22 foundation audit, B17), Qwen3-4B 7-48% before its handoff rerun, over L in {4k, 16k, 28k} and N in {512, 1k, 4k} (vault ch3-formulation, G2/G2b and Qwen3-4B measured turns).
