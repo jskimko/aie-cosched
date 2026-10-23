@@ -26,6 +26,24 @@ Other arrays whose engines run their programs in order, such as other AIE genera
 % SOURCE: Kepler Tuning Guide section 1.4.2.2 (read 2026-10-21); device busy = summed isolated operator times less the dispatch floor, 92/95/97% of TTFT at 512/2k/4k (amd-npu e3acc8a, Figure busy), not a hardware counter.
 % DECISION: "the compiler owns concurrency on static hardware" is cited (Rammer, TSP) and kept as discussion, never a contribution (outline v9 section 2, "Not contributions").
 
+% VALUE: answers the obvious question of why one of the three passes runs on the host while the other two are
+% compiler passes. The answer is a condition rather than a boundary: the two inside the compiler are the two whose
+% output does not depend on the prompt, and a deployment whose shapes are known could emit the composed stream
+% ahead of the run as well.
+Where this work would move into the compiler is decided by when the shapes are known.
+Two of our three passes already run there, and they are exactly the two whose output does not depend on the prompt: the stream pass reorders the segments within one operator's stream, and the loop pass renames the buffers of decode attention, and one build of each serves every context length.
+The composer is the piece that runs at dispatch, and it is the piece whose plan is a function of the cached context and the appended tokens.
+Nothing in that plan requires a host.
+Planning a schedule and composing its commands are compile-time work in kind (Section~\ref{subsec:setup}), and a compiler given the shapes could emit the composed stream before the run, at the cost of one plan per shape rather than one build per shape.
+A deployment whose shapes are fixed therefore needs no dispatch-time planner, however large those shapes are, which is what a fixed chunk size secures~\citep{xu2025llmnpu}.
+An agent appends whatever its tools return to a context that grows each turn, so its shapes belong to the turn rather than to the deployment, and planning each one in a fraction of a second is what avoids enumerating them in advance.
+% SOURCE: the split builds are per configuration and not per shape, 13-14 s from unchanged source
+% (Section~\ref{subsec:split}); planning and composing are per shape, 63-206 ms and 56-148 ms on Llama-3.2-1B and
+% 0.3-1.1 s and 143-368 ms on Qwen3-4B (Section~\ref{subsec:setup}); the decode design is one build per
+% 32,768-token window, with the position setting trip counts at runtime (figs/data/decode-1b.json, windows 32768).
+% DECISION: stated as a condition, not a boundary, and the compiler claim is argued rather than demonstrated: no
+% pass in our trees composes across operators, so the sentence says "could" and names no gain.
+
 % VALUE: one closing paragraph: concurrency is free in the hardware and rationed by false dependences at two
 % granularities; what the three passes recover and at what cost to the stack; what the measurements leave on the
 % table. No outlook, which the transfer argument above carries.
