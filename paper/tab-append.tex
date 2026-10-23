@@ -7,15 +7,15 @@
 % reading). Baseline = the shipped program with attention's columns alternated (shipar), at its own faster split
 % over the splits measured for that model; composed = the composer at its own faster split; bound = the composed
 % arm's measurement divided by the B2 ratio the scorer recorded, so it is the bound at the composed schedule's
-% split and not the smallest bound over splits that Section 5.7's gap analysis uses.
+% split and not the smallest bound over splits that the gap fraction of Section~\ref{subsec:bound-eval} uses.
 % DECISION: the shipped arm without the hand alternation is not a column. It differs from the baseline by under
 % 0.1% in eleven of these twelve cells, because the composer's split is S4 on nine of them and on S4 attention
 % already has two segments per column, so alternating changes nothing. The one exception, Llama-3.1-8B at
-% 2,048 + 4,096, is stated in the text.
+% 2,048 + 4,096, is stated in the caption (the body cites it only through the gain range).
 % DECISION: the model is a spanning row rather than a column, so the table fits one column at \small; a
 % full-width table* for twelve short rows would cost more page than the phase is worth.
 \begin{table}[t]
-\caption{Time from a tool result to the first new token, on appends of $N$ tokens to a cached context of $L$. Each arm is at its own faster split, and $S_k$ is the split the composed schedule takes, $k$ being attention's columns. The baseline is the shipped program with attention's two columns alternated by hand. The bound comes from the same per-operator probes, at the composed schedule's split.}
+\caption{Time from a tool result to the first new token, on appends of $N$ tokens to a cached context of $L$. Each arm is at its own faster split, and $S_k$ is the split the composed schedule takes, $k$ being attention's columns. The baseline is the existing program with attention's two columns alternated by hand, which matches the existing program within 0.1\% except on Llama-3.1-8B at $2{,}048 + 4{,}096$, where the existing program takes $1.04\times$ as long. The bound comes from the same per-operator probes, at the composed schedule's split.}
 \label{tab:append}
 \vskip 0.1in
 \centering
