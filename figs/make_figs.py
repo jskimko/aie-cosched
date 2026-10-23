@@ -442,51 +442,6 @@ def fig_schedules():
     plt.close(fig)
 
 
-def fig_stalls():
-    """Per compute tile, the share of the run its core stalled on a lock, before and after our passes.
-
-    From the tiles' own performance counters, armed through the command stream and read once per run: (a, b) the
-    existing and the composed prefill of Llama-3.2-1B, 2,048 tokens, default split; (c, d) its decode before and
-    after the loop pass, 64 tokens at a 16,384-token context. Tiles the design leaves unused are blank."""
-    panels = (("prefill-existing", "(a) Prefill, existing"), ("prefill-composed", "(b) Prefill, composed"),
-              ("decode-existing", "(c) Decode, existing"), ("decode-renamed", "(d) Decode, renamed"))
-    fig, axes = plt.subplots(2, 2, figsize=(COLUMN, 2.15))
-    cmap = plt.get_cmap("Greys")
-    for ax, (name, title) in zip(axes.flat, panels):
-        tot = json.loads((DATA / "stalls" / f"{name}.json").read_text())["totals"]
-        grid = [[None] * 8 for _ in range(4)]
-        for key, t in tot.items():
-            col, row = (int(v) for v in key.split(","))
-            if t["ACTIVE"] == 0:
-                continue  # a core the design never enables
-            grid[5 - row][col] = t["frac"]["LOCK_STALL"]
-        for r in range(4):
-            for c in range(8):
-                v = grid[r][c]
-                if v is None:
-                    ax.add_patch(plt.Rectangle((c - 0.5, r - 0.5), 1, 1, facecolor="white", edgecolor=GRAY,
-                                               linewidth=0.3))
-                    continue
-                ax.add_patch(plt.Rectangle((c - 0.5, r - 0.5), 1, 1, facecolor=cmap(0.08 + 0.8 * v),
-                                           edgecolor="white", linewidth=0.5))
-                ax.text(c, r, rf"{round(100 * v):d}", ha="center", va="center", fontsize=5.5,
-                        color="white" if v > 0.55 else INK)
-        ax.set_xlim(-0.5, 7.5)
-        ax.set_ylim(3.5, -0.5)
-        ax.set_aspect("equal")
-        ax.set_xticks(range(8), [str(c) for c in range(8)], fontsize=6)
-        ax.set_yticks([])
-        ax.tick_params(length=0, pad=1, top=False, right=False)
-        for side in ax.spines.values():
-            side.set_visible(False)
-        ax.set_title(title, fontsize=7, pad=2, loc="left")
-    fig.text(0.5, 0.0, r"Column; each cell is one compute tile, with its lock stall in \% of the run", ha="center",
-             va="bottom", fontsize=7)
-    fig.tight_layout(pad=0.2, h_pad=0.4, w_pad=0.6, rect=(0, 0.04, 1, 1))
-    fig.savefig(OUT / "stalls.pdf")
-    plt.close(fig)
-
-
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     fig_busy()
@@ -498,5 +453,4 @@ if __name__ == "__main__":
     fig_turns()
     fig_decode()
     fig_schedules()
-    fig_stalls()
     params_rows()
