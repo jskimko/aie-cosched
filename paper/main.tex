@@ -1,10 +1,16 @@
+%%%%%%%% mlsys 2025 EXAMPLE LATEX SUBMISSION FILE %%%%%%%%%%%%%%%%%
 % DECISION: MLSys'27 research track (author, 2026-10-15): the MLSys 2025 style files, which the MLSys 2027 call names; two columns, at most 10 pages before the references; double-blind.
 %% Template: mlsys2025.sty and mlsys2025.bst copied unchanged from media.mlsys.org/Conferences/MLSYS2025/mlsys2025style.zip (sha256 04e77090...ba3768ef); algorithm, algorithmic, and fancyhdr come from TeX Live.
+
 \documentclass{article}
 
+% Recommended, but optional, packages for figures and better typesetting:
 \usepackage{microtype}
 \usepackage{graphicx}
-\usepackage{booktabs}
+\usepackage{subfigure}
+\usepackage{booktabs} % for professional tables
+
+% Added for this paper: tables, math, colour, and URLs.
 \usepackage{array}
 \usepackage{amsmath}
 \usepackage{amssymb}
@@ -12,13 +18,21 @@
 \usepackage{xcolor}
 \usepackage{threeparttable}
 \usepackage[hyphens]{url}
-\usepackage[hidelinks]{hyperref}
 
-%% The template's recommended pairing of hyperref and algorithmic.
+% hyperref makes hyperlinks in the resulting PDF.
+% If your build breaks (sometimes temporarily if a hyperlink spans a page)
+% please comment out the following usepackage line and replace
+% \usepackage{mlsys2025} with \usepackage[nohyperref]{mlsys2025} above.
+\usepackage{hyperref}
+
+% Attempt to make hyperref and algorithmic work together better:
 \newcommand{\theHalgorithm}{\arabic{algorithm}}
 
-%% The review version; the camera-ready version passes [accepted].
+% Use the following line for the initial blind version submitted for review:
 \usepackage{mlsys2025}
+
+% If accepted, instead use the following line for the camera-ready submission:
+% \usepackage[accepted]{mlsys2025}
 
 % Placeholders: \E marks a value or passage still owed; \figph stands in for a figure not yet drawn.
 \newcommand{\E}[1]{\textcolor{red}{$\langle$#1$\rangle$}}
@@ -32,6 +46,8 @@
 
 \hyphenation{tool-chain}
 
+% The \mlsystitle you define below is probably too long as a header.
+% Therefore, a short form for the running title is supplied here:
 % VALUE: the acronym is recoverable from the subtitle word for word (OPerator Concurrency from Command ORDer),
 % and the subtitle states the paper's thesis: concurrency follows from the order of the commands.
 % DECISION: settled by the author with three converging reviews (venue fit, durability in use, accuracy).
@@ -62,19 +78,44 @@
 \twocolumn[
 \mlsystitle{OPCORD: Recovering Operator Concurrency from Command Order on AMD AI Engines}
 
-%% The style file omits the author block in the review version.
+% It is OKAY to include author information, even for blind
+% submissions: the style file will automatically remove it for you
+% unless you've provided the [accepted] option to the mlsys2025
+% package.
+
+% List of affiliations: The first argument should be a (short)
+% identifier you will use later to specify author affiliations
+% Academic affiliations should list Department, University, City, Region, Country
+% Industry affiliations should list Company, City, Region, Country
+
+% You can specify symbols, otherwise they are numbered in order.
+% Ideally, you should not use this facility. Affiliations will be numbered
+% in order of appearance and this is the preferred way.
 \begin{mlsysauthorlist}
 \mlsysauthor{Anonymous Authors}{anon}
 \end{mlsysauthorlist}
+
 \mlsysaffiliation{anon}{Anonymous Institution}
+
 \mlsyscorrespondingauthor{Anonymous Authors}{anonymous@anonymous.org}
 
+% You may provide any keywords that you
+% find helpful for describing your paper; these are used to populate
+% the "keywords" metadata in the PDF but will not be shown in the document
 \mlsyskeywords{AMD AI Engine, XDNA 2, LLM inference, command processor, scheduling}
 
 \vskip 0.3in
 
 \input{0-abstract}
 ]
+
+% this must go after the closing bracket ] following \twocolumn[ ...
+
+% This command actually creates the footnote in the first column
+% listing the affiliations and the copyright notice.
+% The command takes one argument, which is text to display at the start of the footnote.
+% The \mlsysEqualContribution command is standard text for equal contribution.
+% Remove it (just {}) if you do not need this facility.
 
 \printAffiliationsAndNotice{}
 
@@ -91,6 +132,28 @@
 \bibliography{refs}
 \bibliographystyle{mlsys2025}
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SUPPLEMENTAL CONTENT AS APPENDIX AFTER REFERENCES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \input{11-ai-disclosure}
 
+\appendix
+\input{appendix-body}
+
 \end{document}
+
+
+% This document was modified from the file originally made available by
+% Pat Langley and Andrea Danyluk for ICML-2K. This version was created
+% by Iain Murray in 2018. It was modified from a version from Dan Roy in
+% 2017, which was based on a version from Lise Getoor and Tobias
+% Scheffer, which was slightly modified from the 2010 version by
+% Thorsten Joachims & Johannes Fuernkranz, slightly modified from the
+% 2009 version by Kiri Wagstaff and Sam Roweis's 2008 version, which is
+% slightly modified from Prasad Tadepalli's 2007 version which is a
+% lightly changed version of the previous year's version by Andrew
+% Moore, which was in turn edited from those of Kristian Kersting and
+% Codrina Lauth. Alex Smola contributed to the algorithmic style files.
