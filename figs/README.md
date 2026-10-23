@@ -24,6 +24,14 @@ its row. The first five are also present at `a0ee2edf44e04455695f11b2d597ca930d7
 | `decode-1b.json` | `decode-rename/gate-R/1b-2026-10-21/gate-1b.json` | `a6bc94b6` | Llama-3.2-1B decode per token at six context lengths, shipped against the renamed loop |
 | `decode-qwen.json` | `decode-rename/gate-R/qwen-2026-10-21/gate-qwen.json` | `455740b1` | the same for Qwen3-4B, at four context lengths |
 
+The four files in `data/stalls/` are byte copies from `amd-npu` commit `8cb1d1ef` (batch3, 2026-10-23), under
+`long-context/batch3-2026-10-23/`: `tc-prefill/scratch_0_2048-ship.json` → `prefill-existing.json`,
+`tc-prefill/scratch_0_2048-comp.json` → `prefill-composed.json`, `tc-decode/tc/1b-off.json` → `decode-existing.json`, and
+`tc-decode/tc/1b-on.json` → `decode-renamed.json`. Each holds, per compute tile, the core's performance-counter totals
+(TRUE, ACTIVE, LOCK_STALL, MEMORY_STALL) over one armed run and their fractions of the core timer; the decode files count
+64 greedy tokens at positions 16,376 onward over an unseeded cache, which leaves the work, and so the stall shape, as in a
+real-context decode.
+
 Four further files are not byte copies but extracts, each recording its own source in an `about` and a
 `source` field, which is the provenance to trust over this table:
 
