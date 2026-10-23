@@ -1,48 +1,5 @@
-\section{Discussion and Conclusion}
+\section{Conclusion}
 \label{sec:conclusion}
-
-% MERGED from the former discussion section
-% VALUE: transferable insights only, each a possibility under its condition and tied to a measured result: an in-order issuer rations concurrency so its order is the schedule and packing yields little of it; the faster partition may change with the regime, so evaluations of prompts from scratch only may choose the wrong one; probes may rank configurations reliably before they run; once ordered, the bound may move from the issuer to the groups; a false dependence inside an operator is out of reach of reordering but not of renaming; on agent turns, gains measured from scratch may misstate end-to-end gains
-Although we evaluate one NPU, our findings rest on properties that other spatial accelerators may share.
-Where an in-order issuer mediates the concurrency of an array, its instruction order may act as the schedule, so packing work into fewer dispatches may yield little concurrency, and a second queue or a completion signal per group of columns could remove the rationing in hardware (Sections~\ref{subsec:semantics} and~\ref{subsec:ablation}).
-Where operators are partitioned spatially, the faster partition may change between computing a prompt from scratch and appending to a cached context, so an evaluation of prompts computed from scratch alone could choose the partition that is slower for agents (Section~\ref{subsec:ablation}).
-Where issue returns at once and waits block, probes of each operator alone may rank configurations reliably even where they misprice them, so a configuration can be chosen before it runs (Section~\ref{subsec:accuracy}).
-Once the issue order is right, the binding term may move from the issuer to the groups' own busy time, so further gains could come from kernels and from the balance of work between groups rather than from scheduling (Section~\ref{subsec:bound-eval}).
-Where an operator reuses one buffer across the iterations of a loop, reordering issue across operators cannot reach the resulting wait, whereas renaming the buffer inside the operator could (Section~\ref{subsec:decode-eval}).
-Finally, where agents append to long contexts, prefill becomes bound by attention and decode by the KV cache, so gains measured on prompts computed from scratch may misstate what an agent's turn gains (Section~\ref{subsec:turns}).
-% DECISION: each sentence is re-checked against its section's result at the results freeze; a sentence whose result does not hold is dropped (vault paper-cosched-plan, section 6).
-
-% The former limits paragraph is distributed to the points it qualifies: the passes' scope to the passes, the
-% host state to the turn result, the reference-point caveat, the gates, the composition cost and the two failed
-% predictions to the evaluation, and the analysis's refusals to the analysis. Only the one-device limit, which
-% qualifies the transfer argument above, stays here.
-We measure one generation of one vendor's array, so the transfer above rests on the properties we name rather than on measurements elsewhere.
-
-GPUs once lost concurrency in the same way, where streams that shared one hardware work queue could wait on each other, and NVIDIA's Kepler GPUs added hardware queues that remove these false dependences~\citep{nvidia-kepler-tuning}.
-On XDNA~2, one in-order CP per hardware context leaves this job to the program, so the compiler owns concurrency across column groups, much as Rammer's compile-time schedules do on GPUs and IPUs~\citep{ma2020rammer}.
-This places XDNA~2 between GPUs, whose hardware decides overlap at run time, and statically timed machines such as the TSP, whose compiler fixes when every instruction executes~\citep{abts2020tsp}, because its program fixes the order of each engine's work but not its duration.
-A device that reads busy for 92--97\% of TTFT while only one column group works at a time shows why this ownership matters, since utilization measured per device hides the idle columns (Section~\ref{subsec:losses}).
-Other arrays whose engines run their programs in order, such as other AIE generations, may share this property, so the same analysis could apply where their streams can be read.
-% SOURCE: Kepler Tuning Guide section 1.4.2.2 (read 2026-10-21); device busy = summed isolated operator times less the dispatch floor, 92/95/97% of TTFT at 512/2k/4k (amd-npu e3acc8a, Figure busy), not a hardware counter.
-% DECISION: "the compiler owns concurrency on static hardware" is cited (Rammer, TSP) and kept as discussion, never a contribution (outline v9 section 2, "Not contributions").
-
-% VALUE: answers the obvious question of why one of the three passes runs on the host while the other two are
-% compiler passes. The answer is a condition rather than a boundary: the two inside the compiler are the two whose
-% output does not depend on the prompt, and a deployment whose shapes are known could emit the composed stream
-% ahead of the run as well.
-Where this work would move into the compiler is decided by when the shapes are known.
-Two of our three passes already run there, and they are exactly the two whose output does not depend on the prompt: the stream pass reorders the segments within one operator's stream, and the loop pass renames the buffers of decode attention, and one build of each serves every context length.
-The composer is the piece that runs at dispatch, and it is the piece whose plan is a function of the cached context and the appended tokens.
-Nothing in that plan requires a host.
-Planning a schedule and composing its commands are compile-time work in kind (Section~\ref{subsec:setup}), and a compiler given the shapes could emit the composed stream before the run, at the cost of one plan per shape rather than one build per shape.
-A deployment whose shapes are fixed therefore needs no dispatch-time planner, however large those shapes are, which is what a fixed chunk size secures~\citep{xu2025llmnpu}.
-An agent appends whatever its tools return to a context that grows each turn, so its shapes belong to the turn rather than to the deployment, and planning each one in a fraction of a second is what avoids enumerating them in advance.
-% SOURCE: the split builds are per configuration and not per shape, 13-14 s from unchanged source
-% (Section~\ref{subsec:split}); planning and composing are per shape, 63-206 ms and 56-148 ms on Llama-3.2-1B and
-% 0.3-1.1 s and 143-368 ms on Qwen3-4B (Section~\ref{subsec:setup}); the decode design is one build per
-% 32,768-token window, with the position setting trip counts at runtime (figs/data/decode-1b.json, windows 32768).
-% DECISION: stated as a condition, not a boundary, and the compiler claim is argued rather than demonstrated: no
-% pass in our trees composes across operators, so the sentence says "could" and names no gain.
 
 % VALUE: one closing paragraph: concurrency is provided by the hardware and rationed by false dependences at two
 % granularities; what the three passes recover and at what cost to the stack; what the measurements leave on the
