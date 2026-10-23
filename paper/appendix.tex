@@ -30,12 +30,12 @@
 % The body refers to these sections as Appendix A, B, ... since the appendix is uploaded as its own document.
 \renewcommand{\thesection}{\Alph{section}}
 
-\mlsystitlerunning{Appendix: One Command Processor, Many Columns}
+\mlsystitlerunning{Appendix: OPCORD}
 
 \begin{document}
 
 \twocolumn[
-\mlsystitle{Appendix: One Command Processor, Many Columns: Composing Concurrent Operators on AMD AI Engines}
+\mlsystitle{Appendix: OPCORD: Recovering Operator Concurrency from Command Order on AMD AI Engines}
 
 \begin{mlsysauthorlist}
 \mlsysauthor{Anonymous Authors}{anon}
@@ -56,7 +56,7 @@
 % VALUE: the one disclosure in the paper that a reviewer should be able to audit in full: the attribution rule was
 % settled after the capture, the earlier rule labels the same capture differently, and the evidence that the later
 % rule is the physically right one comes from waits and argument slots rather than from the rule itself
-Section~4 of the paper attributes each issue in a recorded command stream to the column group whose compute tiles its
+Section~3.4 of the paper attributes each issue in a recorded command stream to the column group whose compute tiles its
 data reaches, rather than to the column the instruction addresses. This appendix states how that rule was chosen,
 because it was settled after the capture it is applied to and the earlier rule gives a different label.
 
@@ -72,12 +72,13 @@ the attention column's own while carrying that slot's exact per-block pattern, w
 lockstep rather than GEMM work. The route itself is in the configuration, not in the control code.
 
 \textbf{The two labels.} Under the rule registered first, by addressed tile column, the capture is mixed, with 99.4\%
-of its transitions internal to a command. Under the rule the paper uses, where a command whose compute tiles all lie
-in one group takes that group for all its events, the capture has 70 transitions and every one sits at a command
-boundary, which is the serial label. We record plainly that the second rule was proposed after the capture and moves
-the outcome toward our claim, and that the first rule's compute-weighted share could not be computed as registered,
-because the shape decode it needs was never written; its bytes-only share is 0.912 and its bracket
-$[0.065, 0.912]$ straddles one half.
+of its transitions internal to a command. Under the rule the paper uses, where each issue takes the group whose compute
+tiles its data reaches by the configuration's routes, the capture has 70 transitions, 35 into attention and 35 out of it,
+and every one sits at a boundary between two commands, which is the serial label. We record plainly that the second
+rule was proposed after the capture and moves the outcome toward our claim: under the rule registered first, the
+compute-weighted share of the transitions of the overlapping kind is 0.776 (its bytes-only share 0.912), which is the
+majority-mixed label, so the serial prediction we registered was a miss under the registered instrument and a hit
+only under the rule chosen afterwards.
 
 \textbf{What a population check adds, and what it does not.} Over all 218 recorded streams, the columns that carry any
 instruction fall into four sets: 200 streams address only the GEMM columns, 8 address columns $\{0,3\}$ and 8 address
@@ -85,9 +86,9 @@ $\{6,7\}$, 1 addresses all eight, and 1 carries no instruction. In the capture i
 the GEMM columns, 28 are one image on $\{6,7\}$ and 7 the other on $\{0,3\}$, and the stream that addresses all eight
 is not dispatched. In every two-column stream the bulk of the instructions sit on the attention column, by 1{,}420
 against 384 in the largest case. This counts addressed columns and not the programs those instructions serve, so it
-corroborates the attribution rather than establishing it; and because the paper's rule reads the same addressed
-columns, the fact that the column set changes exactly 70 times is a re-derivation of that count under the same rule,
-not a second measurement of it.
+corroborates the attribution rather than establishing it; and because a rule that labels each command by the
+columns it addresses also gives 70, the fact that the column set changes exactly 70 times re-derives that count
+rather than measuring it a second time.
 
 \section{Other Round-Trip Populations}
 \label{app:roundtrip}
@@ -107,7 +108,7 @@ controls, a modified stream and a truncated one, which fail as designed.
 \label{app:flm}
 
 % VALUE: the inequalities behind the reference point, and an honest statement that we can price only part of the gap
-The comparison with the production engine in Section~7 is a reference point, not a like-for-like speedup. The two
+The comparison with the production engine in Section~5.2 is a reference point, not a like-for-like speedup. The two
 stacks differ in their kernels, their dequantization path, their tokenization, and the chunk size their prefill uses,
 and we hold the weights and the prompt fixed but not those.
 
@@ -115,19 +116,19 @@ and we hold the weights and the prompt fixed but not those.
 fixed: 146 commands, 64 configuration switches, 12 module and kernel constructions and 226 runs per request at both
 lengths. A separate dequantization pass is fixed in count and in time, 16 run lists of four commands taking
 78--84\ms{} at both lengths, and one further pass takes 18--20\ms. That is about 100\ms{} of fixed device time, which
-is 40\% of the 248\ms{} difference at 2{,}048 tokens and 49\% of 208\ms{} at 4{,}096. Every command in the capture is
+is 40\% of the 248\ms{} difference from the shipped program at 2{,}048 tokens and 49\% of 208\ms{} at 4{,}096. Every command in the capture is
 serial, and the unit repeated per layer is a dequantization, three matrix multiplications, an attention command and
 four more matrix multiplications.
 
 \textbf{Where the difference goes.} Recording both stacks the same way, by the time each command is outstanding on
 the device and the time the host spends with nothing outstanding, accounts for the whole of the difference at a
-4{,}096-token prompt. Of 194\ms{}, the largest part is host time: the production engine spends 318\ms{} with no command
+4{,}096-token prompt, where the difference from the shipped program with attention alternated was 194\ms{} on the days of the two recordings. Of those 194\ms{}, the largest part is host time: the production engine spends 318\ms{} with no command
 on the device against our 96\ms. Its fixed passes account for a further 102\ms. Its matrix work runs 65\ms{} longer
 than ours. Against those, its attention runs 196\ms{} \emph{faster} than ours, which is the one place the hand-tuned
 engine is ahead of the design we rewrite, and which is why the difference is not larger.
 
 Two limits on that accounting. The comparison is by command kind rather than by identical work: our matrix figure
-includes the output projection and the dequantization folded into each multiplication, which the engine pays
+includes the LM head and the dequantization folded into each multiplication, which the engine pays
 elsewhere. And the recording locates the host time without seeing into it, since the interposer observes the gaps
 between calls rather than what runs inside them, so the dominant term is host-side time we can place but not
 decompose. At a 2{,}048-token prompt we have no equivalent record of the open stack and attribute nothing.
@@ -156,11 +157,11 @@ as it stands, and none was re-run after its outcome was seen.
 
 % VALUE: the three disclosures that belong with the synthetic measurements, including the one hold whose bandwidth
 % bracket is missing and an observation the registration did not anticipate
-Three disclosures belong with Section~7's synthetic designs.
+Three disclosures belong with Section~5.4's synthetic designs.
 
 First, in the all-or-nothing design at the smallest level of core work, the repetitions of the depth-one baseline span
 193\% of their median, because that variant was the first opened in the hold; its median is the statistic the
-registration names, and every other spread in that design is between 0.4\% and 4.9\%.
+registration names, and the other spreads in that design are between 0.4\% and 4.9\% except three, of 34\% at the same level and 15\% and 14\% at the middle one.
 
 Second, the bandwidth cap probe did not run for that hold, because a relative output path was passed to a probe that
 changes directory first, so no cap reading brackets those measurements. It is not one of the output checks, all of
@@ -211,13 +212,13 @@ prefill we rewrite.
 
 % VALUE: the per-layer detail behind the body's statement that one configuration fails a reference check, with the
 % scope stated so that it cannot be read as either our build being broken or the stack being inaccurate
-Section~7 reports that we measure no turn on Gemma3-4B because the configuration failed a reference check before any
+Section~5.1 reports that we measure no turn on Gemma3-4B because the configuration failed a reference check before any
 run was timed. The check crossed two sources of keys and values, the module's own reference forward and the path the
 turn harness uses, with two decode paths, on a six-token prompt with nine greedy dispatches.
 
 Both reference-sourced arms reproduce the reference continuation exactly, and for either source the two decode paths
 give logits that agree bit for bit, so both decode paths and the seeding step are clean. Both arms sourced from the
-split path diverge at the fifth decoded token, with the same continuation the turn run produced. The keys and values
+split path diverge at the fifth decoded token, with the same continuation the turn run produced. The keys
 differ from the reference by 0.6--1.8\% in layers 0--9 and 5.0--9.1\% in layers 10--33, and the values by 0.8--4.9\% in
 layers 0--31 and by 6.8\% and 13.0\% in the last two. The divergence lands on a near tie: with the reference's keys and
 values the correct token leads by 0.875, and with the split path's the other leads by 0.25.

@@ -23,7 +23,7 @@ Every composed command here produces outputs bit-identical to those of the opera
 
 \textbf{Queued Commands.}
 % VALUE: the runtime gives no overlap across commands, and placing two operators in one command is itself neutral, so overlap must come from within a command
-Two commands queued on one hardware context, with no wait between them, take as long as one command that holds both streams in sequence, within 3\% on every pair (Figure~\ref{fig:pairs}).
+Two commands queued on one hardware context, with no wait between them, take as long as one command that holds both streams in sequence, within 3\% on each of the seven pairs where we queue them (Figure~\ref{fig:pairs}).
 Holding both streams in sequence in one command takes the sum of the two operators' times minus one dispatch floor, within 2\%, so placing two operators in one command is itself neutral.
 This is why packing several operators into one dispatch, which is standard practice for amortizing launch cost, as in CUDA Graphs~\citep{nvidia-cudagraphs}, XRT's run lists~\citep{xrt-repo}, and MLIR-AIR's multi-launch programs~\citep{wang2026mlirair}, removes dispatch cost on the NPU but creates no overlap.
 % SOURCE: queued / in-sequence = 1.007-1.029 on 7 pairs (amd-npu 17f7ec3 prefill-overlap/ovl4/, lab-prefill-overlap (5)b); in-sequence / (A + G - F) = 0.996-1.021 over 17 pair runs (ovl/, ovl2/ at 8f13e05 and ovl4/; report.txt H1 column).
@@ -69,7 +69,7 @@ We assume static control: the CP's stream is straight-line, since a synchronizat
 A dispatch at given runtime parameters then has one static set of operations, and a loop with data-dependent control is reported as such and left out of the analysis.
 A loop whose body holds nested control, or an access the analysis cannot classify, is likewise reported as unsupported and not analysed, which in the decode design applies to every loop outside attention.
 We also assume that the host follows static control, issuing commands in an order that depends on the LLM and the lengths of the context and the prompt rather than on data, and its own work enters as a measured cost.
-Durations remain measured inputs, because the program fixes the order of each engine's work but not how long the work takes; each operator's duration enters as a probe measured once per configuration (Section~\ref{subsec:formulation}).
+Durations remain measured inputs, because the program fixes the order of each engine's work but not how long the work takes; each operator's duration enters as a probe measured once per configuration (Section~\ref{subsec:pricing}).
 % SOURCE: operations, locations, and static control (vault lab-cosched-passes (30), item 1); unsupported loops: 22 in the decode census build, all outside the attention herd (lab-cosched-passes (33), Limits); the host's static control (outline v9 section 1); the decode kernels' early return on the pad block branches on a runtime parameter, so it stays static per context length (lab-decode-long-context (10)).
 
 % MOVED 2026-10-22: the formal setup follows the semantics it rests on, as a Problem Definition section does
@@ -132,7 +132,7 @@ On one 128-token prefill chunk of Llama-3.2-1B, 1{,}468 records per run leave th
 For each command, they show when each column group's work was issued and how long each synchronization blocked the CP (Figure~\ref{fig:outstanding}).
 Between commands the timer advances at less than a tenth of its rate, so the records time intervals within a command, whereas the host's clock times the gaps between commands.
 Order inside a core's loop is invisible to the CP, so the decode loop's order rests on its removal (Section~\ref{subsec:rings}).
-% SOURCE: record-timer instruction TXN opcode 0x83 (12 bytes: header, size, 32-bit id; aiebu 48b69735 xaie_txn.h), XRT 2.25.0 ML Timeline (XDP 67165d6 clientDev/ml_timeline.cpp; Strix Halo listed as a client device with a debug buffer); feasibility check: split-1b-S4-L20480, 108 commands, 1,468 records per run, 5 runs with and 5 without, logits sha equal in all 10, summed start-to-wait with / without records 0.93-0.95, per-command fit of the timer 1,752-1,767 MHz against the 1,800 MHz H clock at the top DPM level (xdna-driver bc5dd96 npu4_dpm_clk_table), 110-125 M timer cycles per host second between commands (amd-npu b98e3044; vault lab-flm-streams (39), decisions log D13).
+% SOURCE: record-timer instruction TXN opcode 0x83 (12 bytes: header, size, 32-bit id; aiebu 48b69735 xaie_txn.h), XRT 2.25.0 ML Timeline (XDP 67165d6 clientDev/ml_timeline.cpp; Strix Halo listed as a client device with a debug buffer); feasibility check: split-1b-S4-L20480, 108 commands, 1,468 records per run, 5 runs with and 5 without, logits sha equal in all 10, summed start-to-wait with / without records 0.93-0.95, per-command fit of the timer 1,752-1,767 MHz against the 1,800 MHz H clock at the top DPM level (xdna-driver bc5dd96 npu4_dpm_clk_table), 110-125 M timer cycles per host second between commands (amd-npu b98e3044; vault lab-decode-long-context (39), decisions log D13).
 % DECISION: T-rec was withdrawn by the author (outline v9 revision 31, D13); recovery is the method in every verb row, and the timer records are a figure that governs no verb.
 
 \subsection{Closed Binaries}
@@ -203,7 +203,7 @@ Table~\ref{tab:grid} records what we found by reading designs. To ask how far a 
 At stream granularity the census confirms no instance: the frozen pass proposes no candidate reordering on any of the 277 streams, so there is nothing for the device to confirm, and the count is zero before any run.
 That zero is a property of the pass and its registered rules, not a statement that the streams hold no such dependence.
 Its largest cause is the rule by which the pass groups columns into lanes: columns that patch a common argument are treated as one lane, which makes 199 of the streams single-lane, so no reordering across their columns is ever proposed, although in each of them at least one column's issue sits behind waits that the same rule assigns to other columns.
-Of the remainder, 61 streams issue nothing after their first wait, so any order dependence lies between commands rather than inside one, and 16 reuse buffer descriptors in a way that makes the move illegal.
+Of the remainder, 61 streams issue nothing after their first wait, so any order dependence lies between commands rather than inside one, 16 reuse buffer descriptors in a way that makes the move illegal, and one carries no instructions.
 A separate characterization, which proposes reorderings without requiring that they pay, accepts at least one on 193 of the 218 production streams, each worth a factor of about 1.00, and none on IRON's, where queue room cannot be proved from the stream alone.
 We did not run the corresponding census at loop granularity, and by its own design that census could only ever report instances found, never their absence.
 % TODO (re-run): restore only if the final census again lacks a pre-committed candidate count. Development-phase
@@ -295,7 +295,7 @@ Which test applies therefore follows from the granularity of Table~\ref{tab:grid
 Both give the same necessary condition on a set $S$ of removals: unless $S$ cuts every path or cycle that attains the maximum, one of them survives with its length unchanged, so the phase is still bounded by it and $S$ gains nothing.
 The condition is necessary and not sufficient, for two reasons that this machine supplies.
 After a cut, the next longest path or cycle bounds what remains, so the gain is what separates them rather than the whole of $O(S)$.
-And the groups share the DRAM read cap, so a set that does cut every critical path can still gain nothing when that cap binds, which Section~\ref{subsec:tests} reports for a model whose composed prefill already reads at 93--96\% of it.
+And the groups share the DRAM read cap, so a set that does cut every critical path can still gain nothing when that cap binds, which Section~\ref{subsec:bound-eval} reports for a model whose composed prefill already reads at 93--96\% of it.
 % VALUE: the test says which candidate sets cannot pay, from the graph alone, and says nothing about how much a set that can pay is worth; the magnitude needs the durations and the capacity, which the event model supplies
 We therefore use the condition as a test of which candidate sets cannot pay, and leave the magnitude to the event model of Section~\ref{subsec:pricing}.
 % SOURCE: the acyclic condition is the minimum cut of a critical subnetwork in project crashing (Kelley 1961; Fulkerson 1961), the cyclic one the iteration bound and maximum cycle mean (Ghamarian 2006; Stuijk 2008); both are cited, never claimed (Section~\ref{sec:related}).
@@ -306,8 +306,8 @@ What the ordering case adds is the typed resources: a removal frees work onto a 
 % VALUE: the DRAM cap makes the allowed overlap depend on which group holds the critical path: co-running costs a bandwidth-bound group a fixed fraction of its partner's duration and a compute-bound group almost nothing, so one regime prices a removal lower than the other
 How much overlap the DRAM read rate allows depends on which group holds the critical path.
 We measure this on pairs of one attention operator and one GEMM, issued in one command on disjoint columns.
-Where the GEMM holds the critical path and the pair reads 52.0--52.3~GB/s against a measured cap of 53.9--55.3~GB/s, co-running costs it 8.4--10.5\% of the attention operator's duration.
-Where attention holds the critical path, co-running costs a fixed 21~$\mu$s and does not grow with the GEMM's duration.
+Where the GEMM holds the critical path, on four pairs (five runs) reading 42.9--52.3~GB/s against a measured cap of 53.9--55.3~GB/s, co-running costs it 8.4--10.5\% of the attention operator's device time.
+Where attention holds the critical path, co-running costs at most 15~$\mu$s on the five pairs we measure and does not grow with the GEMM's duration.
 Two operators of equal duration therefore overlap to within $1.81$--$1.84\times$ of the longer one across those penalties in the first case, and $2.00\times$ in the second.
 Per-command read rates during a whole prefill identify the two regimes directly: on Llama-3.2-1B at 4{,}096 tokens, commands that carry only GEMMs read 50.0~GB/s at the median, which is 90--93\% of the cap, whereas commands that carry only attention read 8.3~GB/s, about 15\% of it.
 Commands that carry both read 48.0~GB/s, so the GEMM remains the operator near the cap.
@@ -410,6 +410,6 @@ Four predictions test the event model: which split is faster at each configurati
 Two test the bound: that no measured gain exceeds the bound computed for it, and that the composed schedule stays within a stated distance of the bound.
 One tests the renaming of the decode loop, as a band on the per-token gain at two context lengths rather than a point.
 One tests the set property directly, on designs written to hold two name dependences at a known position: that a removal off the binding cycle is worth nothing at every level of core work, with that outcome, and not a gain, stated as the prediction.
-Section~\ref{sec:eval} reports each outcome with its counts, including the two that failed and the direction of each failure.
+Section~\ref{sec:eval} reports each outcome with its counts, including the three that failed and the direction of each failure.
 % DECISION: the outcomes and the verbs they allow follow outline v9 section 3's rows; a test not completed is reported as its least favourable outcome.
 % SOURCE: the inventory is the set actually scored: the event model's four (Section 5.2, E1-E4, with E4 failed), the bound's two (Section 5.7, the 33-run check held and the 1.30x range failed on 5 of 12), the decode band (Section 5.5, both cells in band on Llama-3.1-8B), and the synthetic certificates (Section 5.3, held at two of three work levels). Nothing else in the paper is registered, and this list is re-checked against the scores at the results freeze.

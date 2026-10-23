@@ -10,8 +10,9 @@ sh paper/figs.sh
 
 ## Where the data comes from
 
-Every file in `data/` is a byte copy from the measurement repository `amd-npu` at
-`a0ee2edf44e04455695f11b2d597ca930d7ce35a` (tag `composer-v1.1`). Each is unchanged from the commit that first added it:
+The files in this table are byte copies from the measurement repository `amd-npu`, each unchanged from the commit named in
+its row. The first five are also present at `a0ee2edf44e04455695f11b2d597ca930d7ce35a` (tag `composer-v1.1`); the two
+`decode-*.json` files postdate that tag and exist only from their own commits (`a6bc94b6`, `455740b1`):
 
 | `data/` | source path | first committed | what it is |
 |---|---|---|---|
