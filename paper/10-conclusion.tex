@@ -44,12 +44,12 @@ An agent appends whatever its tools return to a context that grows each turn, so
 % DECISION: stated as a condition, not a boundary, and the compiler claim is argued rather than demonstrated: no
 % pass in our trees composes across operators, so the sentence says "could" and names no gain.
 
-% VALUE: one closing paragraph: concurrency is free in the hardware and rationed by false dependences at two
+% VALUE: one closing paragraph: concurrency is provided by the hardware and rationed by false dependences at two
 % granularities; what the three passes recover and at what cost to the stack; what the measurements leave on the
 % table. No outlook, which the transfer argument above carries.
 % DECISION: the closing numbers repeat only what Sections 3 and 5 state; the two residual terms are the ones the
 % bound analysis names (the groups' own busy time, and the unhidden CP and host residual), not a wish list.
-Concurrency on a spatial array is free in the hardware and rationed by false dependences: at the one in-order command processor that issues every column group's work, and inside the loops of a single operator.
-Both kinds are textbook order and name dependences, and both survive in designs that an expert has tuned, because the quantity a developer can compute on this device reads busy and because removing any proper subset of the waits that lie on one cycle changes nothing measurable.
+Concurrency on a spatial array is provided by the hardware and rationed by false dependences: at the one in-order command processor that issues every column group's work, and inside the loops of a single operator.
+Both kinds are textbook order and name dependences, and both survive in designs that an expert has tuned, where the quantity a developer can compute on this device reads busy and where, in decode attention, removing only some of the waits on one cycle changes the time by less than 1\%.
 Reading a design's order out of the instruction streams its stack has already emitted makes those waits addressable: each can be attributed to a class, priced from probes of each operator alone, and then removed by reordering issue or by renaming a loop's buffers, with the split of columns chosen for the regime.
 What OPCORD recovers is the concurrency the expert designs leave unused, bit-identically and with the kernels, driver, and firmware unchanged, and what it leaves is the column groups' own busy time, which the bound shows is what now binds, together with the host work that runs between commands.
