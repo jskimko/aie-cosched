@@ -110,8 +110,8 @@ The baseline is therefore not weaker at the split that flatters the result; it i
 
 \subsection{Synthetic Designs}
 \label{subsec:synthetic}
-% VALUE: three hand-written designs (not rewrites) check the textbook all-or-nothing condition on this device and fill the grid's two empty cells; each carries a certificate registered before it ran, that a removal off the binding cycle is worth nothing, and one certificate misses on the slow side at one work level, which is reported with its size
-Three hand-written designs, which are not rewrites of shipped designs, check the textbook condition of Section~\ref{sec:intro} on this device and fill the two cells of Table~\ref{tab:grid} that hold no instance in the designs we rewrite.
+% VALUE: three hand-written designs (not rewrites) check the textbook all-or-nothing condition on this device and fill the grid's two cells that hold no costly instance; each carries a certificate registered before it ran, that a removal off the binding cycle is worth nothing, and one certificate misses on the slow side at one work level, which is reported with its size
+Three hand-written designs, which are not rewrites of shipped designs, check the textbook condition of Section~\ref{sec:intro} on this device and fill the two cells of Table~\ref{tab:grid} that hold no instance costing time in the designs we rewrite.
 Each registered, before it ran, that a removal our analysis places off the binding cycle is worth $1.00 \pm 0.01$.
 
 The first puts one compute tile in a 2{,}048-iteration loop whose input and output each pass through an object FIFO, so that a FIFO of depth one closes a write-after-read cycle through the core and the two such edges lie on the same cycle.
@@ -119,7 +119,7 @@ At three levels of core work, no single removal gained more than 1.0\% and none 
 The registered band held at two of the three levels and missed at the third, where both single removals came out slower rather than unchanged, by 1.8\% and 1.2\%, which is 0.008 and 0.002 beyond the band's edge.
 The pair beat the better single by more than the band at every level.
 
-The other two designs fill the empty cells, so neither is empty by construction.
+The other two designs put a dependence on the critical path in the two cells where the designs we rewrite hold none that costs time, so neither cell is free of cost by construction.
 For a name dependence in the CP's stream, two operators on separate columns are issued over eight chunks with one shared buffer, which makes each chunk's producer wait for the previous chunk's consumer; a two-entry ring removes that wait and gains 1.3\%, which clears its registered threshold by 0.003 but is smaller than the 1.5--2.0\% spread between repetitions, so it demonstrates the class rather than a gain worth taking.
 For an order dependence inside a loop, a consumer holds its first acquire across a pair of elements, which is the hand edit of Section~\ref{subsec:ablation}; at buffer depth two that edge closes the producer--consumer cycle and removing it gains $2.00\times$, and at depth four the same removal is worth 0.999, because what binds there is each core's own per-element loop rather than the edge. That loop compiles to 38 instruction bundles per four elements at depth four against 12 at depth two, since the compiler unrolls it at both depths but software-pipelines it only at depth two, and the ratio of those counts accounts for the measured slowdown to within 2\%. The two orders therefore run the same loop at that depth, and the removal changes nothing because the loop, not the edge, sets the period.
 
