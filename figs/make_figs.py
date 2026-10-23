@@ -8,6 +8,7 @@ Outputs (into FIGS_OUT, default paper/fig):
   accuracy.pdf     predicted against measured TTFT, with the tolerance committed before the runs
   bound.pdf        distance to the lower bound per cell, measured and as predicted before the runs
   decode.pdf       decode time per token against the cached context, baseline against our loop pass
+  timeline.pdf     Figure 1: per column group, work outstanding and the CP blocked, existing against OPCORD
   schedules.pdf    TTFT by split for the three schedules, one panel per model
   params-rows.tex  rows of the event model's parameter table
 """
@@ -442,6 +443,39 @@ def fig_schedules():
     plt.close(fig)
 
 
+def fig_timeline():
+    """Figure 1: when each column group had work outstanding over one prefill, existing against OPCORD.
+
+    Llama-3.2-1B, a 4,096-token prompt, the median-TTFT run of each arm, from the CP's own record timers: the existing
+    program (attention's columns alternated) and the composed schedule. Intervals are merged at 1 ms."""
+    d = json.loads((DATA / "fig1-intervals-1b.json").read_text())["arms"]
+    arms = (("shipar", "Existing program"), ("comp", "OPCORD"))
+    rows = (("A", "Attention", ORANGE), ("G", "GEMMs", BLUE))
+    fig, axes = plt.subplots(2, 1, figsize=(COLUMN, 1.25), sharex=True)
+    base = d["shipar"]["ttft_ms"]
+    for ax, (arm, name) in zip(axes, arms):
+        a = d[arm]
+        for y, (g, label, color) in zip((2, 1), rows):
+            ax.broken_barh([(s, e - s) for s, e in a["outstanding_1ms"][g]], (y - 0.32, 0.64), facecolors=color,
+                           edgecolor="none")
+        ttft = a["ttft_ms"]
+        ax.axvline(ttft, color="black", linewidth=0.6, linestyle=(0, (4, 2)))
+        gain = "" if arm == "shipar" else rf", ${base / ttft:.2f}\times$"
+        ax.text(ttft + 15, 1.5, rf"TTFT {ttft / 1000:.2f}\,s{gain}", ha="left", va="center", fontsize=6.5)
+        ax.set_title(name, fontsize=7, pad=2, loc="left")
+        ax.set_yticks([2, 1], ["Attention", "GEMMs"], fontsize=6.5)
+        ax.set_ylim(0.45, 2.55)
+        ax.tick_params(axis="y", length=0, left=False, right=False)
+        for side in ("top", "right", "left"):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(axis="x", top=False)
+    axes[-1].set_xlim(0, 1700)
+    axes[-1].set_xlabel("Time into the prefill (ms)", labelpad=1)
+    fig.tight_layout(pad=0.2, h_pad=0.3)
+    fig.savefig(OUT / "timeline.pdf")
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     fig_busy()
@@ -453,4 +487,5 @@ if __name__ == "__main__":
     fig_turns()
     fig_decode()
     fig_schedules()
+    fig_timeline()
     params_rows()

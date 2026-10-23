@@ -24,6 +24,11 @@ its row. The first five are also present at `a0ee2edf44e04455695f11b2d597ca930d7
 | `decode-1b.json` | `decode-rename/gate-R/1b-2026-10-21/gate-1b.json` | `a6bc94b6` | Llama-3.2-1B decode per token at six context lengths, shipped against the renamed loop |
 | `decode-qwen.json` | `decode-rename/gate-R/qwen-2026-10-21/gate-qwen.json` | `455740b1` | the same for Qwen3-4B, at four context lengths |
 
+`data/fig1-intervals-1b.json` is a byte copy of `amd-npu` `4170c8ce` `prefill-overlap/ml-timeline/hold-2/report/fig1-intervals-1b.json`:
+per column group, the intervals in which its work was outstanding and the CP's blocked intervals, for the median-TTFT run of the
+existing program (attention alternated) and of the composed schedule, Llama-3.2-1B, 4,096-token prefill; its sums reproduce
+`timeline-1b.json`'s per-group values for those runs (the file's `check`).
+
 Four further files are not byte copies but extracts, each recording its own source in an `about` and a
 `source` field, which is the provenance to trust over this table:
 
