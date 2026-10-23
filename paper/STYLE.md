@@ -473,7 +473,10 @@ FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`, the IEEE templa
   dispatch sequence, runtime sequences and PDIs) without a timing trace, and each removal is bounded before it is built.
   The verb the title and abstract use for C1 (recovers / bounds / predicts / attributes) is set by outline v9 §3's rows, never
   chosen by the writer. C2 is what the analysis finds (the census, the production stream, the grid's instances); C3 is
-  end-to-end worth. The passes and checkers are the implementation, not a contribution. ReGate, Daydream, GPA, LATTICE and
+  end-to-end worth. The passes and checkers are the implementation, not a contribution. *Superseded 2026-10-23 for the
+  contribution list* (author): three items, namely the method (scheduling from the emitted streams, waits classed,
+  legality from the streams alone), the event model and bound, and the design and implementation of OPCORD as the system
+  carrying them (MLSys practice, vault paper-cosched-contributions-review); no evaluation item, no finding item. ReGate, Daydream, GPA, LATTICE and
   SDF critical-cycle analysis are argued by name.
 - **Framing** (author's brief, 2026-10-14; thesis re-cut 2026-10-15): method-first; the composer works on unchanged
   kernels, and the one change inside a design (decode attention's double buffer) is the same rule applied by hand and
