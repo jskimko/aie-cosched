@@ -179,7 +179,7 @@ We find false dependences at two granularities, in the CP's instruction stream a
         \toprule
         & Order & Name \\
         \midrule
-        Stream & column groups take turns in prefill; attention's two columns take turns & none found; realizable (\S\ref{subsec:synthetic}) \\
+        Stream & column groups take turns in prefill; attention's two columns take turns & descriptor, control-register, and queue-slot reuse, off every measured longest path; on it only in a design we write (\S\ref{subsec:synthetic}) \\
         Loop & none found; realizable (\S\ref{subsec:synthetic}) & decode attention's keys, values, and scores, each in one buffer \\
         \bottomrule
     \end{tabular*}
@@ -187,11 +187,12 @@ We find false dependences at two granularities, in the CP's instruction stream a
 
 % VALUE: the instances per cell, and why two cells are empty in the existing designs; DMA-only instances stay visible through an engine label
 Table~\ref{tab:grid} places each instance we know of in the MLIR-AIR designs, which are the designs our passes rewrite.
-Two of the four cells hold no instance in those designs, and neither is empty by construction: we write a design for each and measure the behaviour its class predicts (Section~\ref{subsec:synthetic}), so those cells are empty in what these stacks happen to emit rather than in what the platform allows.
+Two of the four cells hold no instance that costs time in those designs, and neither is empty by construction: we write a design for each that puts its class on the critical path and measure the behaviour the class predicts (Section~\ref{subsec:synthetic}), so those cells are empty of cost in what these stacks happen to emit rather than in what the platform allows.
 In its prefill, order dependences in the instruction stream hold back one column group behind another and one column of an operator behind the other, and the one captured prefill of the production engine shares the first of these.
 In its decode, the attention loop holds name dependences on its keys, its values, and the one buffer through which its two cores pass scores, while its running maximum and accumulator carry true dependences across blocks.
 The census extends the same reading to IRON and to the production engine's streams, which no instance in this table covers (Section~\ref{subsec:census}).
-No name dependence appears in the stream, because the existing prefill already gives each chunk its own buffers, and rings added nothing beyond reordering there, within 0.1\%.
+Name dependences do appear in the stream, on the reuse of a channel's buffer descriptors, control registers, and task-queue slots and, in the fused decode, on the next launch's runtime-parameter and lock writes; where task costs are measured, renaming every one of them cuts no longest path, and the existing prefill already gives each chunk its own data buffers, so rings added nothing beyond reordering, within 0.1\%.
+% SOURCE: aie-cosched 93f491b, mlir-aie f9ad95dc02f (lab-cosched-passes (62), P7c; lit 36/36): cost-free over 792 analysed streams, NAME edges on 543/543 MLIR-AIR streams (30,198 edges, 25,016 able to lie on a blocking path), 209/218 production-engine streams (272,582, all able), 6/31 IRON (504); kinds descriptor and control-register everywhere, configuration writes on the fused decode only (7,244), queue-slot reuse (104 MLIR-AIR, 27 IRON), dispatch end; with measured task costs (the S4 prefill cell, 34 streams) 246 end-kind NAME edges lie on a longest path but removing every NAME edge leaves every stream's length unchanged (34/34). Corrected 2026-10-23: the earlier text said no name dependence appears in the stream.
 No order dependence is known in decode attention's loop, where acquires that cover a pair of blocks arose only in a hand edit's unrolled loop, and loops with nested control are not analysed, so the census tests this cell.
 The loop row carries an engine label, so an instance confined to a DMA engine stays visible.
 % SOURCE: the grid and its instances (vault paper-cosched-direction-converged, Clarification (xiii), ruled on lab-cosched-passes (30)); the score buffer shared_l10 is name x loop in the existing build; the pair-level order edge of the hand edit's arms (b) and (c) came from the pair unroll (lab-cosched-passes (30), item 5; outline v9 section 1); rings beyond reorder in the stream: R-ship = pair within 0.1% (amd-npu 71081d1).
