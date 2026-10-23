@@ -41,12 +41,20 @@
 % it narrows the line below "AMD AI Engines", which is the architecture family the legality conditions are stated
 % over; because truncation eats the trailing scope first and would leave an unscoped claim; and because the draft's
 % own word for the setting is "client", with "edge" reserved for the models.
+% DECISION: the subtitle carries a verb. Without one it is a statement of subject, and a verbless subtitle was
+% judged to read as a measurement study, which is the worst misread available to this paper. "Recovering ...
+% concurrency" is the draft's own phrase (10-conclusion.tex: "what this recovers is the concurrency the expert
+% designs leave unused"), and the acronym still reads off the line, since OPCORD encodes OPerator Concurrency
+% and Command ORDer and never encoded the preposition.
+% VERIFY: "recovering X from Y" usually makes Y the source. The reading is safe only because "command order"
+% is a property rather than a container, so "from" is causal. If that does not hold, "through Command Order"
+% is unambiguously instrumental and costs nothing.
 \mlsystitlerunning{OPCORD}
 
 \begin{document}
 
 \twocolumn[
-\mlsystitle{OPCORD: Operator Concurrency from Command Order on AMD AI Engines}
+\mlsystitle{OPCORD: Recovering Operator Concurrency from Command Order on AMD AI Engines}
 
 %% The style file omits the author block in the review version.
 \begin{mlsysauthorlist}
