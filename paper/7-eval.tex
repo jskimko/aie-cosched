@@ -51,13 +51,20 @@ Because the DRAM read cap varies by up to 12\% between batches, every ratio comp
 
 % VALUE: OPCORD shortens prefill on every LLM against the alternated baseline, each side at its faster split, from scratch and on appends, with bit-identical outputs; the gain is smallest where a short append meets a long context, which points to the GEMM work the reorder can run beside attention
 OPCORD shortens prefill on all five LLMs, and decode and whole agent turns on Llama-3.2-1B and Qwen3-4B, with outputs bit-identical to the existing program's.
-Against the alternated baseline, OPCORD lowers TTFT by $1.14$--$1.46\times$ from scratch and by $1.19$--$1.51\times$ on appends to a cached context (Table~\ref{tab:append}).
+Against the fastest existing schedule we measured, OPCORD lowers TTFT by $1.14$--$1.46\times$ from scratch and by $1.17$--$1.51\times$ on appends to a cached context (Figure~\ref{fig:headline}, and Appendix~\ref{app:percell} for a second grid of appends).
 On every LLM the gain is smallest on the 2{,}048-token append to a 12{,}288-token context, whose new tokens bring the least GEMM work while attending to the most cached ones, which indicates that the reorder's gain follows the GEMM work it can run beside attention.
 % SOURCE: from scratch, each side on its own faster split against the alternated baseline: Llama-3.2-1B 1.25 / 1.45, Qwen3-4B 1.27 / 1.46 at 2,048 / 4,096 (vault lab-split-sweep (18), amd-npu ba9f6f8); Llama-3.1-8B 1.14 / 1.27 (lab-split-sweep (20)); Gemma3-4B 1.212 / 1.259 (lab-split-sweep (21)-(22), amd-npu 08a56cd; S4 rerun at 5 reps within 0.08%, lab-split-sweep (23), amd-npu e9e386e); LFM2-1.2B 1.145 / 1.215 against min(shipped S2, shipped + Ar S2, shipped S4, shipped S1) (lab-split-sweep (28), amd-npu e695d3dd). Range over the five LLMs 1.14-1.46.
 % SOURCE: appends, re-derived from amd-npu 78ec55b7 prefill-overlap/cp-predict/score-2026-10-21.json through Table append: gains 1.197-1.511 over the twelve cells, smallest per LLM at 12,288 + 2,048 (1B 1.205, Qwen3-4B 1.216, Gemma3-4B 1.197, 8B 1.364). LFM2-1.2B appends 1.217 / 1.194 at 4,096 + 4,096 / 16,384 + 4,096 against the same strongest base (lab-split-sweep (28)), with each append identical to a full prefill including the carried convolution state.
 % SOURCE: the split-sweep appends of the other four LLMs (4,096 + 4,096 and 16,384 + 4,096, against the same alternated baseline): 1B 1.46 / 1.33, Qwen3-4B 1.46 / 1.33, 8B 1.48 / 1.49, Gemma3-4B 1.291 / 1.172 (lab-split-sweep (18), (20), (21)-(23)); not quoted as a range because Table append is the fuller append record; Section 7.3 uses them per split.
 % DECISION: one range per regime. From scratch, the split sweep is the only record and covers all five LLMs; on appends, Table append (12 cells, four LLMs, three splits, three arms) is the fullest, and LFM2's two appends are named apart because they sit on the other grid.
-\input{tab-append}
+\begin{figure*}[t]
+    \centering
+    % VALUE: the headline at a glance: OPCORD shortens prefill on every LLM, from scratch and on appends, against the fastest existing schedule measured, with the split it runs on
+    \includegraphics{fig/headline.pdf}
+    \caption{TTFT speedup of OPCORD over the fastest existing schedule we measured for each LLM, the existing program with or without attention's columns alternated by hand on any measured split. Bars are ratios of medians over five runs, whiskers span the runs' range, and the label above each bar is the split OPCORD runs on.}
+    \label{fig:headline}
+\end{figure*}
+% SOURCE: figs/make_figs.py fig_headline over figs/data/headline.json, written by figs/headline_data.py from the split-sweep files at amd-npu ba9f6f8 (1B, Qwen3-4B), f336942b and f5a5f11 (8B), 08a56cd (Gemma3-4B), 838a2220 (LFM2-1.2B).
 
 % VALUE: FastFlowLM as an absolute reference: the composed schedule is below FastFlowLM in every configuration, and the existing program it rewrites is already close to it, so the gains are not measured against a slow baseline; not like for like
 For an absolute reference, the composed schedule's TTFT is $1.31$--$1.86\times$ below FastFlowLM's on the same weights across three LLMs, from scratch and on appends.
@@ -172,7 +179,7 @@ Llama-3.1-8B gains least from scratch, because its composed prefill already read
 \label{subsec:accuracy}
 
 % VALUE: the event model names the faster split in every case and orders every clearly separated pair; it prices the composed schedule within a few percent, always slightly high, and the baselines slightly low, so it understates gains; its value over interpolation is coverage: it prices, without running it, any configuration within each operator's probed range
-The event model names the faster split in all 36 cases, one per append configuration of Table~\ref{tab:append} and schedule, against 27 for the better rule that always answers with one split, and orders all 83 pairs of schedules whose times differ by at least 5\%.
+The event model names the faster split in all 36 cases, over twelve append configurations and three schedules, against 27 for the better rule that always answers with one split, and orders all 83 pairs of schedules whose times differ by at least 5\%.
 It prices the composed schedule at its chosen split within a median 2.15\% and a maximum 7.31\%, always slightly high, and the baselines a median 2.2\% low.
 % SOURCE: scorer cp_score.py 86ba24b6 unchanged, output amd-npu 78ec55b7 prefill-overlap/cp-predict/score-2026-10-21.json, holds fd6e6c7b committed before reading; re-derived from that file: E1 36/36, constant-rule patterns 27 and 25, 33/33 excluding near-ties; E2 83/83 at a 5% gap; E3 (the composer at the model's chosen split) median 2.146%, max 7.311% (Qwen3-4B 8k + 4k), every one an over-prediction (+0.04% to +7.3%); baseline arms under-predicted, median -2.2% shipped and -2.1% shipped + Ar over 33 each; interpolation 2.30% against 1.95% on its 10 cells; E4 measured - predicted = +0.085 / +0.118 / +0.057 / +0.018 / +0.090 / +0.037 / +0.048 / +0.042 / +0.030 / +0.006 / -0.001 / +0.053 (vault lab-split-sweep (27)).
 
@@ -199,7 +206,7 @@ On LFM2-1.2B, whose layers are not all attention, it names the faster split in 7
 \label{subsec:bound-eval}
 Once the order is right, a column group's busy time rather than the CP binds the lower bound, and which group binds flips with the workload.
 On Llama-3.2-1B and Qwen3-4B, the GEMMs bind from scratch at 2{,}048 tokens and attention on an append to 16{,}384, at every split, which is why the faster split moves from two attention columns to four (Section~\ref{subsec:split}).
-On the twelve appends of Table~\ref{tab:append}, the composed schedule lies $1.17$--$1.63\times$ above the bound, and none of the 33 runs that test the bound ran faster than it (Appendix~\ref{subsec:tests}).
+On these twelve appends, the composed schedule lies $1.17$--$1.63\times$ above the bound, and none of the 33 runs that test the bound ran faster than it (Appendix~\ref{subsec:tests}).
 Read as a gap, the schedule closes a median 65\% of the distance from the alternated baseline to the bound, and 34--76\% across these appends, most on the dense LLMs and least on Gemma3-4B, whose windowed attention leaves the GEMMs binding.
 What remains is the price of overlap under the DRAM read cap, 1.0--5.1\% of TTFT where the GEMMs bind, and the CP's and the host's work that the schedule does not hide.
 % SOURCE: computed in aie-cosched-paper-0 tmp/regime/cells.py over the 24 committed bound cells (2 models x 3 splits x 4 configurations, vault lab-split-sweep (8) / ch3-formulation G6): the binding term is the GEMMs in 12 cells and attention in 12; 1B at 2,048 from scratch the GEMM term rises 377 / 413 / 564 ms from S1 to S4, and on a 16,384 + 4,096 append attention falls 10,776 / 5,258 / 2,631 ms.

@@ -1,0 +1,401 @@
+{
+ "source": {
+  "Llama-3.2-1B": [
+   [
+    "ba9f6f8",
+    "llama32_1b_q4nx/w1/shipar-S2.json",
+    "S2"
+   ],
+   [
+    "ba9f6f8",
+    "llama32_1b_q4nx/w1/shipar-S4.json",
+    "S4"
+   ]
+  ],
+  "Qwen3-4B": [
+   [
+    "ba9f6f8",
+    "qwen3_4b_q4nx/w1/shipar-S2.json",
+    "S2"
+   ],
+   [
+    "ba9f6f8",
+    "qwen3_4b_q4nx/w1/shipar-S4.json",
+    "S4"
+   ]
+  ],
+  "Llama-3.1-8B": [
+   [
+    "f336942b",
+    "llama31_8b_q4nx/w1/shipar-S2.json",
+    "S2"
+   ],
+   [
+    "f336942b",
+    "llama31_8b_q4nx/w1/shipar-S4.json",
+    "S4"
+   ],
+   [
+    "f5a5f11",
+    "llama31_8b_q4nx/run-S4.json",
+    "S4"
+   ]
+  ],
+  "Gemma3-4B": [
+   [
+    "08a56cd",
+    "gemma3_4b_q4nx/run-S1.json",
+    "S1"
+   ],
+   [
+    "08a56cd",
+    "gemma3_4b_q4nx/run-S2.json",
+    "S2"
+   ],
+   [
+    "08a56cd",
+    "gemma3_4b_q4nx/run-S4.json",
+    "S4"
+   ],
+   [
+    "08a56cd",
+    "gemma3_4b_q4nx/shipar-S2.json",
+    "S2"
+   ]
+  ],
+  "LFM2-1.2B": [
+   [
+    "838a2220",
+    "lfm2_1_2b_q4nx/rerun-2026-10-22/run-S1.json",
+    "S1"
+   ],
+   [
+    "838a2220",
+    "lfm2_1_2b_q4nx/rerun-2026-10-22/run-S2.json",
+    "S2"
+   ],
+   [
+    "838a2220",
+    "lfm2_1_2b_q4nx/rerun-2026-10-22/run-S4.json",
+    "S4"
+   ],
+   [
+    "838a2220",
+    "lfm2_1_2b_q4nx/rerun-2026-10-22/shipar-S2.json",
+    "S2"
+   ]
+  ]
+ },
+ "cells": {
+  "Llama-3.2-1B": {
+   "scratch:0:2048": {
+    "existing_ms": 664.8467920022085,
+    "existing_arm": "shipar@S2",
+    "existing_commit": "ba9f6f8",
+    "opcord_ms": 531.9578349590302,
+    "opcord_arm": "comp@S2",
+    "opcord_commit": "ba9f6f8",
+    "ratio": 1.2498110720625313,
+    "ratio_lo": 1.24478084294941,
+    "ratio_hi": 1.253949058502356,
+    "reps": [
+     5,
+     5
+    ]
+   },
+   "scratch:0:4096": {
+    "existing_ms": 1606.9445790490136,
+    "existing_arm": "shipar@S2",
+    "existing_commit": "ba9f6f8",
+    "opcord_ms": 1111.5932909306139,
+    "opcord_arm": "comp@S2",
+    "opcord_commit": "ba9f6f8",
+    "ratio": 1.4456227760278195,
+    "ratio_lo": 1.442798244012919,
+    "ratio_hi": 1.4487438772311259,
+    "reps": [
+     5,
+     5
+    ]
+   },
+   "append:4096:4096": {
+    "existing_ms": 2191.400151932612,
+    "existing_arm": "shipar@S4",
+    "existing_commit": "ba9f6f8",
+    "opcord_ms": 1497.2890469944105,
+    "opcord_arm": "comp@S4",
+    "opcord_commit": "ba9f6f8",
+    "ratio": 1.4635785630914275,
+    "ratio_lo": 1.461071579265812,
+    "ratio_hi": 1.4664025852067422,
+    "reps": [
+     5,
+     5
+    ]
+   },
+   "append:16384:4096": {
+    "existing_ms": 3926.6427230322734,
+    "existing_arm": "shipar@S4",
+    "existing_commit": "ba9f6f8",
+    "opcord_ms": 2950.963216018863,
+    "opcord_arm": "comp@S4",
+    "opcord_commit": "ba9f6f8",
+    "ratio": 1.330630860363518,
+    "ratio_lo": 1.3041124663369905,
+    "ratio_hi": 1.3334700172365985,
+    "reps": [
+     5,
+     5
+    ]
+   }
+  },
+  "Qwen3-4B": {
+   "scratch:0:2048": {
+    "existing_ms": 2242.5621889997274,
+    "existing_arm": "shipar@S2",
+    "existing_commit": "ba9f6f8",
+    "opcord_ms": 1763.4187450166792,
+    "opcord_arm": "comp@S2",
+    "opcord_commit": "ba9f6f8",
+    "ratio": 1.2717127995475155,
+    "ratio_lo": 1.2702492290257046,
+    "ratio_hi": 1.2725704520476129,
+    "reps": [
+     5,
+     5
+    ]
+   },
+   "scratch:0:4096": {
+    "existing_ms": 5490.812807925977,
+    "existing_arm": "shipar@S2",
+    "existing_commit": "ba9f6f8",
+    "opcord_ms": 3761.1906899837777,
+    "opcord_arm": "comp@S2",
+    "opcord_commit": "ba9f6f8",
+    "ratio": 1.4598602571649084,
+    "ratio_lo": 1.4431100632848903,
+    "ratio_hi": 1.464138683488876,
+    "reps": [
+     5,
+     5
+    ]
+   },
+   "append:4096:4096": {
+    "existing_ms": 7635.277403052896,
+    "existing_arm": "shipar@S4",
+    "existing_commit": "ba9f6f8",
+    "opcord_ms": 5233.877127058804,
+    "opcord_arm": "comp@S4",
+    "opcord_commit": "ba9f6f8",
+    "ratio": 1.4588186191034194,
+    "ratio_lo": 1.4585126206035148,
+    "ratio_hi": 1.4595311063753456,
+    "reps": [
+     5,
+     5
+    ]
+   },
+   "append:16384:4096": {
+    "existing_ms": 13781.50000597816,
+    "existing_arm": "shipar@S4",
+    "existing_commit": "ba9f6f8",
+    "opcord_ms": 10343.51754898671,
+    "opcord_arm": "comp@S4",
+    "opcord_commit": "ba9f6f8",
+    "ratio": 1.3323803958091844,
+    "ratio_lo": 1.33227611569158,
+    "ratio_hi": 1.3330481149448863,
+    "reps": [
+     5,
+     5
+    ]
+   }
+  },
+  "Llama-3.1-8B": {
+   "scratch:0:2048": {
+    "existing_ms": 3455.1482590613887,
+    "existing_arm": "shipar@S2",
+    "existing_commit": "f336942b",
+    "opcord_ms": 3019.8271119734272,
+    "opcord_arm": "comp@S2",
+    "opcord_commit": "f336942b",
+    "ratio": 1.1441543276970858,
+    "ratio_lo": 1.143495132708189,
+    "ratio_hi": 1.1452081294400582,
+    "reps": [
+     5,
+     5
+    ]
+   },
+   "scratch:0:4096": {
+    "existing_ms": 7805.878825020045,
+    "existing_arm": "shipar@S2",
+    "existing_commit": "f336942b",
+    "opcord_ms": 6123.506428091787,
+    "opcord_arm": "comp@S2",
+    "opcord_commit": "f336942b",
+    "ratio": 1.2747400393360118,
+    "ratio_lo": 1.2725382061670507,
+    "ratio_hi": 1.2750206417853571,
+    "reps": [
+     5,
+     5
+    ]
+   },
+   "append:4096:4096": {
+    "existing_ms": 10909.020886581857,
+    "existing_arm": "ship@S4",
+    "existing_commit": "f5a5f11",
+    "opcord_ms": 7395.3912880970165,
+    "opcord_arm": "comp@S2",
+    "opcord_commit": "f336942b",
+    "ratio": 1.475110709035785,
+    "ratio_lo": 1.4742598648843315,
+    "ratio_hi": 1.4755061548622361,
+    "reps": [
+     2,
+     5
+    ]
+   },
+   "append:16384:4096": {
+    "existing_ms": 16368.412036972586,
+    "existing_arm": "ship@S4",
+    "existing_commit": "f5a5f11",
+    "opcord_ms": 11008.838681038469,
+    "opcord_arm": "comp@S4",
+    "opcord_commit": "f5a5f11",
+    "ratio": 1.486842755282208,
+    "ratio_lo": 1.4868327970988204,
+    "ratio_hi": 1.4868527135432814,
+    "reps": [
+     2,
+     2
+    ]
+   }
+  },
+  "Gemma3-4B": {
+   "scratch:0:2048": {
+    "existing_ms": 1855.324551986996,
+    "existing_arm": "ship@S2",
+    "existing_commit": "08a56cd",
+    "opcord_ms": 1525.6561725400388,
+    "opcord_arm": "comp@S2",
+    "opcord_commit": "08a56cd",
+    "ratio": 1.2160830109565892,
+    "ratio_lo": 1.2134025705028406,
+    "ratio_hi": 1.2187751845988442,
+    "reps": [
+     2,
+     2
+    ]
+   },
+   "scratch:0:4096": {
+    "existing_ms": 3897.3368710139766,
+    "existing_arm": "ship@S2",
+    "existing_commit": "08a56cd",
+    "opcord_ms": 3096.182039938867,
+    "opcord_arm": "comp@S2",
+    "opcord_commit": "08a56cd",
+    "ratio": 1.2587557258393398,
+    "ratio_lo": 1.2567351004054557,
+    "ratio_hi": 1.259806539748847,
+    "reps": [
+     2,
+     5
+    ]
+   },
+   "append:4096:4096": {
+    "existing_ms": 4425.4355990560725,
+    "existing_arm": "ship@S2",
+    "existing_commit": "08a56cd",
+    "opcord_ms": 3430.998279945925,
+    "opcord_arm": "comp@S2",
+    "opcord_commit": "08a56cd",
+    "ratio": 1.289839060812884,
+    "ratio_lo": 1.2874396380170599,
+    "ratio_hi": 1.290249717159481,
+    "reps": [
+     2,
+     5
+    ]
+   },
+   "append:16384:4096": {
+    "existing_ms": 5382.391650520731,
+    "existing_arm": "ship@S4",
+    "existing_commit": "08a56cd",
+    "opcord_ms": 4593.174478970468,
+    "opcord_arm": "comp@S4",
+    "opcord_commit": "08a56cd",
+    "ratio": 1.171823904178611,
+    "ratio_lo": 1.1716287077270315,
+    "ratio_hi": 1.1720191542585694,
+    "reps": [
+     2,
+     2
+    ]
+   }
+  },
+  "LFM2-1.2B": {
+   "scratch:0:2048": {
+    "existing_ms": 587.0481519959867,
+    "existing_arm": "shipar@S2",
+    "existing_commit": "838a2220",
+    "opcord_ms": 512.5416228547692,
+    "opcord_arm": "comp@S2",
+    "opcord_commit": "838a2220",
+    "ratio": 1.1453667874351918,
+    "ratio_lo": 1.1394775786221492,
+    "ratio_hi": 1.1588875750987992,
+    "reps": [
+     5,
+     5
+    ]
+   },
+   "scratch:0:4096": {
+    "existing_ms": 1275.8883798960596,
+    "existing_arm": "shipar@S2",
+    "existing_commit": "838a2220",
+    "opcord_ms": 1046.6436760034412,
+    "opcord_arm": "comp@S2",
+    "opcord_commit": "838a2220",
+    "ratio": 1.2190284135360931,
+    "ratio_lo": 1.213591025213942,
+    "ratio_hi": 1.2375452357840007,
+    "reps": [
+     5,
+     5
+    ]
+   },
+   "append:4096:4096": {
+    "existing_ms": 1689.4788099452853,
+    "existing_arm": "ship@S4",
+    "existing_commit": "838a2220",
+    "opcord_ms": 1388.6195630766451,
+    "opcord_arm": "comp@S4",
+    "opcord_commit": "838a2220",
+    "ratio": 1.2166606714095631,
+    "ratio_lo": 1.2096681753785883,
+    "ratio_hi": 1.2184586161165056,
+    "reps": [
+     5,
+     5
+    ]
+   },
+   "append:16384:4096": {
+    "existing_ms": 2332.9692690167576,
+    "existing_arm": "ship@S4",
+    "existing_commit": "838a2220",
+    "opcord_ms": 1954.6747249551117,
+    "opcord_arm": "comp@S4",
+    "opcord_commit": "838a2220",
+    "ratio": 1.1935332458296013,
+    "ratio_lo": 1.193302395542769,
+    "ratio_hi": 1.1941255443613692,
+    "reps": [
+     5,
+     5
+    ]
+   }
+  }
+ }
+}

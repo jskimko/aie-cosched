@@ -498,6 +498,46 @@ def fig_timeline():
     plt.close(fig)
 
 
+WIDE = 6.75  # MLSys two-column width, inches
+MAGENTA_PASTEL = "#EBA8C8"  # pastel step of MAGENTA, for the first size in each panel
+
+
+def fig_headline():
+    """Headline: OPCORD's TTFT speedup over the fastest existing schedule measured, per LLM, from scratch and on appends.
+
+    One source for all five LLMs, the split sweep (figs/headline_data.py -> data/headline.json): existing = the lowest
+    median of the shipped order and the shipped order with attention's columns alternated over every measured split;
+    OPCORD = the lowest median of the composed schedule over every measured split. Whiskers span the reps' range."""
+    d = json.loads((DATA / "headline.json").read_text())["cells"]
+    llms = list(d)
+    panels = (("From scratch", (("scratch:0:2048", "2K tokens"), ("scratch:0:4096", "4K tokens"))),
+              ("Append of 4K tokens", (("append:4096:4096", "to 4K cached"), ("append:16384:4096", "to 16K cached"))))
+    fig, axes = plt.subplots(1, 2, figsize=(WIDE, 1.7), sharey=True)
+    width = 0.36
+    for ax, (title, cells) in zip(axes, panels):
+        for k, ((cell, label), color) in enumerate(zip(cells, (MAGENTA_PASTEL, MAGENTA))):
+            xs, ys, lo, hi = [], [], [], []
+            for i, llm in enumerate(llms):
+                c = d[llm].get(cell)
+                if c is None:
+                    continue
+                x = i + (k - 0.5) * width
+                xs.append(x); ys.append(c["ratio"]); lo.append(c["ratio"] - c["ratio_lo"]); hi.append(c["ratio_hi"] - c["ratio"])
+                ax.text(x, c["ratio_hi"] + 0.02, c["opcord_arm"].split("@")[1].replace("S", "$S_") + "$",
+                        ha="center", va="bottom", fontsize=5.5)
+            ax.bar(xs, ys, width=width, color=color, edgecolor="none", label=label, zorder=2)
+            ax.errorbar(xs, ys, yerr=[lo, hi], fmt="none", ecolor=INK, elinewidth=0.5, capsize=1.2, zorder=3)
+        ax.axhline(1.0, color="black", linewidth=0.6)
+        ax.set_xticks(range(len(llms)), llms, fontsize=6.5)
+        ax.set_title(title, fontsize=7, pad=2, loc="left")
+        ax.legend(frameon=False, fontsize=6, loc="upper right", ncol=2, handlelength=1.0, columnspacing=0.8)
+    axes[0].set_ylabel("TTFT speedup", labelpad=2)
+    axes[0].set_ylim(0.9, 1.72)
+    fig.tight_layout(pad=0.2, w_pad=0.6)
+    fig.savefig(OUT / "headline.pdf")
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     fig_busy()
@@ -510,4 +550,5 @@ if __name__ == "__main__":
     fig_decode()
     fig_schedules()
     fig_timeline()
+    fig_headline()
     params_rows()

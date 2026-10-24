@@ -55,7 +55,7 @@ The event model names the faster split in all 36 cases we test and predicts TTFT
 Third, OPCORD rewrites compiled designs with these choices, under checkers that refuse any rewrite they cannot show legal, with kernels, driver, and firmware unchanged.
 Its composer issues every column group's work before the CP waits on any of it, and this reorder across groups, which no hand-written or shipped design performs, is the source of the prefill gains.
 Two MLIR-AIE passes automate inside the compiler what experts do by hand, reordering issue within an operator and renaming decode attention's buffers into rings, so that each block's transfer overlaps the previous block's compute.
-Against the fastest existing schedule we measured for each design, OPCORD shortens TTFT across five LLMs by $1.14$--$1.46\times$ from scratch and $1.19$--$1.51\times$ on appends to a cached context, decode by $1.16$--$1.27\times$ at a 16K-token context, and a whole agent turn by $1.15$--$1.32\times$, with bit-identical outputs.
+Against the fastest existing schedule we measured for each design, OPCORD shortens TTFT across five LLMs by $1.14$--$1.46\times$ from scratch and $1.17$--$1.51\times$ on appends to a cached context, decode by $1.16$--$1.27\times$ at a 16K-token context, and a whole agent turn by $1.15$--$1.32\times$, with bit-identical outputs.
 % SOURCE: as the abstract's SOURCE lines (0-abstract.tex): from scratch lab-split-sweep (18), (20), (21), (22), (28); appends amd-npu 78ec55b7 and e695d3dd; decode lab-decode-long-context (22); turns amd-npu c61445da, 171082f6.
 
 % VALUE: (5) contributions: the method, the event model and bound, the design and implementation of OPCORD
