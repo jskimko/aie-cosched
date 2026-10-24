@@ -19,7 +19,7 @@ However, while compilers and mapping frameworks~\citep{hunhoff2025iron,symons202
     % VALUE: Figure 1, motivation and result in one measured picture: per column group, when its work is outstanding over one 4,096-token prefill of Llama-3.2-1B; the groups take turns in the existing program with attention's columns alternated, and run together under OPCORD
     % DECISION: the top row is the existing program with attention's columns alternated by hand, the stronger baseline, so the figure's gain is the reorder across groups and not the hand fix.
     \includegraphics{fig/timeline.pdf}
-    \caption{Times at which each column group has work outstanding over one 4{,}096-token prefill of Llama-3.2-1B, for the existing program with attention's two columns alternated by hand and for OPCORD, each shown by its median run of five.}
+    \caption{Times at which each column group has work outstanding over one 4{,}096-token prefill of Llama-3.2-1B, for the existing program with attention's two columns alternated by hand and for OPCORD, each shown by its median run of five. The bottom lane of each panel marks when both groups have work outstanding, with its total at the right.}
     \label{fig:timeline}
 \end{figure}
 % SOURCE: figs/make_figs.py fig_timeline over figs/data/fig1-intervals-1b.json; an interval is work issued and not yet observed complete, read from timer records in the CP's stream; logits identical with and without records and TTFT within 1.1% (amd-npu 57621ff4; vault lab-decode-long-context (41)).

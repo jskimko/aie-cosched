@@ -437,28 +437,56 @@ def fig_schedules():
     plt.close(fig)
 
 
+def _merge(iv):
+    out = []
+    for s, e in sorted(iv):
+        if out and s <= out[-1][1]:
+            out[-1][1] = max(out[-1][1], e)
+        else:
+            out.append([s, e])
+    return out
+
+
+def _intersect(a, b):
+    out, i, j = [], 0, 0
+    while i < len(a) and j < len(b):
+        s, e = max(a[i][0], b[j][0]), min(a[i][1], b[j][1])
+        if e > s:
+            out.append((s, e))
+        if a[i][1] < b[j][1]:
+            i += 1
+        else:
+            j += 1
+    return out
+
+
 def fig_timeline():
-    """Figure 1: when each column group had work outstanding over one prefill, existing against OPCORD.
+    """Figure 1: when each column group had work outstanding over one prefill, and when both did, existing against OPCORD.
 
     Llama-3.2-1B, a 4,096-token prompt, the median-TTFT run of each arm, from the CP's own record timers: the existing
-    program (attention's columns alternated) and the composed schedule. Intervals are merged at 1 ms."""
+    program (attention's columns alternated) and the composed schedule. The exact intervals are drawn, unmerged, and the
+    third lane is their intersection, so the overlap the figure shows is the overlap the data holds."""
     d = json.loads((DATA / "fig1-intervals-1b.json").read_text())["arms"]
-    arms = (("shipar", "Alternated baseline"), ("comp", "OPCORD"))
+    arms = (("shipar", "Existing, attention's columns alternated"), ("comp", "OPCORD"))
     rows = (("A", "Attention", ORANGE), ("G", "GEMMs", BLUE))
-    fig, axes = plt.subplots(2, 1, figsize=(COLUMN, 1.25), sharex=True)
+    fig, axes = plt.subplots(2, 1, figsize=(COLUMN, 1.45), sharex=True)
     base = d["shipar"]["ttft_ms"]
     for ax, (arm, name) in zip(axes, arms):
         a = d[arm]
-        for y, (g, label, color) in zip((2, 1), rows):
-            ax.broken_barh([(s, e - s) for s, e in a["outstanding_1ms"][g]], (y - 0.32, 0.64), facecolors=color,
-                           edgecolor="none")
+        groups = {g: _merge(a["outstanding"][g]) for g, _, _ in rows}
+        for y, (g, label, color) in zip((3, 2), rows):
+            ax.broken_barh([(s, e - s) for s, e in groups[g]], (y - 0.32, 0.64), facecolors=color, edgecolor="none")
+        both = _intersect(groups["A"], groups["G"])
+        ax.broken_barh([(s, e - s) for s, e in both], (1 - 0.32, 0.64), facecolors=INK, edgecolor="none")
+        overlap = sum(e - s for s, e in both)
         ttft = a["ttft_ms"]
         ax.axvline(ttft, color="black", linewidth=0.6, linestyle=(0, (4, 2)))
         gain = "" if arm == "shipar" else rf", ${base / ttft:.2f}\times$"
-        ax.text(ttft + 15, 1.5, rf"TTFT {ttft / 1000:.2f}\,s{gain}", ha="left", va="center", fontsize=6.5)
+        ax.text(ttft + 15, 2.5, rf"TTFT {ttft / 1000:.2f}\,s{gain}", ha="left", va="center", fontsize=6.5)
+        ax.text(ttft + 15, 1, rf"{overlap:.0f}\,ms", ha="left", va="center", fontsize=6.5)
         ax.set_title(name, fontsize=7, pad=2, loc="left")
-        ax.set_yticks([2, 1], ["Attention", "GEMMs"], fontsize=6.5)
-        ax.set_ylim(0.45, 2.55)
+        ax.set_yticks([3, 2, 1], ["Attention", "GEMMs", "Both"], fontsize=6.5)
+        ax.set_ylim(0.45, 3.55)
         ax.tick_params(axis="y", length=0, left=False, right=False)
         for side in ("top", "right", "left"):
             ax.spines[side].set_visible(False)
