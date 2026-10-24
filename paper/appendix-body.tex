@@ -411,6 +411,39 @@ Nested control is analysed when it resolves from the dispatch: a switch on a run
 \subsection{Attribution Choices}
 \label{app:attribution-choices}
 
+\begin{table}[h]
+    \centering
+    \caption{Ordering Mechanisms}
+    \label{tab:mech}
+    % VALUE: the 11 mechanisms that create a direct happens-before edge, in attribution order, with the granularity of each; the notes define the terms the text does not
+    \begin{threeparttable}
+    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}rlr}
+        \toprule
+        \# & Mechanism & Granularity \\
+        \midrule
+        1 & CP synchronization and mask-poll & stream \\
+        2 & CP in-order issue (completes at issue) & stream \\
+        3 & Channel task queue (FIFO, depth 4) & stream \\
+        4 & Dispatch order on one context & stream \\
+        5 & Configuration and control-packet writes & stream \\
+        6 & BD chaining and repeat & data movement \\
+        7 & Locks on DMA BDs & data movement \\
+        8 & Stream-switch back-pressure & data movement \\
+        9 & Cascade and neighbor memory & data movement \\
+        10 & Core locks & core loop \\
+        11 & Core program order & core loop \\
+        \bottomrule
+    \end{tabular*}
+    \begin{tablenotes}\footnotesize
+    \item A mask-poll makes the CP wait until a register's masked bits hold a given value.
+    % SOURCE: mask-poll = TXN opcode 4 (TXN_OPC_MASKPOLL), "block until (reg & mask) == val" (mlir-aie include/aie/Runtime/TxnEncoding.h:50, :194, aie-cosched-pass-0 checkout).
+    \item A control packet writes registers through the stream switch network~\citep{amd_am027}.
+    \item Cascade streams and neighbor memory pass data between adjacent cores without a DMA~\citep{amd_am027}.
+    \end{tablenotes}
+    \end{threeparttable}
+\end{table}
+
+
 % VALUE: how the analysis attributes and counts edges where a choice is needed: an edge two mechanisms imply goes to the first in Table mech; issue edges never stall and are reported apart; pairs ordered by two disjoint paths are counted as redundant; data-dependent loops are counted as control; loop-carried edges keep their distance; a wait gating several operations gives one edge per gated operation; operations no mechanism explains are counted per stream
 % [Note: these sentences are verbatim from the body of Section~\ref{subsec:reading}, each made a full sentence where it was a clause: "an edge that two mechanisms imply is attributed to the first in the table" and "with their distance recorded".]
 An edge that two mechanisms of Table~\ref{tab:mech} imply is attributed to the first in the table.

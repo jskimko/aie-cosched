@@ -29,51 +29,17 @@ Finally, OPCORD (Section~\ref{sec:method}) reorders issue and renames buffers, a
 % VALUE: the analysis represents a dispatch as operations on engines (CP instructions, BD executions, core loop iterations), each with read and write sets over locations that include every exclusively held resource, so a structural hazard is a conflict on a location (examples in the appendix); under static control, of the CP, the cores, and the host, one dispatch at given runtime parameters has one static set of operations; a loop with data-dependent control is reported and left out, and every loop of the designs we rewrite is analysed; durations and host work are measured inputs (opening paragraph)
 The analysis represents a dispatch as operations on engines, namely one per instruction of a command's stream on the CP, one per execution of a BD on a DMA channel, and one per iteration of a core's counted loop, each with a set of locations that it reads and a set that it writes.
 Locations cover every resource that one operation holds exclusively, from bytes of DRAM, memory tiles, and local memory to BD slots, locks, DMA channels, task-queue slots, stream-switch ports, and configuration registers, so a structural hazard is also a conflict on a location.
-Under the static control we assume, the CP's stream is straight-line, since a synchronization waits but does not branch, and every core loop has a trip count that depends on the dispatch's runtime parameters rather than on computed data.
-The host likewise issues commands in an order that depends on the LLM and on the lengths of the context and the prompt, not on data.
-A dispatch at given runtime parameters then has one static set of operations.
-A loop with data-dependent control is reported with its reason and left out of the analysis, whereas every loop of the MLIR-AIR prefill and decode designs we rewrite is analysed (Section~\ref{subsec:census}).
+Under static control, the CP's stream is straight-line, every core loop's trip count depends on the dispatch's runtime parameters rather than on computed data, and the host's order of commands depends only on the LLM and the lengths of the context and the prompt, so a dispatch has one static set of operations.
+A loop with data-dependent control is reported and left out, whereas every loop of the MLIR-AIR designs we rewrite is analysed (Section~\ref{subsec:census}).
 % SOURCE: operations, locations, and static control (vault lab-cosched-passes (30), item 1); every loop analysed: on all nine fused decodes (1B, 8B, Gemma3, LFM2, Llama-3.2-3B, Phi-4-mini, Qwen2.5-7B / 3B, Qwen3-8B) 0 loops refused (aie-cosched results/2026-10-23-phase-rerun, registered 7687182; mlir-aie dev line 0c5e8e37fac, 6b9e6666991, lit 46/46), and all 3,488 MLIR-AIR prefill loops judged (decisions log, loop census part 3; mlir-aie ba266793aa8); the host's static control (outline v9 section 1); the decode kernels' early return on the pad block branches on a runtime parameter, so it stays static per context length (lab-decode-long-context (10)). Nested-control mechanics: Appendix~\ref{app:nested}.
 
 \subsection{Reading a Stream}
 \label{subsec:reading}
 
-\begin{table}[t]
-    \centering
-    \caption{Ordering Mechanisms}
-    \label{tab:mech}
-    % VALUE: the 11 mechanisms that create a direct happens-before edge, in attribution order, with the granularity of each; the notes define the terms the text does not
-    \begin{threeparttable}
-    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}rlr}
-        \toprule
-        \# & Mechanism & Granularity \\
-        \midrule
-        1 & CP synchronization and mask-poll & stream \\
-        2 & CP in-order issue (completes at issue) & stream \\
-        3 & Channel task queue (FIFO, depth 4) & stream \\
-        4 & Dispatch order on one context & stream \\
-        5 & Configuration and control-packet writes & stream \\
-        6 & BD chaining and repeat & data movement \\
-        7 & Locks on DMA BDs & data movement \\
-        8 & Stream-switch back-pressure & data movement \\
-        9 & Cascade and neighbor memory & data movement \\
-        10 & Core locks & core loop \\
-        11 & Core program order & core loop \\
-        \bottomrule
-    \end{tabular*}
-    \begin{tablenotes}\footnotesize
-    \item A mask-poll makes the CP wait until a register's masked bits hold a given value.
-    % SOURCE: mask-poll = TXN opcode 4 (TXN_OPC_MASKPOLL), "block until (reg & mask) == val" (mlir-aie include/aie/Runtime/TxnEncoding.h:50, :194, aie-cosched-pass-0 checkout).
-    \item A control packet writes registers through the stream switch network~\citep{amd_am027}.
-    \item Cascade streams and neighbor memory pass data between adjacent cores without a DMA~\citep{amd_am027}.
-    \end{tablenotes}
-    \end{threeparttable}
-\end{table}
-
 % VALUE: happens-before is completion before start, not issue order; each direct edge comes from one of 11 mechanisms at the stream, data-movement, or loop granularity and is attributed to exactly one (the attribution choices, edges per gated operation, and uncovered operations in the appendix); a segment is a run of synchronizations with the issue they gate; the evaluation checks the reading
 From these operations, the analysis builds a \emph{happens-before} graph, in which an edge from $a$ to $b$ means that $b$ cannot start until $a$ has completed.
 Issue order alone does not create such an edge, because a queue push is issued in order but its transfer completes later.
-Each direct edge comes from one of the 11 ordering mechanisms of Table~\ref{tab:mech}, at the granularity of the CP's stream, of data movement, or of a core loop, and is attributed to exactly one of them (Appendix~\ref{app:attribution-choices}).
+Each direct edge comes from one of 11 ordering mechanisms, such as a synchronization, a BD chain, or a lock, at the granularity of the CP's stream, of data movement, or of a core loop, and is attributed to exactly one of them (Appendix~\ref{app:attribution-choices}).
 An operator's stream is a sequence of \emph{segments}, where each segment is a run of synchronizations followed by the issue instructions they gate and the first segment has none.
 Section~\ref{subsec:fidelity} checks this reading against what each stack dispatches.
 % SOURCE: the mechanism table, attribution order, granularities, UNATTRIBUTED, and issue edges (vault lab-cosched-passes (30), item 2); the library AIECoschedDeps (mlir-aie f1725dae1f1, pinned); segments as in txn.segments (amd-npu a0ee2ed prefill-overlap/txn.py) and the formulation's operators (Section~\ref{subsec:formulation}); one edge per (wait, gated op) pair (lab-cosched-passes (30), item 3).
@@ -107,8 +73,8 @@ The table places each instance we know of in the MLIR-AIR designs, which are the
         \toprule
         & Order & Name \\
         \midrule
-        Stream & column groups take turns in prefill; attention's two columns take turns & descriptor, control-register, and queue-slot reuse, off every measured longest path; on it only in a design we write (\S\ref{subsec:synthetic}) \\
-        Loop & a DMA channel taking a double buffer's two slots in turn, off every critical cycle computed; on it only in a design we write (\S\ref{subsec:synthetic}) & decode attention's keys, values, and scores, each in one buffer \\
+        Stream & column groups take turns in prefill; attention's two columns take turns & BD and queue-slot reuse, off every critical path \\
+        Loop & a channel sending a double buffer's two slots in turn, off every critical cycle & decode attention's keys, values, and scores, each in one buffer \\
         \bottomrule
     \end{tabular*}
 \end{table}
@@ -116,11 +82,8 @@ The table places each instance we know of in the MLIR-AIR designs, which are the
 % VALUE: the instances per cell: order x stream in prefill (groups take turns, attention's columns take turns; shared by the captured production prefill); name x loop in decode (keys, values, scores; the carried state is true); the other two cells hold none that costs time only because of what these stacks emit, as a design we write for each shows; stream name dependences exist but renaming them cuts no measured longest path; loop order dependences lie off decode's critical cycle and are not established for prefill
 In the prefill, order dependences in the stream hold back one column group behind another and one column of attention behind the other, and the one prefill we capture from FastFlowLM shares the first of these (Appendix~\ref{app:capture}).
 In the decode, the attention loop holds name dependences on its keys, its values, and the one buffer through which its two cores pass scores, whereas its running maximum and accumulator carry true dependences across blocks.
-The other two cells hold no instance that costs time in these designs, but only because of what these stacks emit.
-For each, we write a design that puts its class on the critical path and measure the behavior the class predicts (Section~\ref{subsec:synthetic}).
-Name dependences do appear in the stream, on the reuse of a channel's BDs, control registers, and task-queue slots, yet renaming every one of them leaves every measured longest path unchanged.
-In decode attention's loop, order dependences appear only where a memory tile's channel sends the two slots of a double buffer in turn, and none of them lies on the loop's critical cycle (Section~\ref{subsec:removal}), either as shipped or after renaming.
-Whether the same channel sequencing in the prefill operators' loops lies on a critical cycle is not established, because our critical-cycle analysis does not reduce those loops to one repeating iteration.
+The other two cells hold instances only off every critical path or cycle we compute in these designs, namely the reuse of a channel's BDs and queue slots in the stream and a memory tile's channel sending a double buffer's two slots in turn.
+We therefore test both classes on designs of our own that put them on the critical path (Section~\ref{subsec:synthetic}).
 % SOURCE: aie-cosched 93f491b, mlir-aie f9ad95dc02f (lab-cosched-passes (62), P7c; lit 36/36): cost-free over 792 analysed streams, NAME edges on 543/543 MLIR-AIR streams (30,198 edges, 25,016 able to lie on a blocking path), 209/218 production-engine streams (272,582, all able), 6/31 IRON (504); kinds descriptor and control-register everywhere, configuration writes on the fused decode only (7,244), queue-slot reuse (104 MLIR-AIR, 27 IRON), dispatch end; with measured task costs (the S4 prefill cell, 34 streams) 246 end-kind NAME edges lie on a longest path but removing every NAME edge leaves every stream's length unchanged (34/34). Corrected 2026-10-23: the earlier text said no name dependence appears in the stream.
 % SOURCE: the score buffer shared_l10 is name x loop in the existing build (lab-cosched-passes (30), item 5).
 % SOURCE: aie-cosched results/2026-10-23-order-loop (registered ca13ac5, 579d8d1; results 579d8d1, 0ae7bc9; mlir-aie dev 58569749d3e..36f725e8e6e, lit 49/49): decode attention's 34 group leads carry #6 BD-chaining and #11 program-order edges; with (59)'s costs the critical cycle is 28 RAW + 12 name edges as shipped (1.1466 per iteration) and 36 RAW after the loop pass (0.6487), no order edge on either, and removing every order edge leaves both ratios unchanged; the steady-state order edges are memtile (3,1) MM2S channel 0's chain buf169 -> buf168 (census.mlir 4871-4883), two slots of one ring with separate locks. Decodes, structure only: in 9 groups (core 5_3) a memtile (4,1) #6 edge is on a critical cycle but removing order edges moves no group's ratio (an equal cycle remains). Prefill: 279 groups fail to fold to one steady edge set, the rest exceed the attribution cap, so no verdict.
@@ -145,9 +108,8 @@ Operators on the same group are composed in sequence instead, so their writes to
 A rename is legal only for a location whose conflicts across its uses are all write-after-read or write-after-write, so state carried from one iteration or chunk to the next stays in place.
 Its added instance must also be free, with no slot reused before its previous reader has completed.
 In a loop, the buffer must in addition be guarded by one pair of locks, whose protocol the added slot extends, and that slot must fit in the tile's BDs and local memory.
-Where the streams cannot decide a condition, such as a buffer range they do not fix or task-queue room they cannot prove, the rewrite is refused with that condition as its reason.
-The conditions are decided under the execution semantics of Section~\ref{subsec:model}, whose locations must cover all the state an operation touches.
-We therefore do not claim that they suffice for every design, and every rewrite we run also leaves the outputs bit-identical (Section~\ref{subsec:setup}).
+Where the streams cannot decide a condition, such as a buffer range they do not fix, the rewrite is refused with that condition as its reason.
+Because the conditions hold only if the locations cover all the state an operation touches, we do not claim that they suffice for every design, and every rewrite we run also leaves the outputs bit-identical (Section~\ref{subsec:setup}).
 % SOURCE: the loop conditions: the class rule renames only buffers whose every cross-iteration conflict is WAR / WAW and leaves RAW-carried state untouched; one free / full lock pair, the BD and local-memory budgets (16 BDs, 64 KiB), checked on the input and re-derived on the output (lab-cosched-passes (33), (57)); the ring condition: no slot reused before its previous reader has completed (merged.colour and assert_no_hazard, amd-npu a0ee2ed; the hazard check turns red on an overlapping slot, lab-prefill-overlap (9)).
 % SOURCE: refusals where the stream cannot decide: RANGE-UNKNOWN, RESOURCE-UNPROVEN, FENCE-CROSSED-UNPROVEN (legality.py codes, lab-cosched-passes (10)); in the census, 16 production-engine streams refused with QUEUE-OVERFLOW, 8 of them also FENCE-CROSSED-UNPROVEN, and IRON's proposals refused for queue room not provable from the stream (aie-cosched baf37e0, lab-cosched-passes (62), P7b; B-prime, (46)).
 % SOURCE: bit-identical logits for every composed prefill and append, and identical tokens and logits for every renamed decode (Section~\ref{subsec:setup} defaults; vault lab-decode-long-context (22)).
