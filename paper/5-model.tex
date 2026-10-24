@@ -60,11 +60,8 @@ In a loop, the maximum cycle mean of the repeating graph determines the time per
 The bound is thus Amdahl's law applied to an ordering, computed from the program and the probes without a timing trace (Section~\ref{sec:related}).
 
 % VALUE: for a set of removals the textbook critical-path condition applies (cited, one sentence, never a finding); we use it as a test that discards sets that cannot pay; on this machine it is necessary, not sufficient (the next longest path; shared capacity); the decode instance is in the evaluation
-A set $S$ of removals gains nothing unless it cuts every path or cycle that attains the maximum, because any one left keeps its length, which is the textbook condition that interaction-cost analysis applies to microarchitectural bottlenecks~\citep{fields2003interaction}.
-We apply it as a test on the recovered graph with measured costs, which discards each candidate set that leaves such a path or cycle uncut.
-On this machine the condition is necessary but not sufficient, because a cut gains only down to the next longest path or cycle.
-Moreover, because the groups share the DRAM read cap and the shim tiles' channels, a set that cuts every critical path gains only what that shared capacity leaves.
-Section~\ref{subsec:ablation} shows both cases in decode attention.
+A set of removals gains only if it cuts every path or cycle that attains the maximum, which is the textbook condition of interaction-cost analysis~\citep{fields2003interaction}, and then only down to the next longest path and to what the shared DRAM read cap leaves.
+We use it as a test on the recovered graph with measured costs, which discards every candidate set that cannot pay.
 % SOURCE: the acyclic condition is the minimum cut of a critical subnetwork in project crashing (Kelley 1961; Fulkerson 1961), the cyclic one the iteration bound and maximum cycle mean (Ghamarian 2006; Stuijk 2008), and the set view is interaction cost (Fields 2003); all are cited in Section 8, never claimed.
 % SOURCE: the test is the in-tree set test, acyclic half (longest path, cut, next longest; mlir-aie 7240529eb562, lit 19/19) and loop half (periodic graph, Howard's algorithm, critical subgraph; mlir-aie 54a8b8e192c, lit 10/10) (vault paper-cosched-decisions-log, P1 and P3).
 % DECISION: the critical-path condition is textbook and stated once, here, with its citation; it is a tool, never a finding, and the decode partial-rename instance and the 8B at the cap live in Section 7 (section contract; outline v10.1).
@@ -72,47 +69,20 @@ Section~\ref{subsec:ablation} shows both cases in decode attention.
 % DECISION: the bound's sentences follow outline v9 section 3's rows (P4 withdraws them, P4u marks them untested); the critical-cycle sentences follow the W1-W5 table.
 
 % VALUE: the read cap makes the allowed overlap depend on which operator holds the critical path (two cases): a bandwidth-bound GEMM pays a fixed share of its partner's time, attention almost nothing, so two equal operators run together at most 1.81-1.84x faster than in sequence rather than 2.00x; in a prefill the GEMMs are the ones near the cap; the same cap bounds reordering decode's stream
-How much overlap the shared read rate allows depends on which operator holds the critical path, as pairs of one attention operator and one GEMM issued in one command on disjoint columns show.
-Where the GEMM holds it and reads near the cap, co-running costs the GEMM 8.4--10.5\% of the attention operator's device time, whereas where attention holds it, the cost stays below 15\us{} whatever the GEMM's duration.
-Two operators of equal duration therefore run together at most $1.81$--$1.84\times$ faster than in sequence in the first case, against $2.00\times$ in the second.
-In a whole prefill, the GEMMs are the operators near the cap (Appendix~\ref{app:dram-regimes}).
-The same cap limits what reordering decode's stream could gain to about $1.13\times$, since its phases already read DRAM near the cap.
+Because the groups share the read cap, overlap costs almost nothing where attention holds the critical path, but costs a GEMM that reads near the cap about a tenth of its partner's time, and in a whole prefill the GEMMs are the operators near the cap (Appendix~\ref{app:dram-regimes}).
 % SOURCE: computed in aie-cosched-paper-0 tmp/regime/{pairs,model,final}.py from lab-prefill-overlap (3)'s pre-registered pair table (10 pair-runs on Llama-3.2-1B, 5 attention chunk indices x 3 GEMM shapes, medians of 20, DRAM measured during each concurrent run, cap 53.9-55.3 GB/s): with the GEMM on the critical path the penalty is 3 us + 0.085 x the co-runner's duration (R2 = 0.993, 5 runs, ratio 0.084-0.105); with attention on it the penalty is 21 us - 0.015 x the co-runner (R2 = 0.896, 5 runs, ratio -0.002 to 0.029), at most 15 us on the five pairs; penalty against the pair's total DRAM rate correlates at only r = 0.54, so the regime of the critical-path operator is the predictor and total bandwidth is not (vault decisions log, "Regime analysis, step 1"). Ceiling for two equal durations: 2 / (1 + r) = 1.84-1.81 for r = 0.084-0.105 (derivation in the appendix).
 % SOURCE: GEMM-only commands read 90-93% of the cap and attention-only about 15% during Llama-3.2-1B's 4,096-token prefill (amd-npu 71901c50 metrics/retro-2026-10-21/dram-retro.txt; vault lab-metric-fields (1) and its amendment 1); per-command detail in the appendix.
-% SOURCE: decode reordering or placement bounded at about 1.13x, phases near the DRAM cap (vault lab-bound-validation (1), from lab-decode-long-context (5)-(7)).
 
 % VALUE: the bound is prescriptive (build a removal only where its bound exceeds its cost); since it never falls below one it cannot predict a loss, which the event model prices instead (the 512-token appends, in the evaluation)
 A removal is therefore worth building only where its bound exceeds its cost, which for a rename is the local memory, BDs, locks, and channels it takes, and for a reorder the synchronization and planning it adds.
-Because the bound never falls below one, it cannot predict a loss.
-At 512-token appends, for instance, reordering loses to per-command costs that the event model prices and the bound does not see (Section~\ref{subsec:ablation}).
+The bound cannot predict a loss, such as the per-command costs that make reordering lose on short appends, so the event model prices those (Section~\ref{subsec:ablation}).
 % SOURCE: the bound and its typed resources (outline v9 section 2, C1; vault lab-bound-validation (1)); the 512-token loss and its SOURCE are in 7-eval Sources of the Gains.
 
 \subsection{Event Model}
 \label{subsec:pricing}
 
-\begin{table}[t]
-    \centering
-    \caption{Parameters of the Event Model, Llama-3.2-1B, 2{,}048 Tokens}
-    \label{tab:params}
-    % VALUE: every term of the event model is measured, the busy times once per configuration and the structural terms once on the platform, and none is a free scale factor
-    % DECISION: values are in raw units until the author chooses the reference units (STYLE.md, Per-paper decisions); then they are converted.
-    % SOURCE: rows generated by figs/make_figs.py; they are to come from the constants file calib/frozen.json (npu-gap-0 outputs d94266bf), with per-transition boundary costs and the two overlap lines [the committed rows still carry component-model.json's single overlap term and per-kind boundary costs; verify before the build].
-    \begin{threeparttable}
-    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}>{\raggedright\arraybackslash}p{0.36\linewidth}r}
-        \toprule
-        Term & Value \\
-        \midrule
-        \input{fig/params-rows}
-    \end{tabular*}
-    \begin{tablenotes}\footnotesize
-    \item Busy times from each operator dispatched alone; structural terms from synthetic microbenchmarks; host terms from a microbenchmark of the host code.
-    \item The table holds the measured constants of this configuration, in which one overlap share $\beta$ stands for both lines $\alpha_r + \beta_r \min(a, g)$ and the boundary cost $\epsilon$ is given by the kind of command.
-    \end{tablenotes}
-    \end{threeparttable}
-\end{table}
-
 % VALUE: to choose among schedules without running each, an event simulation of the device, the CP, and the host prices a schedule from measured terms only (eq:cmd; per-command busy with the two overlap cases; the host program, for the existing program as for ours), and reports device time, host exposure, and the head and tail apart; Table params lists the measured constants of one configuration
-To choose among schedules without running each, we price a schedule with an event simulation of the device, the CP, and the host, whose every term is measured (Table~\ref{tab:params}).
+To choose among schedules without running each, we price a schedule with an event simulation of the device, the CP, and the host, whose every term is measured (Appendix~\ref{app:pricing-details} lists them).
 Queued commands run one at a time (Section~\ref{subsec:semantics}), so command $k$ ends at
 \begin{equation}
 \label{eq:cmd}
