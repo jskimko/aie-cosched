@@ -37,8 +37,8 @@ Running both groups at once costs the GEMMs a share of attention's time under th
 
 % VALUE: within one operator's stream, the stream pass (an MLIR-AIE pass on the runtime sequence, compiled or lifted) applies the same reorder: monotone mode only hoists issues; full mode interleaves the columns' segments round-robin by index, the rule that produced the hand-alternated streams, so it emits that alternation byte for byte rather than discovering it
 Our \emph{stream pass} applies the same reorder within one operator's stream, as an MLIR-AIE pass on its runtime sequence, whether compiled or lifted from a recording.
-Its monotone mode only moves each segment's issue to just before the first wait of another column, whereas its full mode also interleaves the columns' segments round-robin by index.
-Full mode is the rule by which we alternated attention's streams by hand for the alternated baseline, so the pass emits that alternation, byte for byte on all 42 such streams.
+It interleaves the columns' segments so that each column's work is issued before the CP waits on another column.
+This is the rule by which we alternated attention's streams by hand, and the pass emits that alternation byte for byte on all 42 such streams.
 % SOURCE: aie-cosched-schedule (mlir-aie 573e0140174, identical in f1725dae1f1; in place on cosched-flag), proposal format /2 at aie-cosched 8dee63f; 42 / 42 decoded order and bytes equal to the hand versions (vault lab-cosched-passes (35), (40)); in place and byte-identical to the Python-applied moves and to the hand template on 42 / 42 (decisions log D24, P4); monotone and full mode as built (lab-cosched-passes, "Scan and monotone" and "Full mode").
 % DECISION: the pass emits the alternation and the checker accepts it; it is never said to discover it, and full mode is never called a predicted-completion rule (Ruling D3, vault decisions log).
 
@@ -56,7 +56,6 @@ The kernels and the order of their arithmetic are unchanged, so the decoded toke
 
 % VALUE: the prefill needs no renaming: the existing program already gives each chunk its own buffers, so with commands in flight no use waits for another; the composer's rings only bound memory, at no change in time, and remove no dependence
 The prefill needs no renaming, because the existing host program already gives every chunk its own buffers, so no use waits for another even with several chunks in flight.
-The composer replaces that naming with rings sized from the plan's live intervals only to bound the memory it takes, which leaves the time unchanged and removes no dependence (Appendix~\ref{app:rings}).
 % SOURCE: shipped naming is one slot per role per chunk; R-ship (the composed schedule at shipped's per-chunk naming) equals the composer with rings within 0.1% (0.99996-1.00074, amd-npu 71081d1) and holds 4-7x the rings' buffer bytes (vault lab-prefill-overlap (29), third revision); merged.colour and Layout (a0ee2ed, now opcord/compose/merged.py).
 % DECISION: the prefill rings remove nothing and are never listed as a removal (decisions log D19, 2026-10-22).
 
@@ -80,8 +79,7 @@ Because the existing order is among the candidates, the composer keeps it wherev
 % DECISION: this states the current planner (N3); the evaluation's present cells used the measured-arm policy of the earlier composer, and the final sweep runs through choose() (vault decisions log D24; eval re-run planned).
 
 % VALUE: chosen splits stay resident and a conversation switches at a turn boundary, moving its cached context to the new split's attention groups; the price of a per-regime split is memory or a switch with a relayout, priced in the appendix; neither applies within one regime
-Each chosen split stays resident in its own hardware context, and a conversation switches at a turn boundary by suspend and resume, moving its cached context to the attention groups of the new split.
-A per-regime split therefore costs either a second copy of the weights or a switch with a relayout, which Appendix~\ref{app:relayout} prices; neither applies within one regime.
+Each chosen split stays resident in its own hardware context, and a conversation switches split at a turn boundary, moving its cached context to the new split's attention groups at a cost that Appendix~\ref{app:relayout} prices.
 % SOURCE: one copy of the weights per resident split (vault lab-metric-fields (1)); warm switch by suspend and resume (lab-split-sweep (5)); relayout measured (lab-split-sweep (38)); the numbers are in Appendix~\ref{app:relayout}.
 % DECISION: the tradeoffs are stated beside the decision that incurs them rather than collected in a section (author, 2026-10-21).
 
@@ -93,7 +91,7 @@ The composer and both passes each carry a checker that tests the legality condit
 The composer checks that every two operators it interleaves meet the condition between whole operators, that no ring slot is reused early, and that each split fits a shim BD's fields.
 A check that does not hold stops the composition with its reason rather than dropping an operator.
 The stream pass checks every pair of instructions that its rewrite inverts, from the routes, BDs, and buffer ranges it derives from the configuration.
-On any finding it leaves the stream unchanged and names the condition, the pair, and whether the rewrite was shown illegal or could not be shown legal, so a reader can tell a hazard from a gap in what the stream reveals.
+On any finding it leaves the stream unchanged and names the condition and the pair.
 The loop pass refuses a buffer that fails the rename conditions or is used outside its block loop, and it re-checks each ring and the carried state on its output.
 % SOURCE: composer checks: own-group register writes (shim BDs and DMA queues, own cores' locks, own cores' runtime parameters), disjoint argument slots or byte ranges, segment order and every op once, assert_no_hazard on ring slots, BD iteration wrap 6 bits and stride 20 bits per GEMM, check_posted for commands in flight; each turns red on a defeated input (lab-prefill-overlap (3), (4), (9); lab-split-sweep (5), (35)); checks fail rather than drop, 26 / 26 (decisions log D24 N1).
 % SOURCE: stream checker in C++ inside aie-cosched-schedule, route facts from the device IR (mlir-aie cosched-flag e20940fac7e); findings RANGE-OVERLAP, RANGE-UNKNOWN, BD-REUSE, PUSH-BEFORE-BD-WRITE, QUEUE-OVERFLOW, NOT-PERMUTATION, CHANNEL-ORDER, BD-ORDER, SKELETON-MOVED and the route codes; any finding refuses the whole rewrite and the IR is unchanged; outcomes DECIDED (shown illegal) against RESOURCE-UNPROVEN, RANGE-UNKNOWN, TOOL-FAILED, PASS-ERROR (not shown legal) (vault lab-cosched-passes (57) steps 3-5, and the checker's reason list).
@@ -115,7 +113,6 @@ The analysis of Section~\ref{sec:order} and both passes, with their checkers, ar
 The loop pass is an opt-in step of the compiler's driver, and switched off, it leaves every instruction stream and configuration the compiler emits byte-identical to the existing build.
 The composer, with the event model and the switch between splits, is a runtime package of about 2{,}700 lines of Python that replaces the dispatch loop of the design's host program and submits to the design's own hardware context.
 OPCORD thus changes no kernel, driver, or firmware.
-It also leaves every reconfiguration point where the stack put it, so the gains we report say nothing about moving those points.
 Appendix~\ref{app:opcord} details the host boundaries and the loop pass's changes to the lowered design.
 % SOURCE: mlir-aie cosched-flag 2b6f1c3ce93 against its base 35fa6b1: lib and include, 15 files, 6,703 lines inserted (AIECoschedDeps, AIECoschedStream, AIECoschedRoutes, AIECoschedCycles, AIECoschedSetTest, AIECoschedSchedule, AIECoschedRename, AIEXPasses.td, the lifter in AIEToConfiguration.cpp); the aiecc opt-in flag in tools/aiecc (35 lines).
 % SOURCE: aie-cosched opcord-runtime 446fa1c (checkout npu-gap-0/opcord-pin), opcord/ without tests: 2,718 lines of Python (compose 1,254, model 922, plan 286, switch 224, package files 32); 65,550 / 65,550 commands byte-identical to the pre-package composer (decisions log D24 N6).
