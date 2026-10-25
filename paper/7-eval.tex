@@ -176,7 +176,7 @@ The other two combinations, name dependences in the stream and order dependences
 \label{subsec:clause}
 
 % VALUE: the condition of Section 3.3, stated in full and tested: what rescheduling recovers is set by how a design cuts its work and by the prompt length; four tests, in the claim's order: exposure and bounds per design class across the census (the cut), the shape across prompt lengths (the length), a synthetic design that varies the balance and the chunk count directly, and one control per clause
-Rescheduling pays only where the condition holds, in an amount set by how a design cuts its work and by the prompt length (Section~\ref{subsec:question}), as we show across the design classes of our census, across prompt lengths, on a synthetic design, and with one control per clause.
+Rescheduling frees overlap only where the condition holds, in an amount set by how a design cuts its work and by the prompt length (Section~\ref{subsec:question}), as we show across the design classes of our census, across prompt lengths, on a synthetic design, and with one control per clause.
 
 \label{subsec:exposure}
 % VALUE: what the exposure measures and what it does not: per workload, the exposure M (share of wall time in commands whose configuration holds two or more operators), the bound b on reorders inside those commands, and the ceiling they imply; these cover the reorders inside a design's existing commands, which is all a closed stack lets us rewrite, whereas on an open fused design that issues one operator per command the composer re-cuts the commands, which the per-removal bound prices
