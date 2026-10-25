@@ -1,10 +1,3 @@
-\section{Motivation}
-\label{sec:motivation}
-
-% VALUE: a fused design avoids reconfiguration, but its operators then share the CP's order; this section shows that the order decides which groups work at once, that fused designs leave independent groups waiting, and when removing those waits can pay
-% DECISION: the lead insight is that the CP's instruction order is the array's schedule and is fixed in the emitted streams; "rationed by false dependences" is its consequence and is never stated as the lead.
-A fused design avoids reconfiguring the array between operators, but its operators then share the CP's order of issue, and this section shows what that order costs.
-
 \subsection{Command Semantics}
 \label{subsec:semantics}
 
@@ -90,13 +83,5 @@ How much each remaining one frees, whether that exceeds its cost, and what a rew
 How much work meets both clauses is set by how the design cuts its work, into configurations, into commands, and into buffers, and by the prompt length, which sets the balance between attention and the GEMMs, and so they set what rescheduling can recover.
 The issue order that pays therefore changes with the prompt and must be priced per length rather than fixed.
 The split that pays moves with the same balance, because more attention columns shorten attention but lengthen every GEMM.
-We call the designs we read from three stacks our \emph{census}, and Section~\ref{subsec:census} checks how the analysis reads it.
-Section~\ref{subsec:pays} tests the condition across the census's design classes, across prompt lengths, on a synthetic design, and with one control per clause.
+We call the designs we read from three stacks our \emph{census}, and Section~\ref{subsec:pays} tests the condition across its design classes, across prompt lengths, on a synthetic design, and with one control per clause.
 % SOURCE: the condition and its resource wording (vault paper-cosched-decisions-log, "The lead", "The legality control is a designed single-hazard rewrite; the condition's resource wording", 2026-10-24); the census tags each instance by it, and the re-tag under the duplicable-resource wording changes no verdict on any stack (aie-cosched 460383a, rows e857444).
-
-% VALUE: removing these waits from compiled designs poses four challenges, each with its reason and the section that answers it: tell which of a design's many false orders can pay (the bound, Section 4, and the evidence of Section 6.7); recover the order from binaries without their source, although even an open design spreads it over the CP's stream, DMA chains, and core loops (Section 4); price an order without running it, because the artifact fixes the order but not the durations and the candidates multiply (Section 5); show a rewrite legal without the compiler that built the design (Sections 4 and 5)
-Removing these waits from already compiled designs poses four challenges.
-First, a design holds many false orders, most of which cost nothing, so each must be bounded to tell which kinds are worth a rewrite (Section~\ref{subsec:removal}).
-Second, the order must be recovered from binaries without their source, and even an open design spreads it over the CP's stream, DMA chains, and core loops (Section~\ref{sec:order}).
-Third, an order must be priced without running it, because the artifact fixes the order of the work but not its durations, and the candidates multiply with chunks, column splits, and removals (Section~\ref{subsec:pricing}).
-Fourth, a reorder or a rename must be shown legal without the compiler that built the design, from what the instructions alone establish about buffers, locks, and routes (Sections~\ref{subsec:legality} and~\ref{subsec:checkers}).

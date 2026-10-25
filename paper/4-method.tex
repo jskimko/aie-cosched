@@ -1,4 +1,33 @@
-\section{Reading Compiled Designs}
+\section{OPCORD}
+\label{sec:method}
+
+\subsection{Overview}
+\label{subsec:overview}
+
+% VALUE: removing these waits from compiled designs poses four challenges, each with its reason and the section that answers it: tell which of a design's many false orders can pay (the bound, Section 4, and the evidence of Section 6.7); recover the order from binaries without their source, although even an open design spreads it over the CP's stream, DMA chains, and core loops (Section 4); price an order without running it, because the artifact fixes the order but not the durations and the candidates multiply (Section 5); show a rewrite legal without the compiler that built the design (Sections 4 and 5)
+Removing these waits from already compiled designs poses four challenges.
+First, a design holds many false orders, most of which cost nothing, so each must be bounded to tell which kinds are worth a rewrite (Section~\ref{subsec:removal}).
+Second, the order must be recovered from binaries without their source, and even an open design spreads it over the CP's stream, DMA chains, and core loops (Section~\ref{sec:order}).
+Third, an order must be priced without running it, because the artifact fixes the order of the work but not its durations, and the candidates multiply with chunks, column splits, and removals (Section~\ref{subsec:pricing}).
+Fourth, a reorder or a rename must be shown legal without the compiler that built the design, from what the instructions alone establish about buffers, locks, and routes (Sections~\ref{subsec:legality} and~\ref{subsec:checkers}).
+
+% VALUE: design opener: OPCORD removes the false dependences of §3.3 in steps, each answering a property of the platform: a blocking in-order CP (reorder issue, by the composer across operators and the stream pass within one), one buffer per role in decode's loop (the loop pass's rings), an order and a split that pay differently with the prompt length (both chosen per length by the event model), designs it did not compile (checkers that refuse with a reason)
+% DECISION: the opener follows the FPGA'27 design opener, each property of the platform followed by the mechanism that answers it, with one subsection per property (STYLE.md, Paper structure, Design; contract §6).
+% DECISION: the legality conditions themselves live in Section~\ref{sec:order}; this section states only how OPCORD acts on them, namely checkers that accept a rewrite or refuse it with a reason (contract §6).
+OPCORD runs the analysis of Section~\ref{sec:order} on each design, takes from it the segments and the legality conditions, provides a rewrite only for the kinds of false order whose bound leaves room, and answers each property of the platform behind the waits of Section~\ref{subsec:losses} with one mechanism.
+Because a synchronization blocks the in-order CP, our composer and stream pass issue every group's work before the CP waits on any (Section~\ref{subsec:order}).
+Because decode attention's loop keeps one buffer per role, our loop pass renames those buffers into rings (Section~\ref{subsec:rings}).
+Because the issue order and the split that pay change with the prompt length, the composer chooses both per length with an event model (Sections~\ref{subsec:split} and~\ref{subsec:pricing}).
+Because OPCORD rewrites designs it did not compile, checkers refuse, with a reason, any rewrite they cannot show legal (Section~\ref{subsec:checkers}).
+\begin{figure}[t]
+    \centering
+    % DECISION: the overview figure (figs/diagrams.py fig_framework), added after the 2026-10-25 independent review (both reviewers asked for a system overview); the bound sits with the dependence graph, the event model prices per length
+    \includegraphics[width=\linewidth]{fig/framework.pdf}
+    \caption{OPCORD over a compiled design: the analysis reads its streams into a dependence graph whose edges are true, name, or order dependences and bounds each false order, the event model prices each candidate order and split per prompt length, and each reorder or rename runs only behind a legality check, which otherwise refuses with its reason.}
+    \label{fig:framework}
+\end{figure}
+
+\subsection{Reading Compiled Designs}
 \label{sec:order}
 
 % VALUE: the opening claim: nothing on XDNA 2 reorders work across engines, so a design's schedule and its waits can be read from the streams its stack emits, and the compiled design, open or closed, is the input to scheduling; arbitration is a resource and durations are left to measurement
@@ -12,7 +41,7 @@ The analysis rests on one assumption, that a core touches a buffer it shares wit
 Because every synchronization in which the CP and the DMAs take part appears in the streams we read, and the cores reach host memory and memory tiles only through DMAs, this assumption suffices on XDNA~2, and any access the analysis cannot observe is treated as a conflict.
 For a closed design, whose core programs we cannot read, the assumption cannot be checked, so the verdicts we give on closed designs rest on it.
 
-\subsection{Reading a Stream}
+\textbf{Reading a Stream.}
 \label{subsec:reading}
 \label{subsec:model}
 
@@ -39,7 +68,45 @@ Because each class is computed with every other edge in place, it says what remo
 % SOURCE: classification by Lost(e), REDUNDANT, CONTROL, loop-carried distance (vault lab-cosched-passes (30), item 3); computed at stream granularity by aie-cosched-stream-deps (mlir-aie 2392abdc230 onward, fixture stream-turns with ORDER, NAME, RAW and REDUNDANT edges, lab-cosched-passes (49)), which agrees with its Python oracle on every compared count on 792 of 793 population streams, the 793rd too large for either (mlir-aie 0489d325082, lab-cosched-passes (53)); at loop granularity by AIECoschedDeps, whose buffer classes are the Lost-pair classes of the loop-carried edges (lab-cosched-passes (33)), with order edges and critical cycles computed in results/2026-10-23-order-loop (mlir-aie dev 58569749d3e..36f725e8e6e).
 % DECISION: the classes, the unattributed and redundant counts, and the pairs each edge alone orders are computed by the analysis (the stream graph and the loop library); the stream-granularity instances below were identified by reading the designs and confirmed by measurement, so the text never says that the analysis found them. The census of Section~\ref{subsec:census} counts instances that the stream pass proposes and the device confirms; it never classifies edges, and the two quantities are never conflated in the text.
 
-\subsection{Legality Conditions}
+\textbf{Closed Binaries.}
+\label{subsec:closed}
+
+% VALUE: a closed stack ships binaries only, so its streams are recorded at the runtime's boundary and lifted with a byte-identical round trip; closed streams are read and judged (each issue attributed by the decoded routes) but not rewritten, and removals are made on the open reimplementation of the same designs
+FastFlowLM ships its designs as binaries, so we record their instruction streams at the runtime's boundary and lift each into MLIR-AIE's runtime sequence, its intermediate form for a command's instruction stream, from which every stream recorded offline re-emits byte for byte.
+We read, judge, and bound these streams, attributing each issue to a column group by the decoded routes, and we observe the host at the same boundary, through the buffers each command binds and the engine's own reads and writes of mapped buffers between commands.
+On a closed stack, a rewrite could only swap a command's stream, reorder or merge commands that no closed host step separates, or narrow a wait, letting a host step start before the command it waits on has completed once the results it reads are ready, where every host access to device results is observed at the runtime's boundary, so the closed host's own steps and its core loops stay as they are.
+We therefore bound every such rewrite (Section~\ref{subsec:removal}) and replay on the device only those whose bound leaves room, to test the bound against measurement rather than to deploy the rewrite, whereas OPCORD rewrites the open designs in use (Section~\ref{sec:method}).
+% SOURCE: the closed-stack rule and the host observed at the driver boundary (spine v18, The system; census partb/README); the measured rewrites are the merges at the 128-token bucket and e4898ce3's stream (census partb/replay/, registered 3ae0370, 67d54fe).
+% SOURCE: recording libhrx (FastFlowLM 44d01787, gemma4e-flash), every prompt length 1-1,024 recorded with 0 /dev/accel opens; 8 buckets, 218 distinct streams, round trip and identity 218 / 218 (vault lab-cosched-passes (14)); lifter fix mlir-aie 91f64387ffb, 375 / 375 MLIR-AIR streams byte-identical (lab-cosched-passes (3)).
+% SOURCE: streams recorded with a library that never opens the device, or captured with an XRT interposer during a device run (gemma4e-flash:e2b, 1,009 tokens; appendix-body.tex, app:capture (cut 2026-10-24)); route maps from the cdo_routes decoder: shim 3 and shim 6 MM2S0 reach only columns 0 and 7 (vault lab-flm-streams (11), (13)); the attribution rule and both labels are in appendix-body.tex, app:attribution (cut 2026-10-24).
+
+\textbf{Bounding a Removal.}
+\label{subsec:removal}
+
+% VALUE: one removal is worth at most the overlap it blocks on typed resources, given every other edge; zero off the longest path; in a loop the maximum cycle mean governs; Amdahl's law for an ordering, from the order and measured durations, not a trace
+Removing a false order $d$ speeds a phase up by at most $T / (T - O(d))$, where $T$ is the phase's time and $O(d)$ is the time during which $d$ keeps work on disjoint resources from overlapping, given every other edge of the happens-before graph.
+The resources are typed, namely the column groups, the CP with its cost at each command boundary, the DRAM read rate up to its cap, and the DMA channels that one group uses on another group's columns, and each runs its own work in turn, so the phase's time is the longest path through the graph with those resources' orders included, and $O(d)$ is zero when $d$ lies off it.
+Because these resources include the core tiles and DMA channels that a rewrite cannot duplicate, and a true dependence stays an edge, a false order that fails either clause of the condition (Section~\ref{subsec:question}) frees no overlap and bounds at $1.000\times$.
+In a loop, the maximum cycle mean of the repeating graph determines the time per iteration instead~\citep{ghamarian2006throughput}.
+The bound is thus Amdahl's law applied to an ordering, computed from the program and from \emph{probes}, which time each operator dispatched alone, without the timing trace that the tools of Section~\ref{sec:related} start from.
+
+% VALUE: for a set of removals the textbook critical-path condition applies (cited, one sentence, never a finding); we use it as a test that discards sets that cannot pay; on this machine it is necessary, not sufficient (the next longest path; shared capacity); the decode instance is in the evaluation
+A set of removals gains only if it cuts every path or cycle that attains the maximum, the critical-path rule of interaction-cost analysis~\citep{fields2003interaction} that Section~\ref{subsec:question} refines, and then only down to the next longest path and to what the shared DRAM read cap leaves.
+We use it as a test on the happens-before graph with measured costs, which discards every candidate set that cannot pay.
+To bound a set of removals taken at once, as Section~\ref{subsec:pays} does for the census, we delete them together, the false edges as edges and the rewrites inside commands and the merges as shorter durations, and recompute the longest path with every command that shares a column or a channel kept in its recorded order, so the joint bound is $T$ over that path's length, a bound over the rewrites that keep each shared resource's order.
+% SOURCE: joint bound b = T0 / Tj, both by the same fixed-order schedule (aie-cosched passes/census_partb_terms.py, schedule() line 150, legal-rewrite-space joint in main() 323-350, last change 55e5c6e); false boundary edges deleted, accepted in-command savings and merges as shorter durations, true waits narrowed; recorded order kept on shared resources (pass-0, 2026-10-25).
+% SOURCE: the acyclic condition is the minimum cut of a critical subnetwork in project crashing (Kelley 1961; Fulkerson 1961), the cyclic one the iteration bound and maximum cycle mean (Ghamarian 2006; Stuijk 2008), and the set view is interaction cost (Fields 2003); all are cited in Section 7, never claimed.
+% SOURCE: the test is the in-tree set test, acyclic half (longest path, cut, next longest; mlir-aie 7240529eb562, lit 19/19) and loop half (periodic graph, Howard's algorithm, critical subgraph; mlir-aie 54a8b8e192c, lit 10/10) (vault paper-cosched-decisions-log, P1 and P3).
+% DECISION: the critical-path condition is textbook; Section 3.3 states it as the rule the condition refines and this section uses it as a test, each with its citation; it is a tool, never a finding, and the decode partial-rename instance lives in Section 6.3 (section contract; outline v10.1).
+% DECISION: the condition is stated as necessary only: a longest-path or cycle criterion is valid on an uncapacitated graph, and this machine has a shared DRAM cap, a shared command processor and a per-command boundary cost; the capacity half is the measured regime of this section, and the 8B at the cap is the negative instance inside the paper.
+% DECISION: the bound's sentences follow outline v9 section 3's rows (P4 withdraws them, P4u marks them untested); the critical-cycle sentences follow the W1-W5 table.
+
+% VALUE: the bound is prescriptive (build a removal only where its bound exceeds its cost); since it never falls below one it cannot predict a loss, which the event model prices instead (the short prompts, in the evaluation)
+A kind of removal is therefore worth a rewrite only where its bound exceeds its cost, which for a rename is the local memory, BDs, locks, and channels it takes, and for a reorder the synchronization and planning it adds.
+The bound cannot predict a loss, such as the per-command costs that make reordering lose on prompts of two chunks, so OPCORD's event model prices those (Section~\ref{subsec:pricing}).
+% SOURCE: the bound and its typed resources (outline v9 section 2, C1; vault lab-bound-validation (1)).
+
+\subsection{Legality}
 \label{subsec:legality}
 
 % VALUE: a class does not make a rewrite safe, because a rewrite moves many instructions at once, so each rewrite is judged as a whole against conditions that the streams and their configuration decide without the source: a reorder keeps every instruction once and each operator's and each channel's order, and every pair it inverts must be independent on host bytes, BDs, task queues, ports, and its own group's fences; between whole operators, disjoint device state makes every interleaving legal at once; operators on one group stay in sequence
@@ -65,48 +132,17 @@ Because the conditions hold only if the locations cover all the state an operati
 % SOURCE: refusals where the stream cannot decide: RANGE-UNKNOWN, RESOURCE-UNPROVEN, FENCE-CROSSED-UNPROVEN (legality.py codes, lab-cosched-passes (10)); in the census, 16 production-engine streams refused with QUEUE-OVERFLOW, 8 of them also FENCE-CROSSED-UNPROVEN, and IRON's proposals refused for queue room not provable from the stream (aie-cosched baf37e0, lab-cosched-passes (62), P7b; B-prime, (46)).
 % SOURCE: bit-identical logits for every composed prefill and append, and identical tokens and logits for every renamed decode (Section~\ref{subsec:setup} defaults; vault lab-decode-long-context (22)).
 
-\subsection{Closed Binaries}
-\label{subsec:closed}
+\textbf{Checkers.}
+\label{subsec:checkers}
 
-% VALUE: a closed stack ships binaries only, so its streams are recorded at the runtime's boundary and lifted with a byte-identical round trip; closed streams are read and judged (each issue attributed by the decoded routes) but not rewritten, and removals are made on the open reimplementation of the same designs
-FastFlowLM ships its designs as binaries, so we record their instruction streams at the runtime's boundary and lift each into MLIR-AIE's runtime sequence, its intermediate form for a command's instruction stream, from which every stream recorded offline re-emits byte for byte.
-We read, judge, and bound these streams, attributing each issue to a column group by the decoded routes, and we observe the host at the same boundary, through the buffers each command binds and the engine's own reads and writes of mapped buffers between commands.
-On a closed stack, a rewrite could only swap a command's stream, reorder or merge commands that no closed host step separates, or narrow a wait, letting a host step start before the command it waits on has completed once the results it reads are ready, where every host access to device results is observed at the runtime's boundary, so the closed host's own steps and its core loops stay as they are.
-We therefore bound every such rewrite (Section~\ref{subsec:removal}) and replay on the device only those whose bound leaves room, to test the bound against measurement rather than to deploy the rewrite, whereas OPCORD rewrites the open designs in use (Section~\ref{sec:method}).
-% SOURCE: the closed-stack rule and the host observed at the driver boundary (spine v18, The system; census partb/README); the measured rewrites are the merges at the 128-token bucket and e4898ce3's stream (census partb/replay/, registered 3ae0370, 67d54fe).
-% SOURCE: recording libhrx (FastFlowLM 44d01787, gemma4e-flash), every prompt length 1-1,024 recorded with 0 /dev/accel opens; 8 buckets, 218 distinct streams, round trip and identity 218 / 218 (vault lab-cosched-passes (14)); lifter fix mlir-aie 91f64387ffb, 375 / 375 MLIR-AIR streams byte-identical (lab-cosched-passes (3)).
-% SOURCE: streams recorded with a library that never opens the device, or captured with an XRT interposer during a device run (gemma4e-flash:e2b, 1,009 tokens; appendix-body.tex, app:capture (cut 2026-10-24)); route maps from the cdo_routes decoder: shim 3 and shim 6 MM2S0 reach only columns 0 and 7 (vault lab-flm-streams (11), (13)); the attribution rule and both labels are in appendix-body.tex, app:attribution (cut 2026-10-24).
+% VALUE: the composer and both passes each carry a checker that tests the legality conditions of Section 4 (pointed to, not restated) on the facts its rewrite touches; the composer's checks stop the composition rather than drop an operator; the stream pass checks every inverted pair and leaves the stream unchanged on a finding, saying whether illegal or not shown legal; the loop pass refuses a buffer it cannot show renamable and confirms its own output
+The composer and both passes each carry a checker that tests the conditions of Section~\ref{subsec:legality} on the facts its rewrite touches, and a check that fails leaves the composition or the stream unchanged and names its reason, rather than dropping an operator or an instruction.
+The stream pass's checker also has a second, independent implementation, against which Section~\ref{subsec:legality-eval} compares its verdicts.
+The loop pass also refuses a buffer used outside its block loop, and it re-checks each ring and the carried state on its output.
+% SOURCE: composer checks (whole-operator condition, no early ring-slot reuse, each split within a shim BD's fields): own-group register writes (shim BDs and DMA queues, own cores' locks, own cores' runtime parameters), disjoint argument slots or byte ranges, segment order and every op once, assert_no_hazard on ring slots, BD iteration wrap 6 bits and stride 20 bits per GEMM, check_posted for commands in flight; each turns red on a defeated input (lab-prefill-overlap (3), (4), (9); lab-split-sweep (5), (35)); checks fail rather than drop, 26 / 26 (decisions log D24 N1).
+% SOURCE: stream checker in C++ inside aie-cosched-schedule, route facts from the device IR (mlir-aie cosched-flag e20940fac7e); findings RANGE-OVERLAP, RANGE-UNKNOWN, BD-REUSE, PUSH-BEFORE-BD-WRITE, QUEUE-OVERFLOW, NOT-PERMUTATION, CHANNEL-ORDER, BD-ORDER, SKELETON-MOVED and the route codes; any finding refuses the whole rewrite and the IR is unchanged; outcomes DECIDED (shown illegal) against RESOURCE-UNPROVEN, RANGE-UNKNOWN, TOOL-FAILED, PASS-ERROR (not shown legal) (vault lab-cosched-passes (57) steps 3-5, and the checker's reason list).
+% SOURCE: loop pass input checks (one free / full lock pair, free lock starting at 1, BD and L1 budgets, every BD block ending in a next_bd, use inside a block loop, supported loop control) and output check (ring as made, carried state's users unchanged, budgets), mlir-aie aie-cosched-pass-0 e9fc225b2b6 / ba7ea1aa552, cherry-picked to cosched-flag (lab-cosched-passes (56), (57) step 2).
 
-\subsection{Bounding a Removal}
-\label{subsec:removal}
-
-% VALUE: one removal is worth at most the overlap it blocks on typed resources, given every other edge; zero off the longest path; in a loop the maximum cycle mean governs; Amdahl's law for an ordering, from the order and measured durations, not a trace
-Removing a false order $d$ speeds a phase up by at most $T / (T - O(d))$, where $T$ is the phase's time and $O(d)$ is the time during which $d$ keeps work on disjoint resources from overlapping, given every other edge of the happens-before graph.
-The resources are typed, namely the column groups, the CP with its cost at each command boundary, the DRAM read rate up to its cap, and the DMA channels that one group uses on another group's columns, and each runs its own work in turn, so the phase's time is the longest path through the graph with those resources' orders included, and $O(d)$ is zero when $d$ lies off it.
-These typed resources include the column groups' core tiles and the DMA channels that the condition of Section~\ref{subsec:question} says a rewrite cannot duplicate, and a true dependence between two pieces of work stays an edge of the graph, so a false order that fails either of its clauses frees no overlap and bounds at $1.000\times$.
-In a loop, the maximum cycle mean of the repeating graph determines the time per iteration instead~\citep{ghamarian2006throughput}.
-The bound is thus Amdahl's law applied to an ordering, computed from the program and from \emph{probes}, which time each operator dispatched alone, without the timing trace that the tools of Section~\ref{sec:related} start from.
-
-% VALUE: for a set of removals the textbook critical-path condition applies (cited, one sentence, never a finding); we use it as a test that discards sets that cannot pay; on this machine it is necessary, not sufficient (the next longest path; shared capacity); the decode instance is in the evaluation
-A set of removals gains only if it cuts every path or cycle that attains the maximum, the critical-path rule of interaction-cost analysis~\citep{fields2003interaction} that Section~\ref{subsec:question} refines, and then only down to the next longest path and to what the shared DRAM read cap leaves.
-We use it as a test on the happens-before graph with measured costs, which discards every candidate set that cannot pay.
-To bound a set of removals taken at once, as Section~\ref{subsec:pays} does for the census, we delete them together, the false edges as edges and the rewrites inside commands and the merges as shorter durations, and recompute the longest path with every command that shares a column or a channel kept in its recorded order, so the joint bound is $T$ over that path's length, a bound over the rewrites that keep each shared resource's order.
-% SOURCE: joint bound b = T0 / Tj, both by the same fixed-order schedule (aie-cosched passes/census_partb_terms.py, schedule() line 150, legal-rewrite-space joint in main() 323-350, last change 55e5c6e); false boundary edges deleted, accepted in-command savings and merges as shorter durations, true waits narrowed; recorded order kept on shared resources (pass-0, 2026-10-25).
-% SOURCE: the acyclic condition is the minimum cut of a critical subnetwork in project crashing (Kelley 1961; Fulkerson 1961), the cyclic one the iteration bound and maximum cycle mean (Ghamarian 2006; Stuijk 2008), and the set view is interaction cost (Fields 2003); all are cited in Section 7, never claimed.
-% SOURCE: the test is the in-tree set test, acyclic half (longest path, cut, next longest; mlir-aie 7240529eb562, lit 19/19) and loop half (periodic graph, Howard's algorithm, critical subgraph; mlir-aie 54a8b8e192c, lit 10/10) (vault paper-cosched-decisions-log, P1 and P3).
-% DECISION: the critical-path condition is textbook; Section 3.3 states it as the rule the condition refines and this section uses it as a test, each with its citation; it is a tool, never a finding, and the decode partial-rename instance lives in Section 6.3 (section contract; outline v10.1).
-% DECISION: the condition is stated as necessary only: a longest-path or cycle criterion is valid on an uncapacitated graph, and this machine has a shared DRAM cap, a shared command processor and a per-command boundary cost; the capacity half is the measured regime of this section, and the 8B at the cap is the negative instance inside the paper.
-% DECISION: the bound's sentences follow outline v9 section 3's rows (P4 withdraws them, P4u marks them untested); the critical-cycle sentences follow the W1-W5 table.
-
-% VALUE: the bound is prescriptive (build a removal only where its bound exceeds its cost); since it never falls below one it cannot predict a loss, which the event model prices instead (the short prompts, in the evaluation)
-A kind of removal is therefore worth a rewrite only where its bound exceeds its cost, which for a rename is the local memory, BDs, locks, and channels it takes, and for a reorder the synchronization and planning it adds.
-The bound cannot predict a loss, such as the per-command costs that make reordering lose on prompts of two chunks, so OPCORD's event model prices those (Section~\ref{subsec:pricing}).
-% SOURCE: the bound and its typed resources (outline v9 section 2, C1; vault lab-bound-validation (1)).
-
-% VALUE: where the classes fall in the designs our passes rewrite: order dependences in the prefill's stream (groups and attention's columns take turns; in the captured production prefill the turns fall only between commands and are held by true dependences) and name dependences in decode attention's loop (keys, values, scores; the carried state is true); stream name dependences and loop order dependences lie off every longest path or critical cycle we compute
-In the designs we evaluate (Section~\ref{subsec:setup}), namely the MLIR-AIR designs our passes rewrite, the costly instances are order dependences in the prefill's stream, which hold back one column group behind another and one column of attention behind the other, and name dependences in decode attention's loop on its keys, its values, and its scores, whereas its running maximum and accumulator carry true dependences.
-In the FastFlowLM flash prefill we record, the column groups also take turns between commands, as MLIR-AIR's do, but each layer's attention runs once over the whole prompt, so true dependences, through its host or its device memory, hold every turn, so the false waits its host adds there repeat a true order and free no overlap (Section~\ref{subsec:observed}).
-The other two combinations, name dependences in the stream and order dependences in a loop, occur in these designs only off every longest path or critical cycle we compute with this test.
-% SOURCE: aie-cosched 93f491b, mlir-aie f9ad95dc02f (lab-cosched-passes (62), P7c; lit 36/36): cost-free over 792 analysed streams, NAME edges on 543/543 MLIR-AIR streams (30,198 edges, 25,016 able to lie on a blocking path), 209/218 production-engine streams (272,582, all able), 6/31 IRON (504); kinds descriptor and control-register everywhere, configuration writes on the fused decode only (7,244), queue-slot reuse (104 MLIR-AIR, 27 IRON), dispatch end; with measured task costs (the S4 prefill cell, 34 streams) 246 end-kind NAME edges lie on a longest path but removing every NAME edge leaves every stream's length unchanged (34/34). Corrected 2026-10-23: the earlier text said no name dependence appears in the stream.
-% SOURCE: the score buffer shared_l10 is name x loop in the existing build (lab-cosched-passes (30), item 5).
-% SOURCE: aie-cosched results/2026-10-23-order-loop (registered ca13ac5, 579d8d1; results 579d8d1, 0ae7bc9; mlir-aie dev 58569749d3e..36f725e8e6e, lit 49/49): decode attention's 34 group leads carry #6 BD-chaining and #11 program-order edges; with (59)'s costs the critical cycle is 28 RAW + 12 name edges as shipped (1.1466 per iteration) and 36 RAW after the loop pass (0.6487), no order edge on either, and removing every order edge leaves both ratios unchanged; the steady-state order edges are memtile (3,1) MM2S channel 0's chain buf169 -> buf168 (census.mlir 4871-4883), two slots of one ring with separate locks. Decodes, structure only: in 9 groups (core 5_3) a memtile (4,1) #6 edge is on a critical cycle but removing order edges moves no group's ratio (an equal cycle remains). Prefill: 279 groups fail to fold to one steady edge set, the rest exceed the attribution cap, so no verdict.
+% VALUE: a pass, unlike a hand edit, applies its legality condition to designs nobody has read, judged without gains claimed
+A hand edit reaches only the streams someone reads, whereas a pass that accepts or refuses every stream applies its legality condition to designs nobody has read, whose verdicts Section~\ref{subsec:census} reports as judgments rather than gains.
+% DECISION: designs never examined are judged by the passes, and no gain is claimed on them (contract, No overclaim).

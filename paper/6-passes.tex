@@ -1,22 +1,3 @@
-\section{OPCORD}
-\label{sec:method}
-
-% VALUE: design opener: OPCORD removes the false dependences of §3.3 in steps, each answering a property of the platform: a blocking in-order CP (reorder issue, by the composer across operators and the stream pass within one), one buffer per role in decode's loop (the loop pass's rings), an order and a split that pay differently with the prompt length (both chosen per length by the event model), designs it did not compile (checkers that refuse with a reason)
-% DECISION: the opener follows the FPGA'27 design opener, each property of the platform followed by the mechanism that answers it, with one subsection per property (STYLE.md, Paper structure, Design; contract §6).
-% DECISION: the legality conditions themselves live in Section~\ref{sec:order}; this section states only how OPCORD acts on them, namely checkers that accept a rewrite or refuse it with a reason (contract §6).
-OPCORD runs the analysis of Section~\ref{sec:order} on each design, takes from it the segments and the legality conditions, provides a rewrite only for the kinds of false order whose bound leaves room, and answers each property of the platform behind the waits of Section~\ref{subsec:losses} with one mechanism.
-Because a synchronization blocks the in-order CP, our composer and stream pass issue every group's work before the CP waits on any (Section~\ref{subsec:order}).
-Because decode attention's loop keeps one buffer per role, our loop pass renames those buffers into rings (Section~\ref{subsec:rings}).
-Because the issue order and the split that pay change with the prompt length, the composer chooses both per length with an event model (Sections~\ref{subsec:split} and~\ref{subsec:pricing}).
-Because OPCORD rewrites designs it did not compile, checkers refuse, with a reason, any rewrite they cannot show legal (Section~\ref{subsec:checkers}).
-\begin{figure}[t]
-    \centering
-    % DECISION: the overview figure (figs/diagrams.py fig_framework), added after the 2026-10-25 independent review (both reviewers asked for a system overview); the bound sits with the dependence graph, the event model prices per length
-    \includegraphics[width=\linewidth]{fig/framework.pdf}
-    \caption{OPCORD over a compiled design: the analysis reads its streams into a dependence graph whose edges are true, name, or order dependences and bounds each false order, the event model prices each candidate order and split per prompt length, and each reorder or rename runs only behind a legality check, which otherwise refuses with its reason.}
-    \label{fig:framework}
-\end{figure}
-
 \subsection{Reordering Issue}
 \label{subsec:order}
 
@@ -35,7 +16,7 @@ A command concatenates its operators' segments under the conditions of Section~\
 
 % VALUE: within a command, the composer opens every group's work and then places each synchronization at its predicted completion, followed by the issue it gates, so no synchronization holds back another group's work; attention's two columns count as two groups; the order is fixed at build time and runs without the host; its price is the shared DRAM read rate, priced in Section 5.4
 Packing the operators into one command in turn would still leave the GEMM group idle while the CP walks attention's synchronizations (Figure~\ref{fig:order}a), so the composer issues the opening segments of every group first.
-It then places each synchronization in order of its \emph{predicted completion}, estimated from the probes, followed by the issue it gates.
+It then places each synchronization in the order in which the probes predict its transfer completes, followed by the issue it gates.
 Attention's two columns count as two groups for this order, so their segments alternate as well.
 The estimates fix this order when the command is built, and the CP executes it without the host.
 Running both groups at once makes a group that reads at the shared DRAM read cap also carry its co-runner's reads (Section~\ref{subsec:semantics}), so a design already near the cap gains little.
@@ -65,17 +46,13 @@ The prefill needs no renaming, because the existing host program already gives e
 % SOURCE: shipped naming is one slot per role per chunk; R-ship (the composed schedule at shipped's per-chunk naming) equals the composer with rings within 0.1% (0.99996-1.00074, amd-npu 71081d1) and holds 4-7x the rings' buffer bytes (vault lab-prefill-overlap (29), third revision); merged.colour and Layout (a0ee2ed, now opcord/compose/merged.py).
 % DECISION: the prefill rings remove nothing and are never listed as a removal (decisions log D19, 2026-10-22).
 
-\subsection{Column Splits}
+\subsection{Pricing and Choosing}
+\label{subsec:pricing}
 \label{subsec:split}
-
-% VALUE: the split is a build parameter of the existing design; the legal splits S1, S2 (default), S4 follow from the KV heads; each split is its own configuration built from the unchanged source, with outputs bit-identical to the default split, so the existing program and the composer each run on any of them
-The existing program fixes its split as a build parameter, and since each attention group serves an equal share of the KV heads, an LLM with 8 KV heads admits attention on 1, 2, or 4 columns, which are the supported splits $S_1$, $S_2$, and $S_4$, with $S_2$ the default.
 We build each split as its own configuration with the design's own build, unchanged apart from its split parameter, with outputs bit-identical to those of the default split, so the existing program and the composed order can each run on any of them.
 % SOURCE: mlir-air a3e26261 fused_prefill/device.py: Attn(col=...) per group in Config.attn, GCOL0, GNC = 1, 6 as module constants; spec() splits kv_heads evenly, so 1, 2, or 4 attention columns with 8 KV heads (vault lab-split-sweep (1)).
 % SOURCE: out-of-tree split modules; logits bit-identical to the default split in every configuration on both models (vault lab-split-sweep (2), (4), (5)).
 
-\subsection{Pricing and Choosing}
-\label{subsec:pricing}
 
 % VALUE: the problem in words: a schedule makes three essential decisions (the split; the order in which the CP interleaves each command's segments, each operator's kept in order; the buffer assignment); operators hand data over through DRAM, so a consumer issues after its producer's last synchronization and any host work, in a separate command; D and packing manage only the host boundary and are reported apart; the objective is the makespan
 % DECISION: no NP-hardness claim until a reduction is written; with negligible issue cost and one layer's fixed per-chunk pattern the problem has the structure of a two-machine chain-reentrant shop (wang1997reentrant), and with non-negligible issue cost the CP acts as a shared server (glass2000dedicated, hall2000common) (vault ch3-formulation, Relation to classical scheduling).
@@ -114,7 +91,6 @@ No constant is fitted to an LLM's end-to-end runs, so every LLM and prompt lengt
 
 % VALUE: before a prompt length runs, the composer prices every candidate (split, existing or composed order, host policy) with the event model and runs the cheapest, settling near-ties by a short measurement; more attention columns shorten attention and lengthen the GEMMs, so the split that pays moves with the balance of the two groups; because the existing order is a candidate, the composer keeps it where composing is priced higher, as at prompts of one or two chunks
 Before a prompt length runs, the composer prices every candidate with the event model, namely each split, the existing order, the existing order after the stream pass, and the composed order, and each number $D$ of commands in flight and packing of commands, and it runs the cheapest unless the near-tie rule below applies.
-More attention columns shorten attention, whose time grows with the prompt, but lengthen every GEMM, so the split that pays moves with the balance between the two groups (Section~\ref{subsec:pays}).
 Because the existing order is among the candidates, the composer keeps it wherever composing is priced higher, as at prompts of one or two chunks.
 % SOURCE: opcord/plan/planner.py choose(model, L, N): candidates every split with a committed probe (S1, S2, S4), arms ship / shipar / comp, composer policies depth {1, 2, 4, 8} x GEMM cap {none, 4} x packing {1, 4}, each priced by event_model.predict, cheapest returned with the whole table; measure-when-close (planner.decide) as in Section~\ref{subsec:pricing}.
 % SOURCE: the four-column split's GEMMs are 27% (1B) and 35% (Qwen3-4B) slower than on six columns, and its attention slope per chunk 3.0-3.1x lower than the default split's existing stream (vault lab-split-sweep (4)-(5)).
@@ -125,21 +101,6 @@ Because a choice compares candidates, we state the event model's error on the di
 Its choice is then right whenever two candidates differ by more than about twice its largest error on a difference, and otherwise costs at most about that much.
 Where the top candidates fall inside a band of 5\% for orders of one kind or 15\% between a composed and an existing order, the composer runs each candidate briefly when it plans the prompt length and keeps the faster, and we always report the event model's unaided choice beside it (Section~\ref{subsec:decision}).
 % SOURCE: measure-when-close, implemented test-first in opcord (planner.CLOSE_BAND, close_candidates, decide; test_measure_close 10/10); bands same 5%, cross 15%, tie 0.5%, one warm and three kept runs per candidate; about 19 min of device time over the whole grid, once per shape (vault decisions log, "Spine v18 drafted; amendment-1 batch and measure-when-close approved").
-
-\subsection{Legality Checkers}
-\label{subsec:checkers}
-
-% VALUE: the composer and both passes each carry a checker that tests the legality conditions of Section 4 (pointed to, not restated) on the facts its rewrite touches; the composer's checks stop the composition rather than drop an operator; the stream pass checks every inverted pair and leaves the stream unchanged on a finding, saying whether illegal or not shown legal; the loop pass refuses a buffer it cannot show renamable and confirms its own output
-The composer and both passes each carry a checker that tests the conditions of Section~\ref{subsec:legality} on the facts its rewrite touches, and a check that fails leaves the composition or the stream unchanged and names its reason, rather than dropping an operator or an instruction.
-The stream pass's checker also has a second, independent implementation, against which Section~\ref{subsec:legality-eval} compares its verdicts.
-The loop pass also refuses a buffer used outside its block loop, and it re-checks each ring and the carried state on its output.
-% SOURCE: composer checks (whole-operator condition, no early ring-slot reuse, each split within a shim BD's fields): own-group register writes (shim BDs and DMA queues, own cores' locks, own cores' runtime parameters), disjoint argument slots or byte ranges, segment order and every op once, assert_no_hazard on ring slots, BD iteration wrap 6 bits and stride 20 bits per GEMM, check_posted for commands in flight; each turns red on a defeated input (lab-prefill-overlap (3), (4), (9); lab-split-sweep (5), (35)); checks fail rather than drop, 26 / 26 (decisions log D24 N1).
-% SOURCE: stream checker in C++ inside aie-cosched-schedule, route facts from the device IR (mlir-aie cosched-flag e20940fac7e); findings RANGE-OVERLAP, RANGE-UNKNOWN, BD-REUSE, PUSH-BEFORE-BD-WRITE, QUEUE-OVERFLOW, NOT-PERMUTATION, CHANNEL-ORDER, BD-ORDER, SKELETON-MOVED and the route codes; any finding refuses the whole rewrite and the IR is unchanged; outcomes DECIDED (shown illegal) against RESOURCE-UNPROVEN, RANGE-UNKNOWN, TOOL-FAILED, PASS-ERROR (not shown legal) (vault lab-cosched-passes (57) steps 3-5, and the checker's reason list).
-% SOURCE: loop pass input checks (one free / full lock pair, free lock starting at 1, BD and L1 budgets, every BD block ending in a next_bd, use inside a block loop, supported loop control) and output check (ring as made, carried state's users unchanged, budgets), mlir-aie aie-cosched-pass-0 e9fc225b2b6 / ba7ea1aa552, cherry-picked to cosched-flag (lab-cosched-passes (56), (57) step 2).
-
-% VALUE: a pass, unlike a hand edit, applies its legality condition to designs nobody has read, judged without gains claimed
-A hand edit reaches only the streams someone reads, whereas a pass that accepts or refuses every stream applies its legality condition to designs nobody has read, whose verdicts Section~\ref{subsec:census} reports as judgments rather than gains.
-% DECISION: designs never examined are judged by the passes, and no gain is claimed on them (contract, No overclaim).
 
 \subsection{Implementation}
 \label{subsec:impl}
