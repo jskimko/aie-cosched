@@ -169,7 +169,7 @@ def fig_framework():
     _stage(ax, 0.02, y1, 0.86, h1, "Compiled design", ours=False)
     for k, kinds in enumerate(("iisiis", "isiiis", "iiisis")):
         _strip(ax, 0.10, y1 + 0.42 - k * 0.14, kinds)
-    _stage(ax, 1.08, y1, 1.0, h1, "Dependence graph")
+    _stage(ax, 1.08, y1, 1.0, h1, "Dependence graph, bounds")
     nodes = {"a": (1.22, 1.32), "b": (1.22, 1.06), "c": (1.50, 1.30), "d": (1.50, 1.04), "e": (1.78, 1.32),
              "f": (1.78, 1.06), "g": (1.96, 1.19)}
     edges = (("a", "c", "true"), ("b", "d", "true"), ("c", "e", "true"), ("d", "f", "true"), ("e", "g", "true"),
@@ -187,7 +187,7 @@ def fig_framework():
         for x0, w in bars:
             ax.add_patch(Rectangle((x0, lane), w, 0.10, facecolor=GRAY, edgecolor="white", linewidth=0.5, zorder=3))
     ax.plot([3.02, 3.02], [1.06, 1.46], color=INK, lw=0.6, linestyle=(0, (2, 1.2)), zorder=4)
-    ax.text(3.0, 0.98, "bound", ha="right", va="center_baseline", fontsize=FS - 0.5)
+    ax.text(3.0, 0.98, "priced per length", ha="right", va="center_baseline", fontsize=FS - 0.5)
     _arrow(ax, (0.88, y1 + h1 / 2), (1.08, y1 + h1 / 2))
     _arrow(ax, (2.08, y1 + h1 / 2), (2.28, y1 + h1 / 2))
     # ---- row 2: the two rewrites, each behind a legality check, and what comes out

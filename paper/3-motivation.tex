@@ -76,16 +76,16 @@ MLIR-AIR's double-buffering transformation declines the loop because its running
 % SOURCE: per layer, the QKV weight streams are awaited, then the KV readbacks start, and the next projection's weight streams are issued before any KV await; weight progress during attention is bounded by buffering and back-pressure (vault lab-decode-long-context (2), amended in (4)).
 % SOURCE: single buffering, the build's own comment ("air-label-scf-for-to-ping-pong declines it, because the running max and accumulator are live across blocks") (vault lab-decode-long-context (5)).
 
-\subsection{When Removing a Wait Pays}
+\subsection{When Removing a Wait Frees Overlap}
 \label{subsec:question}
 
 % VALUE: the question the rest of the paper answers: removing a false order pays only where the work it frees can overlap on resources a rewrite cannot duplicate, with no true dependence between (each clause from a platform fact); how much work qualifies is set by how the design cuts its work and by the prompt length, so the order that pays changes with length and must be priced; the full claim and its tests are in Section 6.7
 % DECISION: the critical-path condition is textbook and cited; the paper's claim is the condition's platform terms (non-duplicable resources, the host as an agent) and its dependence on the cut and the prompt length, never "false dependences cost time".
-Removing a false order pays only where the work it frees runs on core tiles and DMA channels that the work it waited on does not use, resources a rewrite cannot duplicate, since every engine runs its own work in order and a buffer can be renamed into several slots whereas a core tile or a DMA channel cannot.
-It also pays only where no true dependence, on the device or through a host step that reads one command's output before it issues the next, separates the two pieces of work.
+Removing a false order frees overlap only where the work it frees runs on core tiles and DMA channels that the work it waited on does not use, resources a rewrite cannot duplicate, since every engine runs its own work in order and a buffer can be renamed into several slots whereas a core tile or a DMA channel cannot.
+It also frees overlap only where no true dependence, on the device or through a host step that reads one command's output before it issues the next, separates the two pieces of work.
 We call these two checkable clauses together the \emph{condition}, and they refine the textbook rule that removing a false dependence gains time only where it lies on the critical path~\citep{fields2003interaction}, since on this platform removing a false order shortens that path only when both hold.
-Both clauses name resources and dependences that the analysis reads from the artifacts and the host's accesses (Section~\ref{sec:order}), so the condition says which false orders can pay before any duration is measured, rather than restating that the ones on the critical path do.
-How much each one pays, and whether that exceeds its cost, needs durations, which the bound of Section~\ref{subsec:removal} and the event model of Section~\ref{subsec:pricing} supply.
+Both clauses name resources and dependences that the analysis reads from the artifacts and the host's accesses (Section~\ref{sec:order}), so the condition screens out the false orders that cannot free overlap before any duration is measured, whereas the critical-path rule needs durations to say which do.
+How much each remaining one frees, whether that exceeds its cost, and what a rewrite saves beyond overlap, such as a dispatch, need durations, which the bound of Section~\ref{subsec:removal} and the event model of Section~\ref{subsec:pricing} supply.
 
 How much work meets both clauses is set by how the design cuts its work, into configurations, into commands, and into buffers, and by the prompt length, which sets the balance between attention and the GEMMs, and so they set what rescheduling can recover.
 The issue order that pays therefore changes with the prompt and must be priced per length rather than fixed.
