@@ -12,5 +12,5 @@ Against the unmodified decode design, its loop pass, which renames decode attent
 Across the designs we read from three stacks, every overlap gain we measure falls where the condition says one can arise, and a closed production stack leaves almost no overlap to recover in either of its prefill engines.
 One runs each layer's attention once over the whole prompt, so that every GEMM feeds or reads it, and the other runs each operator alone on the whole array.
 What the composed order still pays is the price of overlap under the shared DRAM read cap and the command processor's and the host's work that the schedule does not hide.
-The result suggests that toolchains should emit the order of issue as a priced choice per input size rather than as a fixed artifact.
+Because the order stays the schedule however a design's kernels and cuts improve, the analysis and rewrites apply to each design a toolchain emits, and the result suggests that toolchains should emit the order of issue as a priced choice per input size rather than as a fixed artifact.
 % SOURCE: as the abstract's and Section 7's SOURCE lines; \E values pending the final sweep.

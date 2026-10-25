@@ -12,6 +12,7 @@ OPCORD reads compiled artifacts, closed ones included, and bounds the false orde
 It removes the false orders whose removal pays, choosing the prefill's order and column split per prompt length with an event model, under checkers that refuse any rewrite they cannot show legal.
 On an AMD XDNA~2 NPU, against the existing program on the supported split that minimizes its time to first token, OPCORD shortens the time to first token across five LLMs by \E{X--Y}$\times$ at prompts of 1K to 32K tokens.
 Its loop pass, which renames decode attention's buffers, shortens decode by \E{X--Y}$\times$ at 16K-token contexts against the unmodified decode design, and both keep the outputs bit-identical.
+On MLIR-AIR's designs, OPCORD also reaches the first token sooner than the current release of a hand-tuned production stack, on every LLM and prompt length we compare.
 Across the designs we read from three stacks, every overlap gain we measure falls where the condition says one can arise.
 The condition also explains why a closed production stack leaves almost no overlap to recover in either of its prefill engines: one runs each layer's attention once over the whole prompt, so that every GEMM feeds or reads it, and the other runs each operator alone on the whole array.
 The hardware already provides the concurrency, and within a design's cut, the order in the artifact decides how much of it the work receives.
