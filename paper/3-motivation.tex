@@ -90,7 +90,7 @@ How much each one pays, and whether that exceeds its cost, needs durations, whic
 How much work meets both clauses is set by how the design cuts its work, into configurations, into commands, and into buffers, and by the prompt length, which sets the balance between attention and the GEMMs, and so they set what rescheduling can recover.
 The issue order that pays therefore changes with the prompt and must be priced per length rather than fixed.
 The split that pays moves with the same balance, because more attention columns shorten attention but lengthen every GEMM.
-We call the 112 designs we read from three stacks our \emph{census}, and Section~\ref{subsec:census} checks how the analysis reads it.
+We call the designs we read from three stacks our \emph{census}, and Section~\ref{subsec:census} checks how the analysis reads it.
 Section~\ref{subsec:pays} tests the condition across the census's design classes, across prompt lengths, on a synthetic design, and with one control per clause.
 % SOURCE: the condition and its resource wording (vault paper-cosched-decisions-log, "The lead", "The legality control is a designed single-hazard rewrite; the condition's resource wording", 2026-10-24); the census tags each instance by it, and the re-tag under the duplicable-resource wording changes no verdict on any stack (aie-cosched 460383a, rows e857444).
 
