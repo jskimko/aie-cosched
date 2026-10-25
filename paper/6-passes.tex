@@ -4,10 +4,10 @@
 % VALUE: design opener: OPCORD removes the false dependences of §3.3 in steps, each answering a property of the platform: a blocking in-order CP (reorder issue, by the composer across operators and the stream pass within one), one buffer per role in decode's loop (the loop pass's rings), an order and a split that pay differently with the prompt length (both chosen per length by the event model), designs it did not compile (checkers that refuse with a reason)
 % DECISION: the opener follows the FPGA'27 design opener, each property of the platform followed by the mechanism that answers it, with one subsection per property (STYLE.md, Paper structure, Design; contract §6).
 % DECISION: the legality conditions themselves live in Section~\ref{sec:order}; this section states only how OPCORD acts on them, namely checkers that accept a rewrite or refuse it with a reason (contract §6).
-OPCORD runs the analysis of Section~\ref{sec:order} on each design, takes from it the segments, the legality conditions, and the bound of each false order, and answers each property of the platform behind the waits of Section~\ref{subsec:losses} with one mechanism.
+OPCORD runs the analysis of Section~\ref{sec:order} on each design, takes from it the segments and the legality conditions, provides a rewrite only for the kinds of false order whose bound exceeds the rewrite's cost, and answers each property of the platform behind the waits of Section~\ref{subsec:losses} with one mechanism.
 Because a synchronization blocks the in-order CP, our composer and stream pass issue every group's work before the CP waits on any (Section~\ref{subsec:order}).
 Because decode attention's loop keeps one buffer per role, our loop pass renames those buffers into rings (Section~\ref{subsec:rings}).
-Because the order that pays and the best split change with the prompt length, the composer chooses both per length with an event model, among the removals whose bound exceeds their cost (Sections~\ref{subsec:split} and~\ref{subsec:pricing}).
+Because the order that pays and the best split change with the prompt length, the composer chooses both per length with an event model (Sections~\ref{subsec:split} and~\ref{subsec:pricing}).
 Because OPCORD rewrites designs it did not compile, checkers refuse, with a reason, any rewrite they cannot show legal (Section~\ref{subsec:checkers}).
 
 \subsection{Reordering Issue}
@@ -20,6 +20,7 @@ Because OPCORD rewrites designs it did not compile, checkers refuse, with a reas
 % DECISION: subsec:compose names the composer's part of the reorder and resolves to this subsection; the conditions the former composing subsection stated are in Section~\ref{sec:order}.
 Our \emph{composer} list-schedules the host program's dependency graph chunk by chunk, from the design's per-operator streams and probes, and emits commands that we call the \emph{composed schedule}.
 The existing host program runs a layer stage by stage instead, so no GEMM is ready to run beside attention.
+The composer thus changes the design's cut into commands (Section~\ref{subsec:spectrum}) while keeping its configuration.
 Each command pairs the ready attention operator of the lowest layer and chunk with ready GEMMs whose estimated work matches it.
 A command concatenates its operators' segments under the conditions of Section~\ref{subsec:legality}, so composing changes when work is issued and awaited, never what the work is.
 % SOURCE: merged.plan (amd-npu a0ee2ed prefill-overlap/merged.py, now opcord/compose/merged.py at aie-cosched opcord-runtime 446fa1c): qkv(L, c) after down(L-1, c); attn(L, c) after qkv(L, 0..c); o after attn; gate and up after o; down after gate and up; GEMMs added in the same order until their estimated work reaches the attention operator's; an optional cap on the GEMMs per attention command.
@@ -62,7 +63,7 @@ The prefill needs no renaming, because the existing host program already gives e
 
 % VALUE: the split is a build parameter of the existing design; the legal splits S1, S2 (default), S4 follow from the KV heads; each split is its own configuration built from the unchanged source, with outputs bit-identical to the default split, so the existing program and the composer each run on any of them
 The existing design fixes its split as a build parameter, and since each attention group serves an equal share of the KV heads, an LLM with 8 KV heads admits attention on 1, 2, or 4 columns, which are the shipped splits $S_1$, $S_2$, and $S_4$, with $S_2$ the default.
-We build each split as its own configuration from the unchanged source, with outputs bit-identical to those of the default split, so the existing program and the composed schedule can each run on any of them.
+We build each split as its own configuration with the design's own build, unchanged apart from its split parameter, with outputs bit-identical to those of the default split, so the existing program and the composed schedule can each run on any of them.
 % SOURCE: mlir-air a3e26261 fused_prefill/device.py: Attn(col=...) per group in Config.attn, GCOL0, GNC = 1, 6 as module constants; spec() splits kv_heads evenly, so 1, 2, or 4 attention columns with 8 KV heads (vault lab-split-sweep (1)).
 % SOURCE: out-of-tree split modules; logits bit-identical to the default split in every configuration on both models (vault lab-split-sweep (2), (4), (5)).
 
@@ -79,7 +80,7 @@ The number $D$ of commands in flight and the packing of commands manage only the
 
 % VALUE: to choose among orders and splits without running each, an event simulation of the device, the CP, and the host prices a schedule; its form follows the platform (one in-order queue of commands, a host timeline with waits, column groups that overlap within a command) and its parameters are the operators' own timings plus a few machine constants measured once by microbenchmarks; the existing program runs through the same simulation, so both sides are priced alike; device time, host exposure, and head and tail reported apart
 % COMMENT: this subsection describes the event model's rebuilt form (setup by column group, overlap bounded by bytes over the read cap, the head as a probed operator), which npu-gap is implementing in development; confirm every term against the implementation before the freeze.
-To choose among orders and splits without running each, we price a schedule with an event simulation of the device, the CP, and the host, which we call the \emph{event model}, analytical in form, with a form that follows the platform and parameters that are measured.
+To choose among orders and splits without running each, we price a schedule with an event simulation of the device, the CP, and the host, which we call the \emph{event model}, analytical in form, following the platform's structure, with parameters that are measured.
 Queued commands run one at a time (Section~\ref{subsec:semantics}), so command $k$ ends at
 \begin{equation}
 \label{eq:cmd}
@@ -143,7 +144,7 @@ A hand edit reaches only the streams someone reads, whereas a pass that accepts 
 
 % VALUE: the analysis and both passes with their checkers in MLIR-AIE (C++), the loop pass as an opt-in step of the compiler driver that leaves every output byte-identical when off; the composer, the event model, and the split switch as a Python runtime package replacing the host program's dispatch loop on the design's own hardware context; no kernel, driver, or firmware change, and every reconfiguration point stays where the stack put it
 The analysis of Section~\ref{sec:order} and both passes, with their checkers, are about 6{,}700 lines of C++ in MLIR-AIE~\citep{mlir-aie-repo}.
-The loop pass is an opt-in step of the compiler's driver that, switched off, leaves every instruction stream and configuration the compiler emits byte-identical to the existing build.
+The loop pass is an opt-in step of the compiler's driver that runs on the lowered design that the stack's own passes produce and, switched off, leaves every instruction stream and configuration the compiler emits byte-identical to the existing build.
 The composer, with the event model and the switch between splits, is a runtime package of about 2{,}700 lines of Python that replaces the dispatch loop of the design's host program and submits to the design's own hardware context, so OPCORD changes no kernel, driver, or firmware.
 % SOURCE: mlir-aie cosched-flag 2b6f1c3ce93 against its base 35fa6b1: lib and include, 15 files, 6,703 lines inserted (AIECoschedDeps, AIECoschedStream, AIECoschedRoutes, AIECoschedCycles, AIECoschedSetTest, AIECoschedSchedule, AIECoschedRename, AIEXPasses.td, the lifter in AIEToConfiguration.cpp); the aiecc opt-in flag in tools/aiecc (35 lines).
 % SOURCE: aie-cosched opcord-runtime 446fa1c (checkout npu-gap-0/opcord-pin), opcord/ without tests: 2,718 lines of Python (compose 1,254, model 922, plan 286, switch 224, package files 32); 65,550 / 65,550 commands byte-identical to the pre-package composer (decisions log D24 N6).
