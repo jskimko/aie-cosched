@@ -183,7 +183,10 @@ MLIR-AIR's chunked fused prefill holds every operator in one configuration but i
 MLIR-AIR's fused decode keeps one buffer per role in its attention loop, so each block's transfer waits on the previous block's compute, and the loop pass's gain of Section~\ref{subsec:e2e} is measured there, whereas renaming only the keys and values, which leaves the score buffer closing the cycle, gains 0.3\% (Section~\ref{subsec:ablation}).
 
 FastFlowLM's prefill exposes most of its time, yet leaves almost no overlap to recover, because every turn between its groups is a true dependence.
-Its flash prefill, taken as released, whose design accepts prompts of up to 1{,}024 tokens, spends most of its time on one configuration that holds the operators of both column groups, for an exposure $M$ of 0.82--0.87, and issues each command to one group, so its groups take turns across commands as MLIR-AIR's do.
+Its flash prefill, taken as released, accepts prompts of up to 1{,}024 tokens, its single-turn context, while FastFlowLM serves longer prompts with a separate engine that the user chooses by model tag, not by prompt length.
+% SOURCE: FastFlowLM 44d01787: src/model_list.json gemma4e-flash default_context_length 1024, max_prefill_len 1024, label single-turn, gemma4-it 32768 / 4096; common/AutoModel/automodel.cpp:20-32 forces a single-turn model's context to its default; server/rest_handler.cpp:1270-1275, 1332-1337 refuse a longer request with 400 "Max length reached!" (npu-gap's two 4K cells: HTTP 400); engines libgemma4e_flash.so and libgemma4e_npu.so (pass-0, flm_long.py at aie-cosched 852f610).
+% COMMENT: the long-prompt engine (gemma4-it) is recorded at 512, 4K, 8K, 16K (pass-0 flm_long); per-operator configurations with nearly every command on all eight columns; add its Table 2 row (cuts, M, first-clause share, configuration switches) when the analysis lands, and extend the FastFlowLM verdict to it only then.
+The flash prefill spends most of its time on one configuration that holds the operators of both column groups, for an exposure $M$ of 0.82--0.87, and issues each command to one group, so its groups take turns across commands as MLIR-AIR's do.
 The two differ in how they cut the prompt into commands: MLIR-AIR's reimplementation runs it in 128-token chunks, so the GEMMs of later chunks are free to run beside one chunk's attention (Section~\ref{subsec:losses}), whereas FastFlowLM runs each layer's attention once over the whole prompt, so every GEMM command of a layer either feeds that attention or reads its output.
 Each turn therefore fails the condition's second clause at every length the design accepts: from the GEMMs to attention its host reads a command's output before it issues the next, and from attention to the GEMMs the host's wait is false, but the next command's read of attention's output in device memory orders the same turn.
 The false orders inside its commands bound at $b = 1.000\times$, a ceiling of $1\times$ however large $M$ is.
@@ -213,7 +216,7 @@ Every overlap gain we measure therefore falls where the condition says one can a
         \midrule
         MLIR-AIR prefill & fused; 128-token chunks; one operator per command & gain (Section~\ref{subsec:e2e}) \\
         MLIR-AIR decode & fused; one buffer per role & gain (Section~\ref{subsec:e2e}) \\
-        FastFlowLM prefill & fused; whole prompt per layer; one column group per command & every GEMM feeds or reads its layer's attention; $b = 1.000\times$ inside commands; merge bound $1.075$--$1.093\times$, replay \E{X}\% \\
+        FastFlowLM flash prefill & fused; whole prompt per layer; one column group per command & every GEMM feeds or reads its layer's attention; $b = 1.000\times$ inside commands; merge bound $1.075$--$1.093\times$, replay \E{X}\% \\
         FastFlowLM decode & fused; one command per step & false orders hold apart work on a shared core tile or DMA channel, bound $1.000$--$1.009\times$ \\
         IRON LLM designs & modular & bound $1.000\times$ \\
         Non-LLM designs & one command per design & overlapped by dataflow; the 3 IRON builds bound $1.000\times$ \\

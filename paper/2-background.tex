@@ -70,7 +70,7 @@ MLIR-AIR's open fused prefill~\citep{wang2026mlirair}, which reimplements design
 Its cores loop indefinitely and take their work from runtime parameters, so its operators differ only in their instruction streams, each of which keeps only its own operator's columns.
 It issues one operator per command.
 The host runs each layer stage by stage over chunks of 128 tokens, finishing every chunk's QKV projection before any attention and every attention before the remaining projections, and its CPU computes the normalizations, rotary embedding, and residual additions between commands.
-FastFlowLM's own binaries likewise issue each command to one column group, but over the whole prompt rather than in chunks (Section~\ref{subsec:observed}).
+FastFlowLM's own flash binaries likewise issue each command to one column group, but over the whole prompt rather than in chunks (Section~\ref{subsec:observed}).
 % SOURCE: mlir-air a3e26261 programming_examples/llms/shared/fused_prefill/: device.py (column map cols(cfg); "one PDI serves every op and shape and the ops differ only in their insts"), engine.py (strip_columns), dense.py (_mix_all, stage-major order), hostops.py; README.md: "Some of the LLM implementations in this directory reimplement AMD NPU LLM designs originally developed by the FastFlowLM team".
 
 % VALUE: decode is a separate design that generates one token per step and whose attention reads the KV cache of the whole context, so its per-token time grows with the context
