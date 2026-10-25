@@ -7,7 +7,7 @@
 OPCORD runs the analysis of Section~\ref{sec:order} on each design, takes from it the segments and the legality conditions, provides a rewrite only for the kinds of false order whose bound leaves room, and answers each property of the platform behind the waits of Section~\ref{subsec:losses} with one mechanism.
 Because a synchronization blocks the in-order CP, our composer and stream pass issue every group's work before the CP waits on any (Section~\ref{subsec:order}).
 Because decode attention's loop keeps one buffer per role, our loop pass renames those buffers into rings (Section~\ref{subsec:rings}).
-Because the issue order that pays and the best split change with the prompt length, the composer chooses both per length with an event model (Sections~\ref{subsec:split} and~\ref{subsec:pricing}).
+Because the issue order and the split that pay change with the prompt length, the composer chooses both per length with an event model (Sections~\ref{subsec:split} and~\ref{subsec:pricing}).
 Because OPCORD rewrites designs it did not compile, checkers refuse, with a reason, any rewrite they cannot show legal (Section~\ref{subsec:checkers}).
 
 \subsection{Reordering Issue}
@@ -29,9 +29,9 @@ A command concatenates its operators' segments under the conditions of Section~\
 % VALUE: within a command, the composer opens every group's work and then places each synchronization at its predicted completion, followed by the issue it gates, so no synchronization holds back another group's work; attention's two columns count as two groups; the order is fixed at build time and runs without the host; its price is the shared DRAM read rate, priced in Section 5.4
 Packing the operators into one command in turn would still leave the GEMM group idle while the CP walks attention's synchronizations (Figure~\ref{fig:order}a), so the composer issues the opening segments of every group first.
 It then places each synchronization in order of its \emph{predicted completion}, estimated from the probes, followed by the issue it gates.
-Attention's two columns count as two groups, so their segments alternate as well.
+Attention's two columns count as two groups for this order, so their segments alternate as well.
 The estimates fix this order when the command is built, and the CP executes it without the host.
-Running both groups at once costs the GEMMs a share of attention's time under the shared DRAM read rate (Section~\ref{subsec:pricing}), so a design already near the cap gains little.
+Running both groups at once makes a group that reads at the shared DRAM read cap also carry its co-runner's reads (Section~\ref{subsec:pricing}), so a design already near the cap gains little.
 % SOURCE: merged.cp_order (a0ee2ed, now opcord/compose/merged.py): the opening segments of both attention columns and of the first GEMM, then synchronizations by predicted completion; mid-stream fractions (0.25, 0.5) of attention's estimate, the lowest of five placements tried; the in-turn order takes 1.26x as long on the same 38 commands (lab-prefill-overlap (16)).
 % DECISION: tradeoffs are stated beside the decision that incurs them rather than collected in a section (author, 2026-10-21).
 
@@ -73,14 +73,13 @@ We build each split as its own configuration with the design's own build, unchan
 % VALUE: the problem in words: a schedule makes three essential decisions (the split; the order in which the CP interleaves each command's segments, each operator's kept in order; the buffer assignment); operators hand data over through DRAM, so a consumer issues after its producer's last synchronization and any host work, in a separate command; D and packing manage only the host boundary and are reported apart; the objective is the makespan
 % DECISION: no NP-hardness claim until a reduction is written; with negligible issue cost and one layer's fixed per-chunk pattern the problem has the structure of a two-machine chain-reentrant shop (wang1997reentrant), and with non-negligible issue cost the CP acts as a shared server (glass2000dedicated, hall2000common) (vault ch3-formulation, Relation to classical scheduling).
 \label{subsec:formulation}
-We price a schedule from the probes of Section~\ref{subsec:removal}, before the schedule runs.
 A schedule of a compiled design makes three essential decisions, namely the split, which sets which operators can run at once (Section~\ref{subsec:prefill}), the order in which the CP interleaves each command's segments, keeping every operator's segments in their own order, and the slot that each use of a buffer takes, since two uses of one slot run in turn even when neither consumes the other's data.
 Because operators hand data over through DRAM with no lock between them, a consumer issues only after its producer's final synchronization and any host work between the two, in a separate command.
 The number $D$ of commands in flight and the packing of commands manage only the boundary with the host, so we treat them as host policy, which the composer chooses with the split, and the objective is the makespan, which for prefill is the TTFT less the work before the first decoder layer and after the last.
 
 % VALUE: to choose among orders and splits without running each, an event simulation of the device, the CP, and the host prices a schedule; its form follows the platform (one in-order queue of commands, a host timeline with waits, column groups that overlap within a command) and its parameters are the operators' own timings plus a few machine constants measured once by microbenchmarks; the existing program runs through the same simulation, so both sides are priced alike; device time, host exposure, and head and tail reported apart
 % COMMENT: this subsection describes the event model's rebuilt form (setup by column group, overlap bounded by bytes over the read cap, the head as a probed operator), which npu-gap is implementing in development; confirm every term against the implementation before the freeze.
-To choose among orders and splits without running each, we price a schedule with an event simulation of the device, the CP, and the host, which we call the \emph{event model}, analytical in form, following the platform's structure, with parameters that are measured.
+To choose among orders and splits without running each, we price a schedule before it runs, from the probes of Section~\ref{subsec:removal}, with an event simulation of the device, the CP, and the host, which we call the \emph{event model}, analytical in form, following the platform's structure, with parameters that are measured.
 Queued commands run one at a time (Section~\ref{subsec:semantics}), so command $k$ ends at
 \begin{equation}
 \label{eq:cmd}
@@ -105,7 +104,7 @@ Finally, the event model adds the work before the first decoder layer and after 
 Only the operators' timings and bytes depend on the LLM and the split, so we measure the timings once per configuration by dispatching each GEMM alone and each attention chunk alone at several cached-context lengths, and read the bytes from the operators' streams.
 Between measured points the event model interpolates, and beyond them it refuses to price.
 The machine constants, namely $F$, the setups and windows of the transitions, the host's issue and post-processing costs, and $R$, are measured once by microbenchmarks on dummy data, as analytical models of communication and of memory-bound kernels measure theirs~\E{cite: Hockney; LogP; roofline}.
-No constant is fitted to an LLM's end-to-end runs, so every configuration of Section~\ref{subsec:decision} tests the event model rather than supplying its constants.
+No constant is fitted to an LLM's end-to-end runs, so every LLM and prompt length that Section~\ref{subsec:decision} scores tests the event model rather than supplying its constants.
 % SOURCE: microbenchmarks (npu-gap prefill-overlap/microbench.py): dispatch floor from empty commands; setup from back-to-back sequences mixing same-group and cross-group pairs, non-negative least squares on one set and checked on another; read cap from co-runs on both sides of the crossover between the longest group and bytes over the cap; per split build (S1, S2, S4 of Llama-3.2-1B) with a Qwen3-4B transfer check; values \E{pending}.
 % COMMENT: bib entries needed (read each source first): Hockney's model, LogP / LogGP, the roofline model.
 

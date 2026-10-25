@@ -3,7 +3,7 @@
 
 % VALUE: what the evaluation establishes, in order: OPCORD shortens prefill and decode on five LLMs against the existing program on its own best shipped split, and where the gain comes from; its choice of order and split stays near the best measured option; its rewrites are legal and its analysis reads every stream exactly; and what rescheduling recovers follows the cut and the prompt length, as Section 3.3 states
 % DECISION: no question list at the head of the evaluation; subsections have noun titles and each opens with its finding.
-Sections~\ref{subsec:e2e}--\ref{subsec:decision} evaluate OPCORD, Sections~\ref{subsec:legality-eval} and~\ref{subsec:census} the analysis's legality conditions, as the checkers apply them, and its reading of every stack, and Section~\ref{subsec:pays} the condition that says where rescheduling pays.
+Sections~\ref{subsec:e2e}--\ref{subsec:decision} evaluate OPCORD, Sections~\ref{subsec:legality-eval} and~\ref{subsec:census} the analysis's legality conditions, as the checkers apply them, its reading of every stack, and its bound, and Section~\ref{subsec:pays} the condition that says where rescheduling pays.
 % COMMENT: every \E value comes from the amendment-1 batch, the decode development batch, the synthetic sweep, the legality control, the FastFlowLM replay, and finally the final sweep; prose stays as written while numbers move (STYLE.md, Results vary between runs).
 
 \begin{figure*}[t]
@@ -20,7 +20,7 @@ Sections~\ref{subsec:e2e}--\ref{subsec:decision} evaluate OPCORD, Sections~\ref{
 
 % VALUE: the platform and its power state, the software, the designs, and the five LLMs (three classes of edge LLM)
 We measure on a GMKtec NucBox EVO-X2 with an AMD Ryzen\texttrademark{} AI Max+ 395 and 64\,GB of shared memory, under Linux~7.0 with the amdxdna driver, XRT~2.25.0~\citep{xdna-driver,xrt-repo}, and NPU firmware 1.1.2.65 in performance mode.
-We rewrite MLIR-AIR's fused prefill and fused decode~\citep{wang2026mlirair}, compiled with MLIR-AIE~\citep{mlir-aie-repo}, for five LLMs with 4-bit weights, covering three classes of edge LLM: the dense Llama-3.2-1B~\citep{meta2024llama32}, Qwen3-4B~\citep{yang2025qwen3}, and Llama-3.1-8B, together with Gemma3-4B, which uses sliding-window attention, and LFM2-1.2B, which has convolution layers.
+We rewrite MLIR-AIR's fused prefill and fused decode~\citep{wang2026mlirair}, compiled with MLIR-AIE~\citep{mlir-aie-repo}, for five LLMs with 4-bit weights, covering three classes of edge LLM: dense (Llama-3.2-1B~\citep{meta2024llama32}, Qwen3-4B~\citep{yang2025qwen3}, and Llama-3.1-8B), sliding-window (Gemma3-4B), and convolutional (LFM2-1.2B).
 % SOURCE: machine files read 2026-10-14/15: uname -r 7.0.0-34-generic; amdxdna 2.25.0_20260922 (DKMS, 31c01f2019e7); XRT 2.25.0 (3923b2b5be55); NPU firmware 1.1.2.65 (sysfs fw_version); BIOS EVO-X2 1.12; NPU power mode performance, CPU EPP and governor performance (lab-prefill-overlap (11), lab-split-sweep (9)).
 % SOURCE: mlir-air a3e26261 (llms/shared/fused_prefill, fused_decode; the runs use npu-gap's 44e8d8f7); mlir_aie wheel 1.4.5.dev22+g35fa6b1; weights FastFlowLM/Qwen3-4B-NPU2 rev 07651f11cac7, the Llama-3.2-1B q4nx bundle, FastFlowLM/Llama-3.1-8B-NPU2 rev 52700648, all sha256-verified (lab-prefill-overlap (23), lab-split-sweep (10)).
 % DECISION: the BIOS power mode cannot be read from the OS; add it once the author records it.
@@ -109,7 +109,7 @@ Even reordering from four chunks on the existing program's best split loses \E{Z
         Always reorder & \E{} & \E{} \\
         Reorder from four chunks & \E{} & \E{} \\
         Fixed split $S_2$ & \E{} & \E{} \\
-        Four chunks, existing program's best split & \E{} & \E{} \\
+        Four chunks, baseline's split & \E{} & \E{} \\
         \bottomrule
     \end{tabular*}
 \end{table}
@@ -125,13 +125,13 @@ Its time for the chosen schedule lies within a median \E{A}\% of the measurement
 \label{subsec:legality-eval}
 
 % VALUE: the checkers refuse every injected illegal rewrite; a rewrite refused on a single data hazard, forced onto the device, corrupts output while its accepted twin stays bit-identical, so a refusal marks a real hazard rather than caution
-The checkers refuse every illegal rewrite we inject, and the refusal we force onto the device marks a real hazard rather than caution.
-A second, independent implementation of the stream pass's checker agrees with it on every verdict over our prefill builds, and every rename the loop pass refuses, when forced, yields a design that an independent check of the loop refuses too.
-% SOURCE: configured agreement C++ / Python on every prefill build (110 operators with no differing facts; Gemma3's differences all the oracle's TOOL-FAILED condition, counted apart), 0 DISAGREE; the 42 hand-alternated streams 162 / 162 AGREE; 10 negative controls with identical codes; every forced loop-pass refusal REFUSED by loopcheck with READS-DIFFER (decisions log, "P6 steps 1-5 done"; vault lab-cosched-passes (57) step 5 and forced refusals).
+The checkers refuse all 10 illegal rewrites we inject, and the refusal we force onto the device marks a real hazard rather than caution.
 In a small design of our own, a rewrite that the checkers refuse on a single data hazard, a read of a 64\,KB buffer moved above the wait that guards its write, returns stale data in \E{X} of 10 runs, whereas its accepted twin stays bit-identical in every run.
 % SOURCE: legality control B-synthetic (registered fdd96b4; design, pair and gates 61fad00; census control/): twin ACCEPTED, hazard RANGE-OVERLAP only over 65,536 bytes; N = 10 each, X pre-filled with a sentinel; device run on its user's go, \E{pending}.
+A second, independent implementation of the stream pass's checker agrees with it on every verdict over our prefill builds, and every rename the loop pass refuses, when forced, yields a design that an independent check of the loop refuses too.
+% SOURCE: configured agreement C++ / Python on every prefill build (110 operators with no differing facts; Gemma3's differences all the oracle's TOOL-FAILED condition, counted apart), 0 DISAGREE; the 42 hand-alternated streams 162 / 162 AGREE; 10 negative controls with identical codes; every forced loop-pass refusal REFUSED by loopcheck with READS-DIFFER (decisions log, "P6 steps 1-5 done"; vault lab-cosched-passes (57) step 5 and forced refusals).
 
-\subsection{Coverage of the Analysis}
+\subsection{Coverage and Bounds of the Analysis}
 \label{subsec:census}
 
 % VALUE: the census defined (112 designs from three stacks); the analysis reads exactly what each stack dispatches: streams of three toolchains re-emit byte for byte, nearly every wait is attributed to a mechanism, and every loop of the MLIR-AIR designs is judged; the bound is checked against measurement in Sections 6.3 and 6.7
@@ -160,7 +160,7 @@ What rescheduling recovers is set by how a design cuts its work and by the promp
 \label{subsec:exposure}
 % VALUE: what the exposure measures and what it does not: per workload, the exposure M (share of wall time in commands whose configuration holds two or more operators), the bound b on reorders inside those commands, and the ceiling they imply; these cover the reorders inside a design's existing commands, which is all a closed stack lets us rewrite, whereas on an open fused design that issues one operator per command the composer re-cuts the commands, which the per-removal bound prices
 How a design cuts its work into configurations, commands, and buffers sets how much of its work meets the condition.
-For a closed stack, whose rewrites stay inside the design's existing commands apart from merges, we state per workload its \emph{exposure} $M$, the share of the wall time spent in commands whose configuration holds two or more operators, together with the bound $b$ on the gain inside those commands (Section~\ref{subsec:removal}).
+For a closed stack, whose rewrites stay inside the design's existing commands apart from merges, we state per recorded request its \emph{exposure} $M$, the share of the wall time spent in commands whose configuration holds two or more operators, together with the bound $b$ on the gain inside those commands (Section~\ref{subsec:removal}).
 The two imply a ceiling on the end-to-end gain from inside commands of $1 / \bigl((1 - M) + M / b\bigr)$, which separates a design that exposes little work from one whose exposed work cannot overlap.
 An open fused design leaves more room, since OPCORD's composer also re-cuts its commands, so that operators issued one per command come to share commands, a rewrite that the bound of each false order across commands covers.
 On MLIR-AIR's prefill, which spends nearly all of its time on one configuration that holds every operator and so has an exposure near one, this re-cut carries nearly all of the gain, because each of its commands issues one operator and leaves room inside only for the stream pass's alternation within attention (Section~\ref{subsec:ablation}).
@@ -168,15 +168,16 @@ On MLIR-AIR's prefill, which spends nearly all of its time on one configuration 
 
 \label{subsec:observed}
 % VALUE: the census by design class, each placed by its cuts, with what the condition predicts and what the bounds and measurements show: MLIR-AIR's prefill (fused configuration, one operator per command) gains, as Section 6.2 measures; FastFlowLM's flash prefill (fused configuration, one column group per command, the same shape) has M 0.82-0.87 but b 1.000 inside its one-group commands, and its waits between commands are mostly true through the host, so most of them fail the second clause; its one rewrite worth measuring (a merge at the shortest prompts) is the bound's check in Section 6.6; its decode pairs share an engine; IRON's modular operator sequences share no command and their streams price at one; the non-LLM designs overlap through dataflow; so every design the condition says can gain is one whose gain we measure
-Across the 112 designs of our census (Table~\ref{tab:census}), the condition, read from each design's artifacts, predicts gains only where a false order in a fused configuration holds back work that could overlap on resources a rewrite cannot duplicate, with no true dependence between, and measurement bears this out for MLIR-AIR's prefill and decode, while the bounds, computed with measured durations, bear it out for the rest, and the two controls at the end of this section test each clause directly.
+Across the 112 designs of our census (Table~\ref{tab:census}), the condition of Section~\ref{subsec:question}, read from each design's artifacts, predicts gains only where a false order in a fused configuration holds back work that could overlap on resources a rewrite cannot duplicate, with no true dependence between.
+Measurement bears this out for MLIR-AIR's prefill and decode, the bounds of Section~\ref{subsec:census}, computed with measured durations, show that the work the condition leaves elsewhere is small, and the two controls at the end of this section test each clause directly.
 MLIR-AIR's chunked fused prefill holds every operator in one configuration but issues one command per operator and chunk, with attention and the GEMMs on disjoint column groups, so its column groups take turns on work that meets both clauses (Section~\ref{subsec:losses}), and the gains of Section~\ref{subsec:e2e} are measured there.
-MLIR-AIR's fused decode keeps one buffer per role in its attention loop, so each block's transfer waits on the previous block's compute, and the loop pass's gain of Section~\ref{subsec:e2e} is measured there, whereas renaming only the keys and values, which leaves the score buffer closing the cycle, gains nothing (Section~\ref{subsec:ablation}).
+MLIR-AIR's fused decode keeps one buffer per role in its attention loop, so each block's transfer waits on the previous block's compute, and the loop pass's gain of Section~\ref{subsec:e2e} is measured there, whereas renaming only the keys and values, which leaves the score buffer closing the cycle, gains 0.3\% (Section~\ref{subsec:ablation}).
 FastFlowLM's prefill, taken as released, which MLIR-AIR's reimplements with one operator per command (Section~\ref{subsec:prefill}), spends most of its time on one configuration that holds both column groups, for an exposure $M$ of 0.82--0.87, but issues each command to one group, so its groups take turns across commands as MLIR-AIR's do, and the false orders inside its commands bound at $b = 1.000\times$, so deleting them lets no further work overlap.
 Most of its waits between commands are true, since its host reads a command's output before it issues the next, which fails the condition's second clause, and the false ones bound below $1.05\times$ with measured durations on every prompt we bound, except the merge of two commands at the shortest prompts that saves a dispatch rather than freeing overlap (Section~\ref{subsec:census}).
 Its decode runs one command per step, whose false pairs all share a core tile or a DMA channel, and bounds at $1.000$--$1.009\times$.
 IRON's modular operator sequences give each operator its own configuration, so their operators share no command, their exposure is zero, and they pay reconfiguration between operators instead, and their 32 streams, which issue their transfers ahead of their waits, all bound at $1.000\times$.
 Each of the non-LLM designs we read runs as one command whose stages already overlap through the array's own dataflow, and the 3 that IRON builds also bound at $1.000\times$.
-Every overlap gain we measure therefore falls where the condition says one can arise, and where it says none can, the bounds stay at or near $1\times$.
+Every overlap gain we measure therefore falls where the condition says one can arise, and where it says none can, the bounds, whose typed resources and edges carry its two clauses (Section~\ref{subsec:removal}), stay at or near $1\times$.
 % SOURCE: census Part A 112 designs (aie-cosched 7827f85); FastFlowLM exposure, scored request, M 0.82-0.87 (flash), b over the legal rewrite space 1.000 under the task form (terms4, registered 67d54fe, rows 3c70af2; exposure 2a7990a / a3ef131); 211 of 312 waits true at E2B 1,024 (census SUMMARY); measured-only joint below 1.05 on every scored request (terms3/terms4); decode boundary 1.000-1.009, inside a runlist 1.000 (decode2 rows e679463). IRON composition predicted 1.000 for every design (aie-cosched a73ba38 / dbdbda0); non-LLM designs: each one command (pass-0 task 6, 2026-10-24).
 % SOURCE: FastFlowLM's only crossing over its legal rewrite space is the dispatch a merge of two commands saves at the 128-token bucket, 1.075-1.093x as an upper bound at the measured floor F = 195.0 us (terms5, aie-cosched e8232aa); the merges are measured below.
 % SOURCE: FastFlowLM terms4 (registered 67d54fe, rows 3c70af2): in-command 1.000 on every row; measured-only joint below 1.05 on every scored request; legal-space joint 1.034-1.049 at 512 and 1,024, 1.075-1.093 at 128 through the merge bracket at F = 195.0 us (terms5, e8232aa); exposure M 0.82-0.87 (a3ef131); decode 1.000-1.009 (e679463); merge replay stage 1 (e2b-p128 and e4b-p128 merges, registered 3ae0370), \E{pending}; IRON in-command pricing: 35 streams, every x_J 1.000, bound 1.000 (aie-cosched 1a87bc6, partb/iron-partb.json); composition predicted 1.000 (a73ba38).
@@ -199,7 +200,7 @@ Every overlap gain we measure therefore falls where the condition says one can a
         FastFlowLM prefill & fused; one column group per command & waits between commands mostly true through the host; $b = 1.000\times$ inside commands; merge bound $1.075$--$1.093\times$, replay \E{X}\% \\
         FastFlowLM decode & fused; one command per step & false pairs share an engine, bound $1.000$--$1.009\times$ \\
         IRON LLM designs & modular & bound $1.000\times$ \\
-        Non-LLM designs & one command per design & overlapped by dataflow, bound $1.000\times$ \\
+        Non-LLM designs & one command per design & overlapped by dataflow; the 3 IRON builds bound $1.000\times$ \\
         \bottomrule
     \end{tabular*}
 \end{table}

@@ -6,7 +6,7 @@
 Neural processing units (NPUs) such as the AMD XDNA~2 bring large language model (LLM) inference to client machines~\citep{rico2024xdna,linux-amdnpu}.
 Such an NPU is now standard equipment, because a platform requirement of 40 trillion operations per second put one into mainstream laptops~\citep{copilotplus-reqs}.
 % SOURCE: the Copilot+ PC hardware requirement of 40+ TOPS for the NPU (copilotplus-reqs).
-It is a spatial dataflow array, on which a design runs each operator of an LLM as a flow on its own group of tiles, while one in-order command processor (CP) issues the work of every group, so the order of issues and waits in the compiled commands is the schedule that the array runs.
+It is a spatial dataflow array, on which a design runs each operator of an LLM as a flow on its own group of tiles, which today's designs lay out as whole columns and we call a column group, while one in-order command processor (CP) issues the work of every group, so the order of issues and waits in the compiled commands is the schedule that the array runs.
 In the fused prefill that MLIR-AIR builds for each LLM~\citep{wang2026mlirair}, which with its host program we call the \emph{existing program}, attention's columns and the columns of the matrix multiplications (GEMMs) take turns, although attention on one chunk and the GEMMs of other chunks do not consume each other's work (Figure~\ref{fig:timeline}, top, for Llama-3.2-1B).
 The measure a developer can compute, which divides the operators' summed time by the wall time, still reads the device as busy for 92--97\% of the time to first token (TTFT).
 % SOURCE: busy 92-97% of TTFT at 512 / 2,048 / 4,096 tokens, each operator's isolated time less the dispatch floor, summed over the prefill (amd-npu e3acc8a prefill-e2/decomp.txt; Section 3.2).
@@ -38,7 +38,7 @@ The insight of this work is that, because the CP's instruction order is the arra
 The waits above are textbook order dependences, and decode attention's loop, which keeps one buffer per role so that each block's transfer waits on the previous block's compute, adds textbook name dependences (Section~\ref{subsec:losses})~\citep{bernstein1966analysis,kuck1981dependence}, which together we call \emph{false orders}.
 Removing those on the critical path is the textbook remedy~\citep{fields2003interaction}.
 What this platform adds is when removing one pays, namely only where it lets work overlap on resources a rewrite cannot duplicate, with no true dependence on the device or through the host between.
-A buffer can be renamed into several slots, whereas a core tile or a DMA channel cannot, and both clauses name resources and dependences that the artifact records, so they can be decided before any duration is measured.
+A buffer can be renamed into several slots, whereas a core tile or a DMA channel cannot, and both clauses name resources and dependences that the artifacts and the host's recorded accesses establish, so they can be decided before any duration is measured.
 How a design cuts its work into configurations, commands, and buffers, and the length of the prompt, set how much work meets this condition.
 Because the prefill runs over fixed-size chunks and attention's work per chunk grows with the prompt while the GEMMs' work stays fixed, the issue order that pays changes with the prompt and must be priced rather than fixed.
 
@@ -58,6 +58,6 @@ Across 112 designs from three stacks, every overlap gain we measure falls where 
 In summary, the primary contributions of this work are as follows:
 \begin{itemize}
     \item We identify that fused designs on a spatial NPU can serialize independent work through the order and buffers fixed in their compiled artifacts, and characterize when removing it pays: what rescheduling recovers is set by how a design cuts its work, from modular to fused and into commands and buffers, and by the prompt length, a characterization that predicts where gains arise and where they cannot.
-    \item We develop an analysis that reads compiled NPU programs, closed ones included, as dependence graphs over every agent that touches state, accepts a reorder or a rename only where the artifact shows it legal, and bounds what each false order can recover.
+    \item We develop an analysis that reads compiled NPU programs, closed ones included, as dependence graphs over every agent that touches state, decides from the artifact alone which reorders and renames are legal, and bounds what each false order can recover.
     \item We design and implement OPCORD, a post-compilation rescheduler that, building on this analysis, rewrites issue order and buffers behind legality checkers and chooses the order and the column split per prompt length with an analytical event model, leaving kernels, driver, and firmware unchanged.
 \end{itemize}
