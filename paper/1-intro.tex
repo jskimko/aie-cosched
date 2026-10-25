@@ -36,7 +36,7 @@ GPUs met the same kind of wait when every stream shared one compute queue, and i
 The insight of this work is that, because the CP's instruction order is the array's schedule, fixed in the artifact a toolchain emits, every wait in a design, every column a wait holds idle, and which waits can pay to remove can be read from that artifact.
 The waits above are textbook order dependences, and decode attention's loop, which keeps one buffer per role so that each block's transfer waits on the previous block's compute, adds textbook name dependences~\citep{bernstein1966analysis,kuck1981dependence}, which together we call false orders (Section~\ref{subsec:losses}).
 Removing those on the critical path is the textbook remedy~\citep{fields2003interaction}.
-What this platform adds is when removing one pays, namely only where the work it frees runs on core tiles and DMA channels that the work it waited on does not use, resources a rewrite cannot duplicate, with no true dependence on the device or through the host between.
+What this platform adds is when removing one pays, namely only where two clauses hold: the work it frees runs on core tiles and DMA channels that the work it waited on does not use, resources a rewrite cannot duplicate, and no true dependence, on the device or through the host, lies between the two.
 A buffer can be renamed into several slots, whereas a core tile or a DMA channel cannot.
 Both clauses name resources and dependences that the artifacts and the host's accesses, read from its program or observed at the runtime's boundary, establish, so they can be decided before any duration is measured.
 
