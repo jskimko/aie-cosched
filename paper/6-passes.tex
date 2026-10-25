@@ -57,69 +57,55 @@ The prefill needs no renaming, because the existing program already gives every 
 % VALUE: the problem in words: a schedule makes three essential decisions (the split; the order in which the CP interleaves each command's segments, each operator's kept in order; the buffer assignment); operators hand data over through DRAM, so a consumer issues after its producer's last synchronization and any host work, in a separate command; D and packing manage only the host boundary and are reported apart; the objective is the makespan
 % DECISION: no NP-hardness claim until a reduction is written; with negligible issue cost and one layer's fixed per-chunk pattern the problem has the structure of a two-machine chain-reentrant shop (wang1997reentrant), and with non-negligible issue cost the CP acts as a shared server (glass2000dedicated, hall2000common) (vault ch3-formulation, Relation to classical scheduling).
 \label{subsec:formulation}
-A schedule of a compiled design makes three essential decisions.
-The first is the split, which sets which operators can run at once (Section~\ref{subsec:prefill}).
-The second is the order in which the CP interleaves each command's segments, keeping every operator's segments in their own order.
-The third is the slot that each use of a buffer takes, since two uses of one slot run in turn even when neither consumes the other's data.
+A schedule of a compiled design makes three essential decisions, namely the split, which sets which operators can run at once (Section~\ref{subsec:prefill}), the order in which the CP interleaves each command's segments, with each operator's segments kept in their own order, and the slot that each use of a buffer takes, since two uses of one slot run in turn even when neither consumes the other's data.
 Because operators hand data over through DRAM with no lock between them, a consumer issues only after its producer's final synchronization and any host work between the two, in a separate command.
 The number $D$ of commands in flight and the packing of commands manage only the boundary with the host, so we treat them as host policy, which the composer chooses with the split.
 The objective is the makespan, which for prefill is the TTFT less the work before the first decoder layer and after the last.
-We build each split as its own configuration with the design's own build, unchanged apart from its split parameter.
-Each gives outputs bit-identical to those of the default split, so the existing program and the composed order can each run on any of them.
+Each split is its own configuration from the design's own build, changing only the split parameter, with outputs bit-identical to the default split's, so either order can run on any of them.
 % SOURCE: mlir-air a3e26261 fused_prefill/device.py: Attn(col=...) per group in Config.attn, GCOL0, GNC = 1, 6 as module constants; spec() splits kv_heads evenly, so 1, 2, or 4 attention columns with 8 KV heads (vault lab-split-sweep (1)).
 % SOURCE: out-of-tree split modules; logits bit-identical to the default split in every configuration on both models (vault lab-split-sweep (2), (4), (5)).
 
 % VALUE: to choose among orders and splits without running each, an event simulation of the device, the CP, and the host prices a schedule; its form follows the platform (one in-order queue of commands, a host timeline with waits, column groups that overlap within a command) and its parameters are the operators' own timings plus a few machine constants measured once by microbenchmarks; the existing program runs through the same simulation, so both sides are priced alike; device time, host exposure, and head and tail reported apart
 % DECISION: this subsection states the frozen form (dev form, frozen 2026-10-25; amd-npu 12250226, FORM-A2.md; opcord-runtime 3bead38, opcord/model/event_model.py, constants opcord/model/constants/frozen.json), term by term as npu-gap checked it against the code; the rebuilt form (per-split setups and windows, overlap bounded by bytes over the read cap) scored worse and did not freeze (vault decisions log, event-model form, 2026-10-25).
-To choose among orders and splits without running each, we price a schedule before it runs, from the probes of Section~\ref{subsec:removal}, with an event simulation of the device, the CP, and the host, which we call the \emph{event model}.
-The event model is analytical in form and follows the platform's structure, and its parameters are measured.
+To choose among orders and splits without running each, we price a schedule from the probes of Section~\ref{subsec:removal} with an analytical event simulation of the device, the CP, and the host, which we call the \emph{event model} and whose form follows the platform's structure.
 Queued commands run one at a time (Section~\ref{subsec:semantics}), so command $k$ ends at
 \begin{equation}
 \label{eq:cmd}
 e_k = \max\bigl(e_{k-1} + s_k,\; q_k + F\bigr) + \tau_k,
 \end{equation}
-where $q_k$ is the time the host queues it, after its issue cost, $F$ is the dispatch floor (Section~\ref{subsec:platform}), one constant, and $s_k$ is the transition into it from the previous command.
-The transition is one constant for each pair of command kinds, attention or GEMM, and is negative where the next command's start overlaps the end of the previous one.
-A command of GEMMs alone takes the sum of its operators' times alone, plus a fixed cost $\gamma$ for each operator after the first.
+where $q_k$ is the time the host queues it, after its issue cost, $F$ is the dispatch floor (Section~\ref{subsec:platform}), and $s_k$ is the transition from the previous command, one constant per pair of command kinds (attention or GEMM), negative where the next command's start overlaps the end of the previous one.
+A command of GEMMs alone takes the sum of its operators' times alone plus a fixed cost $\gamma$ for each operator after the first.
 A command in which attention runs beside GEMMs takes
 \begin{equation}
 \label{eq:overlap}
 \tau_k = \max(a_k, g_k) + c_r + d_r \min(a_k, g_k),
 \end{equation}
-where $a_k$ and $g_k$ are the two groups' times alone, $r$ marks which of the two is longer, and $c_r$ is a fixed cost.
-The share $d_r$ of the shorter group's time that the overlap fails to hide is about 0.12 when the GEMMs are longer and slightly below zero when attention is.
+where $a_k$ and $g_k$ are the two groups' times alone, $r$ marks which of the two is longer, $c_r$ is a fixed cost, and $d_r$ is the share of the shorter group's time that the overlap fails to hide.
 On the host side, each command costs an issue, by its kind, and each operator a post-processing step.
-The composer's host waits on the oldest command once $D$ are in flight, whereas the existing program waits where its own host program does, stage by stage.
 The existing program runs through the same simulation, from a model of its host program's order, so both sides of every comparison are priced alike.
-Finally, the event model adds the work before the first decoder layer, linear in the prompt length from that work's own probes.
-For both orders, it keeps this term apart from the decoder layers, so an error in it cannot hide behind the layers' terms.
-The event model prices the LM head from the probes of its chunks, apart for the composed order and, chunk by chunk, as part of the simulated program for the existing one.
+Its host waits stage by stage where that program does, whereas the composer's host waits on the oldest command once $D$ are in flight.
+Finally, the event model adds the work before the first decoder layer, linear in the prompt length from that work's own probes, and keeps it apart from the layers' terms for both orders, so an error in it cannot hide behind them.
+It prices the LM head from its chunks' probes, apart for the composed order and chunk by chunk within the simulated program for the existing one.
 % SOURCE: opcord/model/event_model.py (opcord-runtime 3bead38): Eq. 1 at EM:122 (end = max(end_prev + eps, h + F) + busy, h the host clock after the issue cost, busy with the floor removed, the first command's eps 0); eps by command kind EM:114-121; GEMM-only commands, the stages' times plus gamma per extra GEMM, EM:406; the two-regime composition max(a, g) + a_r + b_r min(a, g), EM:13-18, 82-89; the composer's depth wait EM:170 and the shipped program's stage-major waits EM:179-224; the shipped program through the same simulate(), EM:402-403; head fixed + per-token term EM:388-390, LM-head chunks EM:324-329, 359, 378, 414 (lm_chunks: every chunk of the shipped LM head, 51 -> 67 of 70 cells within 5%); refusal outside the measured contexts EM:239-240, the sliding-window median past the window EM:251-257, a chunk at its absolute position EM:263-276; per-model post costs EM:346 and head EM:389; the arms ship / shipar / comp priced per split at plan/planner.py:62 (npu-gap term checks, 2026-10-25).
 
 % VALUE: the operators' timings depend on the LLM and the split and are measured once per configuration by running each operator alone; the few machine constants (dispatch floor, transitions by command kind, the per-GEMM cost, the overlap regimes, host issue and post) are measured once by microbenchmarks, none fitted to an LLM's end-to-end runs; precedent: analytical models whose parameters are machine constants measured by microbenchmarks
-The operators' timings depend on the LLM and the split, so we measure them once per configuration by dispatching each GEMM alone and each attention chunk alone at several cached-context lengths.
-The host's post-processing costs and the work before the first layer are measured per LLM.
-Between measured points the event model interpolates, pricing each chunk of attention at its position in the prompt, and beyond the measured contexts it refuses to price.
-Within them, an operator with a sliding window, whose work stops growing past the window, takes there the median of its times measured past the window.
-The machine constants, shared by every LLM, are $F$, the transitions, $\gamma$, the terms $c_r$ and $d_r$ for both values of $r$, and the host's issue costs.
-We measure them once, in one calibration hold, by microbenchmarks that run Llama-3.2-1B's first-layer operators alone and in short sequences, as analytical models of communication and of memory-bound kernels measure theirs~\citep{hockney1994communication,culler1993logp,williams2009roofline}.
+The operators' timings depend on the LLM and the split, so we measure them once per configuration by dispatching each GEMM alone and each attention chunk alone at several cached-context lengths, and the host's post-processing costs and the work before the first layer once per LLM.
+The event model interpolates between measured points, pricing each attention chunk at its position in the prompt, and refuses to price beyond the measured contexts, while an operator with a sliding window takes, past the window, the median of its times measured there.
+The machine constants $F$, the transitions, $\gamma$, $c_r$ and $d_r$, and the host's issue costs are shared by every LLM and measured once by microbenchmarks that run Llama-3.2-1B's first-layer operators alone and in short sequences, as analytical models of communication and of memory-bound kernels measure theirs~\citep{hockney1994communication,culler1993logp,williams2009roofline}.
 No constant is fitted to an LLM's end-to-end runs, so every LLM and prompt length that Section~\ref{subsec:decision} scores tests the event model rather than supplying its constants.
 % SOURCE: frozen constants (opcord/model/constants/frozen.json + PROVENANCE; calibration hold 2026-10-22 22:20-22:43, amd-npu d94266bf, microbench device.json / host.json; frozen.json from npu-gap-0-c8 b15d9dca): F 94.507 us; transitions gemm->gemm 12.93, gemm->attn -6.65, attn->gemm 47.95, attn->attn 20.94 us; gamma 24.56 us; regimes GEMM-longer c 42.33 us, d 0.1160 (n 10), attention-longer c 21.43 us, d -0.0260 (n 5); issue attention 68.06, GEMM 7.36 us; post per model and operator (host.json, e.g. Llama-3.2-1B qkv 179.5, up 202.3, attention 76.1 us); head per model fixed + per token (Llama-3.2-1B -0.305 ms + 3.28 us/token). The microbenchmarks run Llama-3.2-1B's layer-0 operators with real weights; tests/test_event_model.py forbids end-to-end sources in frozen.json. Operator inputs: split-sweep/<model>/probe-<split> (e2-n2048, probe-n2048) and the per-chunk attention probes. The measured per-build command cost c_cmd (+-7 us) is reported, not used (FINAL-SWEEP.md).
 
 % VALUE: before a prompt length runs, the composer prices every candidate (split, existing or composed order, host policy) with the event model and runs the cheapest, settling near-ties by a short measurement; more attention columns shorten attention and lengthen the GEMMs, so the split that pays moves with the balance of the two groups; because the existing order is a candidate, the composer keeps it where composing is priced higher, as at prompts of one or two chunks
-Before a prompt length runs, the composer prices every candidate with the event model.
-The candidates span each split, the existing order, the existing order after the stream pass, and the composed order, and each number $D$ of commands in flight and packing of commands.
-The composer runs the cheapest unless the near-tie rule below applies.
-Because the existing order is among the candidates, the composer keeps it wherever composing is priced higher, as at prompts of one or two chunks.
+Before a prompt length runs, the composer prices with the event model every candidate, which spans each split, the existing order with and without the stream pass, the composed order, and each host policy.
+It runs the cheapest unless the near-tie rule below applies, and because the existing order is a candidate, it keeps that order wherever composing is priced higher, as at prompts of one or two chunks.
 % SOURCE: opcord/plan/planner.py choose(model, L, N): candidates every split with a committed probe (S1, S2, S4), arms ship / shipar / comp, composer policies depth {1, 2, 4, 8} x GEMM cap {none, 4} x packing {1, 4}, each priced by event_model.predict, cheapest returned with the whole table; measure-when-close (planner.decide) as in Section~\ref{subsec:pricing}.
 % SOURCE: the four-column split's GEMMs are 27% (1B) and 35% (Qwen3-4B) slower than on six columns, and its attention slope per chunk 3.0-3.1x lower than the default split's existing stream (vault lab-split-sweep (4)-(5)).
 % DECISION: resident splits, switching at a turn boundary, and relayout belong to agent workloads, an extension under spine v18; their text is archived in the vault.
 
 % VALUE: the event model's error is stated on the difference between candidates, so its choice is right whenever two candidates differ by more than about twice that error and costs at most about that much otherwise; where the top candidates fall inside a frozen band, a short measurement at plan time settles the tie, and the unaided choice is always reported
-Because a choice compares candidates, we state the event model's error on the difference between two candidates' times rather than on each time alone.
-Its choice is then right whenever two candidates differ by more than about twice its largest error on a difference, and otherwise costs at most about that much.
-Where the top candidates fall inside a band of 5\% for orders of one kind or 15\% between a composed and an existing order, the composer runs each candidate briefly when it plans the prompt length and keeps the faster.
-We always report the event model's unaided choice beside the choice this measurement makes (Section~\ref{subsec:decision}).
+Because a choice compares candidates, we state the event model's error on the difference between two candidates' times rather than on each time alone, so its choice is right whenever they differ by more than about twice its largest such error and otherwise costs at most about that much.
+Where the top candidates fall inside a band of 5\% for orders of one kind or 15\% between a composed and an existing order, the composer briefly runs each when it plans the prompt length and keeps the faster.
+We always report the event model's unaided choice beside the measured one (Section~\ref{subsec:decision}).
 % SOURCE: measure-when-close, implemented test-first in opcord (planner.CLOSE_BAND, close_candidates, decide; test_measure_close 10/10); bands same 5%, cross 15%, tie 0.5%, one warm and three kept runs per candidate; about 19 min of device time over the whole grid, once per shape (vault decisions log, "Spine v18 drafted; amendment-1 batch and measure-when-close approved").
 
 \subsection{Implementation}

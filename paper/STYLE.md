@@ -438,7 +438,8 @@ FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`, the IEEE templa
   10 Conclusion. Contributions: four items (the analysis method, the condition, the event model and bound, OPCORD).
   The baseline is the existing program on the shipped split that minimizes its TTFT, run on the faster of its own
   host code and our runner; the hand-alternated baseline is retired. FastFlowLM, taken as released, is an
-  observation for the condition only, never a speedup reference and never "hand-tuned" or "expert". Appends and agent
+  observation for the condition, never the baseline of OPCORD's speedups and never "hand-tuned" or "expert"; its current
+  release appears once as an absolute comparison, marked as a snapshot (author, 2026-10-25). Appends and agent
   turns are an extension and stay out of the body. The text before this rewrite is archived verbatim in the vault
   (`archive-tex-2026-10-24`).
 - **Contribution list** (author, 2026-10-24; supersedes the noun-phrase item form and the contribution items above

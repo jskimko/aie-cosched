@@ -53,10 +53,51 @@ Because the DRAM read cap varies by up to 12\% between batches, every ratio pair
 OPCORD shortens TTFT on all five LLMs, with outputs bit-identical to the existing program's, by \E{X--Y}$\times$ at prompts of 1{,}024 tokens and more (Figure~\ref{fig:headline}).
 The gain rises with the prompt length and peaks at \E{8--16K} tokens, where the overlap between the groups and the alternation within attention together are largest (Section~\ref{subsec:shape-eval}).
 At prompts of one or two chunks, OPCORD keeps the existing order, whose TTFT it then equals.
-In absolute terms, OPCORD on MLIR-AIR's designs reaches the first token sooner than FastFlowLM's current release, version 1.0.8, by its own prefill timer, on all five LLMs at every prompt length we compare, by \E{1.2--2.3}$\times$ at 1K to 16K tokens, whereas the existing program is slower than that engine at 16K tokens on four of the five, a comparison of two releases that their developers will keep improving.
+% SOURCE: valid end-to-end cells so far, pre-final (vault decisions log, issue check 8d2eac19): Qwen3-4B 1.33-1.57x (8-32K); LFM2-1.2B 1.10-1.24x (1-2K) and 1.45x (32K); Gemma3-4B 1.20x (1K), 1.22-1.30x (2-8K), 1.18x (32K); Llama-3.1-8B 1.04-1.25x (512-2K); the rest from the amendment-1 batch.
+
+% VALUE: absolute standing, as a snapshot of two releases: OPCORD on MLIR-AIR's designs reaches the first token sooner than FastFlowLM's current release on all five LLMs at every length compared, whereas the existing program is slower than that engine at 16K on four of the five; in decode FastFlowLM stays faster on three LLMs, and the loop pass brings two within a few percent
+In absolute terms, OPCORD on MLIR-AIR's designs reaches the first token sooner than FastFlowLM's current release, version 1.0.8, by its own prefill timer, on all five LLMs at every prompt length we compare, by \E{1.2--2.3}$\times$ at 1K to 16K tokens (Table~\ref{tab:absolute}).
+The existing program on its default split, by contrast, is slower than that engine at 16K tokens on four of the five.
+Both comparisons are of two releases that their developers will keep improving.
 In decode, FastFlowLM's engine stays faster on three LLMs, whose MLIR-AIR decode designs differ in more than their order, and the loop pass brings Llama-3.2-1B and Llama-3.1-8B within \E{3}\% of it at 16K tokens.
 % SOURCE: D1 (amd-npu 45421aa3, 3c07fde9, ab/results/d1-2026-10-25; one batch 11:20-14:30 at pin 4c56faa, every gate passed): TTFT medians FastFlowLM (server prefill_duration_ttft) / existing S2 / OPCORD's pick, ms, at 1K / 4K / 16K: Llama-3.2-1B 576.7 / 326.0 / 284.8, 1769.1 / 1909.9 / 1076.0, 10980.5 / 17999.2 / 6057.4; LFM2-1.2B 609.6 / 296.6 / 270.2, 1665.6 / 1386.7 / 1053.9, 7962.3 / 9421.2 / 4906.0; Qwen3-4B 1816.5 / 1076.9 / 860.6, 5858.0 / 6557.5 / 3742.7, 34669.4 / 62990.2 / 22142.0; Gemma3-4B 1597.4 / 874.2 / 735.8, 4601.8 / 3903.1 / 2996.2, 19484.0 / 18386.8 / 13926.9; Llama-3.1-8B 2445.6 / 1682.7 / 1528.4, 8004.0 / 8735.5 / 6212.5, 41822.5 / 67623.4 / 34033.5; at 128 tokens FastFlowLM 345-1176 ms against 56-252 ms. Decode ms per token at 16K, FastFlowLM / existing / loop pass: 27.18 / 34.99 / 27.29 (1B), 20.80 / 45.40 / 37.48 (LFM2), 100.09 / 155.89 / 139.76 (Qwen3-4B), 65.84 / 147.89 / 144.42 (Gemma3-4B), 133.16 / 148.43 / 136.20 (8B). The two TTFT timers differ in definition (FastFlowLM's server timer against our prefill call to logits); some FastFlowLM decode reps ended early on EOS (NOTES).
-% SOURCE: valid end-to-end cells so far, pre-final (vault decisions log, issue check 8d2eac19): Qwen3-4B 1.33-1.57x (8-32K); LFM2-1.2B 1.10-1.24x (1-2K) and 1.45x (32K); Gemma3-4B 1.20x (1K), 1.22-1.30x (2-8K), 1.18x (32K); Llama-3.1-8B 1.04-1.25x (512-2K); the rest from the amendment-1 batch.
+
+\begin{table}[t]
+    \centering
+    \caption{Time to First Token. FastFlowLM 1.0.8 by its own prefill timer, the existing program on its default split $S_2$, and OPCORD on the split it chooses.}
+    \label{tab:absolute}
+    % VALUE: TTFT of FastFlowLM's current release, the existing program, and OPCORD on the five LLMs at three prompt lengths
+    % SOURCE: D1, the source line above (FastFlowLM by its server's prefill timer; the existing program on $S_2$; OPCORD at its own pick).
+    \small
+    \begin{tabular*}{\linewidth}{@{}ll@{\extracolsep{\fill}}rrr@{}}
+        \toprule
+         & & \multicolumn{3}{c}{TTFT (ms)} \\
+        \cmidrule(l){3-5}
+         & & FastFlowLM & Existing, & \\
+        LLM & Tokens & 1.0.8 & $S_2$ & OPCORD \\
+        \midrule
+        Llama-3.2-1B & 1K & \E{576.7} & \E{326.0} & \E{284.8} \\
+         & 4K & \E{1769.1} & \E{1909.9} & \E{1076.0} \\
+         & 16K & \E{10980.5} & \E{17999.2} & \E{6057.4} \\
+        \addlinespace
+        LFM2-1.2B & 1K & \E{609.6} & \E{296.6} & \E{270.2} \\
+         & 4K & \E{1665.6} & \E{1386.7} & \E{1053.9} \\
+         & 16K & \E{7962.3} & \E{9421.2} & \E{4906.0} \\
+        \addlinespace
+        Qwen3-4B & 1K & \E{1816.5} & \E{1076.9} & \E{860.6} \\
+         & 4K & \E{5858.0} & \E{6557.5} & \E{3742.7} \\
+         & 16K & \E{34669.4} & \E{62990.2} & \E{22142.0} \\
+        \addlinespace
+        Gemma3-4B & 1K & \E{1597.4} & \E{874.2} & \E{735.8} \\
+         & 4K & \E{4601.8} & \E{3903.1} & \E{2996.2} \\
+         & 16K & \E{19484.0} & \E{18386.8} & \E{13926.9} \\
+        \addlinespace
+        Llama-3.1-8B & 1K & \E{2445.6} & \E{1682.7} & \E{1528.4} \\
+         & 4K & \E{8004.0} & \E{8735.5} & \E{6212.5} \\
+         & 16K & \E{41822.5} & \E{67623.4} & \E{34033.5} \\
+        \bottomrule
+    \end{tabular*}
+\end{table}
 
 \begin{figure}[t]
     \centering
@@ -205,58 +246,38 @@ Rescheduling frees overlap only where the condition holds, in an amount set by h
 We show this across the design classes of our census, across prompt lengths, on a synthetic design, and with one control per clause.
 
 \label{subsec:exposure}
-% VALUE: what the exposure measures and what it does not: per workload, the exposure M (share of wall time in commands whose configuration holds two or more operators), the bound b on reorders inside those commands, and the ceiling they imply; these cover the reorders inside a design's existing commands, which is all a closed stack lets us rewrite, whereas on an open fused design that issues one operator per command the composer re-cuts the commands, which the per-removal bound prices
-We state for each design its \emph{exposure} $M$, the share of the wall time spent in commands whose configuration holds two or more operators, taken per recorded prompt on a closed stack.
-A closed stack's rewrites stay inside its own commands, apart from reorders and merges of commands that no host step separates and narrowings of waits whose host accesses are observed (Section~\ref{subsec:closed}).
-For such a stack we also state $B$, the joint bound of Section~\ref{subsec:removal} over every legal rewrite inside those commands.
-The two imply a ceiling on the end-to-end gain from inside commands of $1 / \bigl((1 - M) + M / B\bigr)$, which separates a design that exposes little work from one whose exposed work cannot overlap.
-An open fused design leaves more room, since OPCORD's composer also re-cuts its commands so that operators issued one per command come to share commands.
-The bound of each false order across commands covers this rewrite.
-MLIR-AIR's prefill spends nearly all of its time on one configuration that holds every operator, and so has an exposure near one.
-On it, this re-cut carries nearly all of the gain at the splits OPCORD chooses (Section~\ref{subsec:ablation}), because each of its commands issues one operator and leaves room inside only for the stream pass's alternation within attention.
+% VALUE: the two measures per design: the exposure M (share of wall time in commands whose configuration holds two or more operators) and, for a closed stack, whose rewrites stay inside its commands, the joint bound B over the legal rewrites inside them; together they separate a design that exposes little work from one whose exposed work cannot overlap
+We state each design's \emph{exposure} $M$, the share of the wall time spent in commands whose configuration holds two or more operators, and for a closed stack, whose rewrites stay inside its commands apart from those of Section~\ref{subsec:closed}, the joint bound $B$ of Section~\ref{subsec:removal} over every legal rewrite inside them.
+Together they imply a ceiling of $1 / \bigl((1 - M) + M / B\bigr)$ on the end-to-end gain from inside commands, which separates a design that exposes little work from one whose exposed work cannot overlap.
 % SOURCE: exposure metric and ceiling (aie-cosched registered 2a7990a; script 3d11670; rows a3ef131; partb/README).
+% SOURCE: the ceiling that M and B imply on the end-to-end gain from inside commands, 1 / ((1 - M) + M / B); the rewrites a closed stack allows outside its commands are reorders and merges of commands that no host step separates and narrowings of waits whose host accesses are observed (Closed Binaries); on a closed stack, M is taken per recorded prompt.
 
 \label{subsec:observed}
-% VALUE: the census by design class, each placed by its cuts, with what the condition predicts and what the bounds and measurements show: MLIR-AIR's prefill (fused configuration, one operator per command) gains, as Section 6.2 measures; FastFlowLM's flash prefill (fused configuration, one column group per command, the same shape) has M 0.82-0.87 but runs each layer's attention once over the whole prompt (no chunks; a 1,024-token cap), so every GEMM feeds or reads it and every turn between groups is a true dependence, failing the second clause at every length it accepts; b 1.000 inside its one-group commands; its one rewrite worth measuring (a merge at the shortest prompts) is the bound's check in Section 6.6; its decode pairs share an engine; its long-prompt engine is modular, one operator per whole-array configuration, failing the first clause at every length; IRON's modular operator sequences share no command and their streams price at one; the non-LLM designs overlap through dataflow; so every design the condition says can gain is one whose gain we measure
-Across the designs of our census (Table~\ref{tab:census}), the condition of Section~\ref{subsec:question}, read from each design's artifacts, predicts gains only where a false order in a fused configuration meets both of its clauses.
-Measurement bears this out for MLIR-AIR's prefill and decode, and the bounds of Section~\ref{subsec:removal}, computed with measured durations and reported below, show that the designs where the condition predicts no gain have little to recover.
-MLIR-AIR's prefill, whose column groups take turns on work that meets both clauses, and its decode, whose loop keeps one buffer per role, are where the gains of Section~\ref{subsec:e2e} are measured.
+% VALUE: the census by design class, each placed by its cuts, with what the condition predicts and what the bounds and measurements show: MLIR-AIR's prefill and decode gain, the prefill through the composer's re-cut of its one-operator commands; FastFlowLM's current release leaves almost no overlap in either prefill engine, because the flash prefill's turns are true dependences (attention once over the whole prompt; B 1.000, joint bound a few percent) and the per-operator engine shares columns between consecutive commands; IRON's modular sequences bound at one, as do the non-LLM designs in the table; so every design the condition says can gain is one whose gain we measure
+Across our census (Table~\ref{tab:census}), the condition, read from each design's artifacts, predicts gains only where a false order in a fused configuration meets both clauses, and measurement bears this out on MLIR-AIR's prefill and decode (Section~\ref{subsec:e2e}).
+Although the prefill's exposure is near one, nearly all of its gain at the splits OPCORD chooses comes from the composer's re-cut of its one-operator commands (Section~\ref{subsec:ablation}), which the bound of each false order across commands covers.
+% SOURCE: moved detail behind the census paragraph: MLIR-AIR's prefill, whose column groups take turns on work that meets both clauses, and its decode, whose loop keeps one buffer per role, are where the gains of Section subsec:e2e are measured; the prefill's exposure is near one because it spends nearly all of its time in one configuration that holds every operator; the re-cut makes operators issued one per command come to share commands; inside its one-operator commands the prefill leaves room only for the stream pass's alternation within attention.
 
-FastFlowLM's prefill exposes most of its time, yet leaves almost no overlap to recover, because every turn between its groups is a true dependence.
-Its flash prefill, taken as released, accepts prompts of up to 1{,}024 tokens, which is its single-turn context.
-FastFlowLM serves longer prompts, and every LLM without a flash design, our five LLMs included, with its per-operator engine, which the user chooses by model tag, not by prompt length.
+FastFlowLM's current release leaves almost no overlap to recover in either of its prefill engines.
+Its flash prefill, which serves Gemma4 at prompts of up to 1{,}024 tokens, exposes most of its time but runs each layer's attention once over the whole prompt rather than in 128-token chunks, so every GEMM command of a layer feeds that attention or reads its output.
+Every turn between its column groups is therefore a true dependence, through the host or through device memory, which fails the second clause at every length the design accepts.
+Its false orders bound at $B = 1.000\times$ inside commands, a ceiling of $1\times$ however large $M$ is.
+With measured durations, the joint bound over its whole legal rewrite space stays within a few percent of $1\times$ at every prompt from 128 to 1{,}024 tokens, at about \E{1.04--1.05}$\times$ at 512 to 1{,}024 and \E{1.08--1.09}$\times$ at 128, where a merge of two commands saves a dispatch rather than freeing overlap (Section~\ref{subsec:census}).
 % SOURCE: FastFlowLM 44d01787: src/model_list.json gemma4e-flash default_context_length 1024, max_prefill_len 1024, label single-turn, gemma4-it 32768 / 4096; common/AutoModel/automodel.cpp:20-32 forces a single-turn model's context to its default; server/rest_handler.cpp:1270-1275, 1332-1337 refuse a longer request with 400 "Max length reached!" (npu-gap's two 4K cells: HTTP 400); engines libgemma4e_flash.so and libgemma4e_npu.so (pass-0, flm_long.py at aie-cosched 852f610).
-The flash prefill spends most of its time on one configuration that holds the operators of both column groups, for an exposure $M$ of 0.82--0.87.
-It issues each command to one group, so its groups take turns across commands as MLIR-AIR's do.
-The two differ in how they cut the prompt into commands.
-MLIR-AIR's design runs it in 128-token chunks, so the GEMMs of later chunks are free to run beside one chunk's attention (Section~\ref{subsec:losses}).
-FastFlowLM instead runs each layer's attention once over the whole prompt, so every GEMM command of a layer either feeds that attention or reads its output.
-Each turn therefore fails the condition's second clause at every length the design accepts.
-From the GEMMs to attention, its host reads a command's output before it issues the next.
-From attention to the GEMMs, the host's wait is false, but the next command's read of attention's output in device memory orders the same turn.
-The false orders inside its commands bound at $B = 1.000\times$, a ceiling of $1\times$ however large $M$ is.
-The joint bound covers the whole legal rewrite space of Section~\ref{subsec:closed}, across commands as well as inside them, and includes the host's false waits after attention, whose removal could only let host steps start earlier.
-With measured durations, this bound stays within a few percent of $1\times$ at every prompt from 128 to 1{,}024 tokens.
-It is about \E{1.04--1.05}$\times$ at 512 to 1{,}024 tokens and \E{1.08--1.09}$\times$ at 128, where the merge of two commands saves a dispatch rather than freeing overlap (Section~\ref{subsec:census}).
+% SOURCE: moved detail behind the flash prefill: it issues each command to one column group, as MLIR-AIR's prefill does, so its groups take turns across commands; every GEMM command of a layer feeds that attention or reads its output, which makes the turns true dependences; the merge saves a dispatch rather than freeing overlap; its joint bound covers the legal rewrite space of Closed Binaries across commands as well as inside them; it accepts prompts of up to 1,024 tokens, its single-turn context; FastFlowLM serves longer prompts, and every LLM without a flash design, our five LLMs included, with its per-operator engine, which the user chooses by model tag, not by prompt length; its exposure M is 0.82-0.87 on one configuration that holds the operators of both column groups; MLIR-AIR's 128-token chunks leave the GEMMs of later chunks free to run beside one chunk's attention (Section subsec:losses).
+% SOURCE: moved detail on the host's waits: from the GEMMs to attention, the host reads a command's output before it issues the next; from attention to the GEMMs, the host's wait is false, but the next command's read of attention's output in device memory orders the same turn; the joint bound includes these false waits after attention, whose removal could only let host steps start earlier, and stays within a few percent of 1x at every prompt from 128 to 1,024 tokens. Its decode (one command per step, inside 1.000x, between steps at most 1.009x) is stated in Table tab:census.
 % COMMENT: pass-0 P1 recomputes this joint as a bound over every order of the remaining work (T over the larger of the longest true-dependence path and the busiest resource's total work); restate the values and Section 4.4's definition from it.
 % SOURCE: the joint with the measured merges counted once (the merge's modelled run-setup cost replaced by the measured S, not added to it): E2B 1k 1.029, E4B 1k 1.024, E4B 128 1.054 [1.052, 1.056], E2B 128 1.068 [1.066, 1.072] (pass-0 merge-decision.json, aie-cosched c93845c, 5fafd0f); the registered form, which counts that cost twice, 1.041 / 1.038 / 1.063 / 1.080.
 % DECISION: no threshold; the 1.05x line was a planning cutoff (EXPECTED.md, aie-cosched 896023f) and is retired as a criterion (author, 2026-10-25): the claim is the size, a few percent against MLIR-AIR's gains where the condition holds.
-Its decode runs one command per step, whose false orders inside the command all hold apart work that shares a core tile or a DMA channel and bound at $1.000\times$, while the false waits between steps bound at most $1.009\times$.
-Its per-operator engine is modular and runs the prompt in pieces of up to 4{,}096 tokens.
-It gives each operator its own configuration, nearly always of all eight columns, which a hardware context holds one at a time.
-As a result, \E{99.6--100}\% of consecutive commands share a column, and the first clause fails on our five LLMs at 4K tokens and on Gemma4 from 4K to 16K.
+FastFlowLM's modular per-operator engine, which serves our five LLMs and Gemma4's longer prompts, gives each operator its own configuration, nearly always of all eight columns, so \E{99.6--100}\% of consecutive commands share a column and the first clause fails on our five LLMs at 4K tokens and on Gemma4 from 4K to 16K.
 % SOURCE: FastFlowLM's per-operator engine on our five LLMs (pass-0 aie-cosched 334bc31, results/2026-10-25-flm-command-cut/dense4k.json, flm_dense4k.py c90d484; offline 4K recordings, 0 /dev/accel): 193 / 385 / 469 / 443 / 189 prefill commands (Llama-3.2-1B / Llama-3.1-8B / Qwen3-4B / Gemma3-4B / LFM2-1.2B), one attention command per layer, configurations mm, dequant, attn (+ conv on LFM2), one multi-operator layer.xclbin command, fused_prefill never dispatched; consecutive pairs sharing a column 100%, on the same column set 83-100%, configuration switches at about a third of the boundaries; the same design class as Gemma4's gemma4-it engine (long.json, 1612357). MLIR-AIR's README says some of its LLM implementations reimplement FastFlowLM's designs, and its Gemma3-4B calls itself faithful to FastFlowLM's Gemma3 engine (mlir-air 44e8d8f7 programming_examples/llms/README.md:10-15, gemma3_4b_q4nx_inference.py:4-6), so the paper does not say which FastFlowLM design MLIR-AIR's fused prefill reimplements.
-It does hold independent work, such as dequantizing weights within a chunk and the next chunk's early GEMMs, but on the columns of the work it would overlap.
-Recovering that work would therefore take a design that places operators on disjoint columns, not a new order of its commands.
+% SOURCE: moved detail behind the per-operator engine: it runs the prompt in pieces of up to 4,096 tokens, and a hardware context holds its configurations one at a time; it does hold independent work, such as dequantizing weights within a chunk and the next chunk's early GEMMs, but on the columns of the work it would overlap, so recovering it would take a design that places operators on disjoint columns, not a new order of its commands.
 % SOURCE: FastFlowLM gemma4-it E2B / E4B at 4K, 8K, 16K, recorded offline with 0 /dev/accel opens (aie-cosched 1612357, results/2026-10-25-flm-command-cut/long.json, flm_long.py 852f610; amd-npu 2d95cc27 recorder): AutoModel chunks of 4,096 run in turn, 488 / 597 commands per chunk, one attention command per layer per chunk (28 swa + 7 attn; 35 + 7); per-operator configurations only, fused_prefill.xclbin never dispatched (512 and up); exposure by command count 0.002 / 0.0017 (layer.xclbin only); consecutive pairs sharing a shim column 99.6-99.8%, on the identical set 79%, nearly always all 8; configuration switches at 177 of 487 boundaries per E2B chunk; device-memory RAW only (host paths uncounted, so independence is overstated): within a chunk 145 / 451 (E2B) and 173 / 553 (E4B) GEMM-type commands with no path to or from the neighbouring attention, mostly weight-only dequant; across chunks 245 / 451 and 294 / 553 of chunk c+1's GEMM-type commands with no path from chunk c's attention, at every boundary. FastFlowLM 44d01787: engine by model tag (gemma4-it 32768 / 4096 against gemma4e-flash single-turn 1024).
 
-IRON's modular operator sequences give each operator its own configuration of the whole array, which a hardware context holds one at a time.
-Consecutive operators therefore share every core tile and DMA channel, which the first clause excludes.
-Their operators share no command, their exposure is zero, and they pay reconfiguration between operators instead.
-Their 32 streams, which issue their transfers ahead of their waits, all bound at $1.000\times$.
-Each of the non-LLM designs we read runs as one command whose stages already overlap through the array's own dataflow, and the 3 that IRON builds also bound at $1.000\times$.
-Every overlap gain we measure, on the designs we rewrite, the synthetic design, and the two controls below, therefore falls where the condition says one can arise.
-Where it says none can, the bounds, computed with measured durations, stay at or near $1\times$, while the controls below test each clause directly.
+IRON's modular operator sequences give each operator its own configuration of the whole array, so consecutive operators share every core tile and DMA channel, which the first clause excludes.
+Their 32 streams, at an exposure of zero and with their transfers already issued ahead of their waits, all bound at $1.000\times$.
+Every overlap gain we measure, on the designs we rewrite, the synthetic design, and the controls below, therefore falls where the condition says one can arise, and where it says none can, the bounds, computed with measured durations, stay at or near $1\times$.
+% SOURCE: moved detail behind the IRON paragraph: IRON's configurations are held one at a time by a hardware context; its operators share no command and pay reconfiguration between operators instead; its 32 streams already issue their transfers ahead of their waits; each of the non-LLM designs we read runs as one command whose stages already overlap through the array's own dataflow, and the 3 that IRON builds also bound at 1.000x (Table tab:census).
 % SOURCE: FastFlowLM flash prefill (aie-cosched 232dafe, passes/flm_chunking.py, all 8 buckets p128-p1024, both models): 35 / 42 attention commands at every bucket, one per layer, largest buffers +1 MiB per 128 tokens; RAW graph over device memory: no GEMM command inside a layer independent of its layer's attention (only 3 before layer 0 and 2 after the last); max_prefill_len 1024 (FastFlowLM 44d01787 src/model_list.json), 4K cells refused with HTTP 400 (amd-npu 7297b0d3). Switches: A->G host waits false 35/35 and 42/42 but cmd->cmd true through device memory; G->A host waits true 35/35 and 42/42 (21a35ae). One group per command (aa4df07).
 % SOURCE: census Part A 112 designs (aie-cosched 7827f85); FastFlowLM exposure, scored request, M 0.82-0.87 (flash), b over the legal rewrite space 1.000 under the task form (terms4, registered 67d54fe, rows 3c70af2; exposure 2a7990a / a3ef131); 211 of 312 waits true at E2B 1,024 (census SUMMARY); measured-only joint below 1.05 on every scored request (terms3/terms4); decode boundary 1.000-1.009, inside a runlist 1.000 (decode2 rows e679463). IRON composition predicted 1.000 for every design (aie-cosched a73ba38 / dbdbda0); non-LLM designs: each one command (pass-0 task 6, 2026-10-24).
 % SOURCE: FastFlowLM's only crossing over its legal rewrite space is the dispatch a merge of two commands saves at the 128-token bucket, 1.075-1.093x as an upper bound at the measured floor F = 195.0 us (terms5, aie-cosched e8232aa); the merges are measured below.
@@ -278,7 +299,7 @@ Where it says none can, the bounds, computed with measured durations, stay at or
         MLIR-AIR prefill & fused; 128-token chunks; one operator per command & gain (Section~\ref{subsec:e2e}) \\
         MLIR-AIR decode & fused; one buffer per role & gain (Section~\ref{subsec:e2e}) \\
         FastFlowLM flash prefill & fused; whole prompt per layer; one column group per command & every GEMM feeds or reads its layer's attention; $B = 1.000\times$ inside commands; merge bound $1.075$--$1.093\times$, replay \E{2.9--3.3}\% \\
-        FastFlowLM per-operator prefill & modular; pieces of up to 4{,}096 tokens; one operator per configuration, nearly all on all eight columns & independent work only on shared columns; the first clause fails at every length \\
+        FastFlowLM per-operator prefill & modular; pieces of up to 4{,}096 tokens; one operator per configuration, nearly all on all eight columns & independent work only on shared columns; the first clause fails at every length recorded \\
         FastFlowLM decode & fused; one command per step & false orders inside the command on a shared core tile or DMA channel, $1.000\times$; waits between steps at most $1.009\times$ \\
         IRON LLM designs & modular & bound $1.000\times$ \\
         Non-LLM designs & one command per design & overlapped by dataflow; the 3 IRON builds bound $1.000\times$ \\
@@ -288,25 +309,20 @@ Where it says none can, the bounds, computed with measured durations, stay at or
 
 \label{subsec:shape-eval}
 % VALUE: the prompt length sets the balance of the exposed work: attention per chunk grows with the chunk's position while the GEMMs' work per chunk is fixed; at one split on every LLM the reorder ties at one chunk and loses at two (per-command costs and the pipeline's fill and drain outweigh the overlap), gains from four and rises to about twice at 8-16K where the groups balance, and falls at 32K where attention outweighs the GEMMs; in the middle range an estimate from the groups' busy times and the hidden host time tracks the gain, while only the event model prices the few-chunk costs and the incomplete overlap at long balanced prompts; the split moves the balance, so the best split changes with the length
-The prompt length sets the balance of the work the two groups can overlap.
-In a prefill cut into chunks of 128 tokens, attention's work per chunk grows with the chunk's position, while the GEMMs' work per chunk stays fixed.
-Overlapping the two column groups across chunks hides the shorter group's time behind the longer one's.
-At the default split on every LLM, the reorder ties at one chunk and loses at two, because the per-command costs and the time to fill and drain the pipeline of commands outweigh the overlap.
-It gains from four chunks and peaks at 8--16K tokens on every LLM, at up to about $2\times$.
-The peak lies near where the groups' work balances on LFM2-1.2B and Llama-3.1-8B, and past it on Qwen3-4B and Llama-3.2-1B, where alternating attention's columns keeps adding gain as attention grows.
-By contrast, Gemma3-4B, whose attention has no wait to alternate and stays below the GEMMs, gains about $1.3\times$ from 4K tokens on.
+The prompt length sets the balance of the work the two groups can overlap, because attention's work per 128-token chunk grows with the chunk's position while the GEMMs' work per chunk stays fixed.
+At the default split on every LLM, the reorder ties at one chunk and loses at two, where per-command costs and the pipeline's fill and drain outweigh the overlap, and it gains from four chunks to a peak of up to about $2\times$ at 8--16K tokens.
+The peak lies near where the groups balance, or past it where alternating attention's columns keeps adding gain as attention grows, whereas Gemma3-4B, whose attention has no wait to alternate and stays below the GEMMs, gains about $1.3\times$ from 4K tokens on.
 % SOURCE: gain decomposition on the 70 measured development cells (pass-0 aie-cosched c4a8650, passes/gain_decompose.py, results/2026-10-25-gain-decompose): orig / comp = alternation (orig / stream, measured) x cross-group overlap x host and dispatch hiding (stream - comp split by the group terms); on S2 at 1K / 4K / 16K: Llama-3.2-1B 1.129 / 1.720 / 2.043 (alternation 1.065 / 1.188 / 1.505), Llama-3.1-8B 1.113 / 1.408 / 1.986, Qwen3-4B 1.180 / 1.756 / 1.823, LFM2-1.2B 1.100 / 1.316 / 1.952, Gemma3-4B 1.120 / 1.250 / 1.284 (alternation 1.001); balance (attention after alternation level with the GEMMs) against peak: LFM2-1.2B 15.9K / 16K, Llama-3.1-8B 12.1K / 16K, Qwen3-4B 5.6K / 8K, Llama-3.2-1B 5.6K / 16K, Gemma3-4B 32.3K / 8K (1.25-1.30 from 4K to 32K); the overlap share of stream - comp has median 0.959, host and dispatch hiding 0.95-1.04, mostly at short prompts.
-The balance alone accounts for this shape from 1K to 4K tokens.
-There, an estimate from the two groups' busy times and the host time the overlap hides tracks the gain within 5\%, though it is not a bound.
-Only the event model, which composes each command, prices the dispatch costs at few chunks and the incomplete overlap at long balanced prompts.
+The balance alone accounts for this shape from 1K to 4K tokens, where an estimate from the groups' busy times and the hidden host time tracks the gain within 5\% without bounding it.
+Only the event model prices the dispatch costs at few chunks and the incomplete overlap at long balanced prompts.
 % SOURCE: same-split shape on the development grids, pre-final: one chunk 0.976-1.006, two chunks 0.945-0.972, four chunks 1.040-1.076 on all five LLMs, 1.13-1.18x at 1,024, 1.82-2.17x at 8-16K, falling at 32K (vault decisions log, grids of 2026-10-23/24; issue check 8d2eac19). The estimate with its host term against the event model and the measured cells: pass-0 group terms (registered 3fab31d) and the synthetic sweep (abaa3d9).
 % SOURCE: same-split ratios on the development grids, pre-final: one chunk 0.976-1.006 (a tie), two chunks 0.945-0.972, four chunks 1.040-1.076 on all five LLMs, 1.13-1.18x at 1,024, 1.82-2.17x at 8-16K (vault decisions log, the grids of 2026-10-23/24). The estimate F1 = (A + G + H_orig) / (max(A, G) + H_comp) over 70 measured cells (aie-cosched results/2026-10-24-group-terms, rows e5798e4, fit 6c5b666): within 5% on 23 of 24 cells at 1k-4k (geomean 0.996), over-predicting below and above that range (per-command costs and the pipeline's fill and drain at few chunks; incomplete overlap inside one command at long balanced prompts), 3 of 20 at N <= 512 (1.079), 12 of 26 at >= 8k (1.021; Gemma3-4B 16-32K 1.16-1.41, A and G about 21 s each at 32,768 against a composed device busy of 33.5 s); the event model 51 of 70 within 5% at the pin, 67 of 70 (geomean 0.992) at the frozen dev form with every LM-head chunk priced (amd-npu 277cefce FORM-A2.md). Pre-final.
 % DECISION: the shape rule is an estimate for a middle range of lengths, never a bound: a plain cap of 2x is contradicted by Llama-3.2-1B's 2.07-2.17x, because it omits the host time the composer hides; at few chunks only the event model prices the per-command costs, and at long prompts where the groups balance, overlap within one command stays short of perfect (Gemma3-4B at 16-32K), which only the event model's per-command composition captures (group-term fit 6c5b666).
+% SOURCE: moved detail behind the shape paragraph: the peak lies near where the groups' work balances on LFM2-1.2B and Llama-3.1-8B, and past it on Qwen3-4B and Llama-3.2-1B, where alternating attention's columns keeps adding gain as attention grows (balance against peak in the gain-decomposition line above); overlapping the two column groups across chunks hides the shorter group's time behind the longer one's, and the balance alone accounts for the shape from 1K to 4K tokens; the synthetic LLM is built as MLIR-AIR's fused prefill as the five LLMs are; the event model alone prices the few-chunk and long-prompt costs because it composes each command.
 
 % VALUE: a synthetic LLM on the same engine varies the balance and the number of chunks directly, with OPCORD unmodified: the gain peaks where the groups balance and dips at few chunks at every balance, so the shape is a property of the exposed work, not of the five LLMs
-To vary the balance directly, we run a synthetic two-layer LLM through OPCORD unmodified, built as MLIR-AIR's fused prefill as the five LLMs are, changing its GEMM work at a fixed attention.
-Across balances from one eighth to eight and 1 to 32 chunks, the gain peaks where the groups' work balances and dips below one at few chunks at every balance (Figure~\ref{fig:synthetic}).
-The shape therefore belongs to that balance rather than to the five LLMs.
+To vary the balance directly, we run OPCORD unmodified on a synthetic two-layer LLM built as MLIR-AIR's fused prefill, changing its GEMM work at a fixed attention.
+Across balances from one eighth to eight and 1 to 32 chunks, the gain peaks where the groups balance and dips below one at few chunks at every balance (Figure~\ref{fig:synthetic}), so the shape belongs to the balance rather than to the five LLMs.
 % SOURCE: Route E builds (mlir-air synthetic-route-e 8ce52a3c; four builds, (d, inter) = (256, 768), (1024, 768), (2048, 2304), (2048, 12288), the 1B's attention, 2 layers); predictions abaa3d9 (registered 2984f01), re-predicted at the frozen event model (dev form, opcord-runtime 3bead38) before the runs; measurements \E{pending}.
 \begin{figure}[t]
     \centering
@@ -317,9 +333,8 @@ The shape therefore belongs to that balance rather than to the five LLMs.
 \end{figure}
 
 % VALUE: one control per clause: forcing the reordered groups onto one DMA channel (a resource a rewrite cannot duplicate), or adding a host step that reads each output before the next command (a true dependence through the host), leaves the gain the condition predicts
-Each clause is also tested directly by breaking it, and the condition predicts no gain from either break.
-Forcing the reordered groups of a two-group fused design that we write with IRON's interface onto one DMA channel, which a rewrite cannot duplicate, leaves a gain of \E{Y}$\times$.
-Adding to the synthetic LLM a host step that reads each output before the next command leaves \E{Z}$\times$.
+Each clause is also tested directly by breaking it, which the condition predicts leaves no gain.
+Forcing the reordered groups of a two-group fused design that we write with IRON's interface onto one DMA channel, which a rewrite cannot duplicate, leaves \E{Y}$\times$, and adding to the synthetic LLM a host step that reads each output before the next command leaves \E{Z}$\times$.
 % SOURCE: controls through the generic composer front end (vault decisions log, 2026-10-24), \E{pending}.
 
 % VALUE: the consequence: the order is fixed in the artifact while the work it lets overlap changes with the prompt, so the order that pays changes with the prompt; choosing it needs durations no compile has, which is why OPCORD prices the order and the split per prompt length
