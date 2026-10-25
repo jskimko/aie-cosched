@@ -3,8 +3,17 @@
 
 % VALUE: what the evaluation establishes, in order: OPCORD shortens prefill and decode on five LLMs against the existing program on its own best shipped split, and where the gain comes from; its choice of order and split stays near the best measured option; its rewrites are legal and its analysis reads every stream exactly; and what rescheduling recovers follows the cut and the prompt length, as Section 3.3 states
 % DECISION: no question list at the head of the evaluation; subsections have noun titles and each opens with its finding.
-Sections~\ref{subsec:e2e}--\ref{subsec:decision} evaluate OPCORD, Sections~\ref{subsec:legality-eval} and~\ref{subsec:census} its analysis, and Section~\ref{subsec:pays} the condition that says where rescheduling pays.
+Sections~\ref{subsec:e2e}--\ref{subsec:decision} evaluate OPCORD, Sections~\ref{subsec:legality-eval} and~\ref{subsec:census} the analysis's legality conditions, as the checkers apply them, and its reading of every stack, and Section~\ref{subsec:pays} the condition that says where rescheduling pays.
 % COMMENT: every \E value comes from the amendment-1 batch, the decode development batch, the synthetic sweep, the legality control, the FastFlowLM replay, and finally the final sweep; prose stays as written while numbers move (STYLE.md, Results vary between runs).
+
+\begin{figure*}[t]
+    \centering
+    % VALUE: the headline at a glance: OPCORD's TTFT gain over the baseline on every LLM across the prompt sweep, with the split it runs on
+    % COMMENT: regenerate from the final sweep against the baseline of this section; the current figure plots the retired hand-alternated baseline.
+    \includegraphics{fig/headline.pdf}
+    \caption{TTFT speedup of OPCORD over the existing program on the shipped split that minimizes its TTFT, across prompt lengths, for each LLM. Points are ratios of medians with 95\% intervals, and the marker gives the split OPCORD runs on.}
+    \label{fig:headline}
+\end{figure*}
 
 \subsection{Experimental Setup}
 \label{subsec:setup}
@@ -21,8 +30,8 @@ Prompts run from 128 to 32{,}768 tokens in powers of two and one token past each
 % SOURCE: MLPerf Client v2.0 task parameters: scored prompts about 80 to 3,500 tokens, summarization about 7,600, agentic contexts 12K and 15K (vault decisions log, "MLPerf Client's current task parameters"); its harness is not run.
 
 % VALUE: one baseline: the existing program on the shipped split that minimizes its TTFT, with every split predicted within 5% of it measured, run on the faster of its own host code and our runner, so it differs from OPCORD only in the order and the split OPCORD chooses; the remedies are their own rows; FastFlowLM appears only as an observation for the condition
-Every result compares against one baseline, namely the existing program on the shipped split that minimizes its TTFT, which we find by measuring every shipped split that the event model places within 5\% of the fastest, an ordering whose error Section~\ref{subsec:decision} reports.
-The baseline runs on the faster of its own host code and our runner with the existing order, so it differs from OPCORD only in what OPCORD chooses, namely the order and the split for that order.
+Every result compares against one baseline, namely the existing program on the shipped split that minimizes its TTFT at each prompt length, which we find by measuring every shipped split that the event model places within 5\% of the fastest, an ordering whose error Section~\ref{subsec:decision} reports.
+The baseline runs on the faster of its own host code and our runtime package (Section~\ref{subsec:impl}) issuing the existing order, so it differs from OPCORD only in what OPCORD chooses, namely the order and the split for that order.
 For decode, the baseline is the unmodified decode design.
 % SOURCE: the baseline rule (vault decisions log, the per-split cells' ruling and amendment 1, 2026-10-24); OPCORD's ratio = baseline / composed, at the event model's choice.
 % DECISION: the old hand-alternated baseline is retired; FastFlowLM, taken as released, is an observation for the condition (Section~\ref{subsec:pays}), never a speedup reference.
@@ -42,21 +51,6 @@ OPCORD shortens TTFT on all five LLMs, with outputs bit-identical to the existin
 The gain rises with the prompt length, peaks at \E{8--16K} tokens, and falls at 32K, as the balance of the work the two groups can overlap predicts (Section~\ref{subsec:shape-eval}).
 At prompts of one or two chunks, OPCORD keeps the existing order, whose TTFT it then equals.
 % SOURCE: valid end-to-end cells so far, pre-final (vault decisions log, issue check 8d2eac19): Qwen3-4B 1.33-1.57x (8-32K); LFM2-1.2B 1.10-1.24x (1-2K) and 1.45x (32K); Gemma3-4B 1.20x (1K), 1.22-1.30x (2-8K), 1.18x (32K); Llama-3.1-8B 1.04-1.25x (512-2K); the rest from the amendment-1 batch.
-\begin{figure*}[t]
-    \centering
-    % VALUE: the headline at a glance: OPCORD's TTFT gain over the baseline on every LLM across the prompt sweep, with the split it runs on
-    % COMMENT: regenerate from the final sweep against the baseline of this section; the current figure plots the retired hand-alternated baseline.
-    \includegraphics{fig/headline.pdf}
-    \caption{TTFT speedup of OPCORD over the existing program on the shipped split that minimizes its TTFT, across prompt lengths, for each LLM. Points are ratios of medians with 95\% intervals, and the marker gives the split OPCORD runs on.}
-    \label{fig:headline}
-\end{figure*}
-
-% VALUE: decode: renaming the KV loop lowers time per token against the unmodified decode design by a factor that grows with the context and with the ratio of serialized compute to transfer per position
-\label{subsec:decode-eval}
-Because our loop pass lets each block's transfer overlap the compute on the previous block, the decode gain grows with the context, as attention's share of each token does (Figure~\ref{fig:decode}).
-At 16{,}384 tokens, the renamed design lowers the time per token against the unmodified decode design by \E{X--Y}$\times$ across the five LLMs, and by up to \E{Z}$\times$ at 30{,}720 tokens.
-The gain is smaller where an LLM's serialized compute per position is a smaller share of its transfer, 0.34 on Qwen3-4B against 0.71 on Llama-3.2-1B.
-% SOURCE: development pairs, pre-final, not under the current protocol (vault decisions log, "Decode status", 2026-10-24): Llama-3.2-1B 1.27x at 16,384 and 1.39x at 32,512 (rename gate R, medians); Qwen3-4B 1.16x / 1.21x at 16,384 / 28,800; Llama-3.1-8B 1.079 [1.074, 1.084] at 16,384 and 1.140 [1.136, 1.151] at 30,720 (hand rename, 5 ABBA reps); serialized compute over transfer per position 0.34 (Qwen3-4B) and 0.71 (1B) (lab-decode-long-context (14)).
 
 \begin{figure}[t]
     \centering
@@ -66,6 +60,14 @@ The gain is smaller where an LLM's serialized compute per position is a smaller 
     \caption{Decode time per token against the length of the cached context, for the unmodified decode design and after our loop pass renames the keys, values, and scores into rings. Every step's logits are bit-identical between the two designs at every point. The annotation on each panel is the fitted cost per decoded position.}
     \label{fig:decode}
 \end{figure}
+
+% VALUE: decode: renaming the KV loop lowers time per token against the unmodified decode design by a factor that grows with the context and with the ratio of serialized compute to transfer per position
+\label{subsec:decode-eval}
+Because our loop pass lets each block's transfer overlap the compute on the previous block, the decode gain grows with the context, as attention's share of each token does (Figure~\ref{fig:decode}).
+At 16{,}384 tokens, the renamed design lowers the time per token against the unmodified decode design by \E{X--Y}$\times$ across the five LLMs, and by up to \E{Z}$\times$ at 30{,}720 tokens.
+The gain is smaller where an LLM's serialized compute per position is a smaller share of its transfer, 0.34 on Qwen3-4B against 0.71 on Llama-3.2-1B.
+% SOURCE: development pairs, pre-final, not under the current protocol (vault decisions log, "Decode status", 2026-10-24): Llama-3.2-1B 1.27x at 16,384 and 1.39x at 32,512 (rename gate R, medians); Qwen3-4B 1.16x / 1.21x at 16,384 / 28,800; Llama-3.1-8B 1.079 [1.074, 1.084] at 16,384 and 1.140 [1.136, 1.151] at 30,720 (hand rename, 5 ABBA reps); serialized compute over transfer per position 0.34 (Qwen3-4B) and 0.71 (1B) (lab-decode-long-context (14)).
+
 
 \subsection{Sources of the Gains}
 \label{subsec:ablation}
@@ -140,8 +142,11 @@ Our census holds 112 designs, LLM and non-LLM, and over the 792 of these streams
 % VALUE: our passes also judge MLIR-AIR designs of LLMs never run or examined, renaming their decodes as on the evaluated LLMs, with no gain claimed
 Our passes also judge the MLIR-AIR designs of five LLMs we never ran or examined, renaming attention's keys, values, and scores on their decodes as on the evaluated LLMs, but we claim no gain on any of them.
 
-% VALUE: the bound itself is checked against measurement twice: beside FastFlowLM's replayed merge of two commands at the shortest prompts, and in decode, where renaming only part of the critical cycle gains nothing
-The bound itself is checked against measurement twice, first beside FastFlowLM's replayed merge of two of its commands at prompts of up to 128 tokens, which bounds at $1.075$--$1.093\times$ and saves \E{X}\% (Section~\ref{subsec:observed}), and its critical-path test is checked in decode, where renaming only part of the critical cycle gains 0.3\% (Section~\ref{subsec:ablation}).
+% VALUE: the bound decides which kinds of rewrite are worth building and the event model prices the composer's removals, so the bound and its critical-path test are each checked against measurement where they decide: the bound on FastFlowLM's one rewrite worth replaying, a merge of two commands at the shortest prompts, and the test in decode, where renaming only part of the critical cycle gains nothing
+On the designs OPCORD rewrites, the bound decides which kinds of rewrite are worth building (Section~\ref{subsec:removal}), and the event model, not the bound, prices each removal (Section~\ref{subsec:pricing}).
+The bound and its critical-path test are each checked against measurement where they decide.
+The bound is checked on the one rewrite of a closed stack that it leaves worth measuring, a merge of two of FastFlowLM's commands at prompts of up to 128 tokens, which saves their dispatch rather than freeing overlap, bounds at $1.075$--$1.093\times$, and saves \E{X}\% when replayed on the device.
+The critical-path test is checked in decode, where renaming only part of the critical cycle gains 0.3\% (Section~\ref{subsec:ablation}).
 % COMMENT: verify how the 793-stream population relates to the 112 census designs (pass-0) before stating it.
 % SOURCE: P8 (a), the unexamined MLIR-AIR models Llama-3.2-3B, Phi-4-mini, Qwen2.5-3B and 7B, and Qwen3-8B (aie-cosched e5ad472; 0 accel opens; kernels byte-identical).
 
@@ -162,13 +167,12 @@ On MLIR-AIR's prefill, which spends nearly all of its time on one configuration 
 % SOURCE: exposure metric and ceiling (aie-cosched registered 2a7990a; script 3d11670; rows a3ef131; partb/README).
 
 \label{subsec:observed}
-% VALUE: the census by design class, each placed by its two cuts, with what the condition predicts and what the bounds and measurements show: MLIR-AIR's prefill (fused configuration, one operator per command) gains, as Section 6.2 measures; FastFlowLM's flash prefill (fused, several operators per command) has M 0.82-0.87 but b 1.000 because its streams already keep every column busy, its waits between commands are mostly true, its one rewrite worth measuring (merging commands at the shortest prompts) is measured against its bound, and its decode pairs share an engine; IRON's modular operator sequences share no command and their streams price at one; the non-LLM designs overlap through dataflow; so every design the condition says can gain is one whose gain we measure
-Across the 112 designs of our census (Table~\ref{tab:census}), the condition predicts gains only where a false order in a fused configuration holds back work that could overlap on resources a rewrite cannot duplicate, with no true dependence between, and measurement bears this out for MLIR-AIR's prefill and decode and for the two controls, while the bounds bear it out for the rest.
+% VALUE: the census by design class, each placed by its cuts, with what the condition predicts and what the bounds and measurements show: MLIR-AIR's prefill (fused configuration, one operator per command) gains, as Section 6.2 measures; FastFlowLM's flash prefill (fused configuration, one column group per command, the same shape) has M 0.82-0.87 but b 1.000 inside its one-group commands, and its waits between commands are mostly true through the host, so most of them fail the second clause; its one rewrite worth measuring (a merge at the shortest prompts) is the bound's check in Section 6.6; its decode pairs share an engine; IRON's modular operator sequences share no command and their streams price at one; the non-LLM designs overlap through dataflow; so every design the condition says can gain is one whose gain we measure
+Across the 112 designs of our census (Table~\ref{tab:census}), the condition, read from each design's artifacts, predicts gains only where a false order in a fused configuration holds back work that could overlap on resources a rewrite cannot duplicate, with no true dependence between, and measurement bears this out for MLIR-AIR's prefill and decode, while the bounds, computed with measured durations, bear it out for the rest, and the two controls at the end of this section test each clause directly.
 MLIR-AIR's chunked fused prefill holds every operator in one configuration but issues one command per operator and chunk, with attention and the GEMMs on disjoint column groups, so its column groups take turns on work that meets both clauses (Section~\ref{subsec:losses}), and the gains of Section~\ref{subsec:e2e} are measured there.
 MLIR-AIR's fused decode keeps one buffer per role in its attention loop, so each block's transfer waits on the previous block's compute, and the loop pass's gain of Section~\ref{subsec:e2e} is measured there, whereas renaming only the keys and values, which leaves the score buffer closing the cycle, gains nothing (Section~\ref{subsec:ablation}).
-FastFlowLM's prefill, taken as released, which MLIR-AIR's reimplements with one operator per command (Section~\ref{subsec:prefill}), spends most of its time on a configuration that holds several operators, for an exposure $M$ of 0.82--0.87, yet the false orders inside its commands bound at $b = 1.000\times$, because its streams already keep every column busy at once, so deleting those orders lets no further work overlap.
-Between its commands, most waits are true, since the host reads each command's output before it issues the next, and the false ones bound below $1.05\times$ with measured durations on every prompt we bound, except a merge of two commands at prompts of up to 128 tokens, which saves their dispatch and bounds at $1.075$--$1.093\times$.
-That merge, the one rewrite its bound leaves worth measuring, saves \E{X}\% when replayed on the device, which checks the bound against measurement rather than the condition, since a merge saves a dispatch rather than freeing overlap.
+FastFlowLM's prefill, taken as released, which MLIR-AIR's reimplements with one operator per command (Section~\ref{subsec:prefill}), spends most of its time on one configuration that holds both column groups, for an exposure $M$ of 0.82--0.87, but issues each command to one group, so its groups take turns across commands as MLIR-AIR's do, and the false orders inside its commands bound at $b = 1.000\times$, so deleting them lets no further work overlap.
+Most of its waits between commands are true, since its host reads a command's output before it issues the next, which fails the condition's second clause, and the false ones bound below $1.05\times$ with measured durations on every prompt we bound, except the merge of two commands at the shortest prompts that saves a dispatch rather than freeing overlap (Section~\ref{subsec:census}).
 Its decode runs one command per step, whose false pairs all share a core tile or a DMA channel, and bounds at $1.000$--$1.009\times$.
 IRON's modular operator sequences give each operator its own configuration, so their operators share no command, their exposure is zero, and they pay reconfiguration between operators instead, and their 32 streams, which issue their transfers ahead of their waits, all bound at $1.000\times$.
 Each of the non-LLM designs we read runs as one command whose stages already overlap through the array's own dataflow, and the 3 that IRON builds also bound at $1.000\times$.
@@ -192,7 +196,7 @@ Every overlap gain we measure therefore falls where the condition says one can a
         \midrule
         MLIR-AIR prefill & fused; one operator per command & gain (Section~\ref{subsec:e2e}) \\
         MLIR-AIR decode & fused; one buffer per role & gain (Section~\ref{subsec:e2e}) \\
-        FastFlowLM prefill & fused; one configuration holds both groups & columns already busy, $b = 1.000\times$ inside commands; merge bound $1.075$--$1.093\times$, replay \E{X}\% \\
+        FastFlowLM prefill & fused; one column group per command & waits between commands mostly true through the host; $b = 1.000\times$ inside commands; merge bound $1.075$--$1.093\times$, replay \E{X}\% \\
         FastFlowLM decode & fused; one command per step & false pairs share an engine, bound $1.000$--$1.009\times$ \\
         IRON LLM designs & modular & bound $1.000\times$ \\
         Non-LLM designs & one command per design & overlapped by dataflow, bound $1.000\times$ \\
@@ -212,7 +216,7 @@ The split moves this balance, so the split that minimizes TTFT also changes with
 % DECISION: the shape rule is an estimate for a middle range of lengths, never a bound: a plain cap of 2x is contradicted by Llama-3.2-1B's 2.07-2.17x, because it omits the host time the composer hides; at few chunks only the event model prices the per-command costs, and at long prompts where the groups balance, overlap within one command stays short of perfect (Gemma3-4B at 16-32K), which only the event model's per-command composition captures (group-term fit 6c5b666).
 
 % VALUE: a synthetic LLM on the same engine varies the balance and the number of chunks directly, with OPCORD unmodified: the gain peaks where the groups balance and dips at few chunks at every balance, so the shape is a property of the exposed work, not of the five LLMs
-To vary the balance directly, we run a synthetic two-layer LLM through OPCORD unmodified on the same engine, changing its GEMM work at a fixed attention.
+To vary the balance directly, we run a synthetic two-layer LLM through OPCORD unmodified, built as MLIR-AIR's fused prefill as the five LLMs are, changing its GEMM work at a fixed attention.
 Across balances from one eighth to eight and 1 to 32 chunks, the gain peaks where the groups' work balances and dips below one at few chunks at every balance, so the shape belongs to that balance rather than to the five LLMs (Figure~\ref{fig:synthetic}).
 % SOURCE: Route E builds (mlir-air synthetic-route-e 8ce52a3c; four builds, (d, inter) = (256, 768), (1024, 768), (2048, 2304), (2048, 12288), the 1B's attention, 2 layers); predictions abaa3d9 (registered 2984f01), re-predicted at the rebuilt event model before the runs; measurements \E{pending}.
 \begin{figure}[t]
@@ -224,7 +228,7 @@ Across balances from one eighth to eight and 1 to 32 chunks, the gain peaks wher
 \end{figure}
 
 % VALUE: one control per clause: forcing the reordered groups onto one DMA channel (a resource a rewrite cannot duplicate), or adding a host step that reads each output before the next command (a true dependence through the host), leaves the gain the condition predicts
-Each clause also holds under direct test, since forcing the reordered groups of IRON's two-group design onto one DMA channel, which a rewrite cannot duplicate, leaves a gain of \E{Y}$\times$, and adding to the synthetic LLM a host step that reads each output before the next command leaves \E{Z}$\times$, where the condition predicts no gain from either.
+Each clause also holds under direct test, since forcing the reordered groups of a two-group fused design that we build with IRON onto one DMA channel, which a rewrite cannot duplicate, leaves a gain of \E{Y}$\times$, and adding to the synthetic LLM a host step that reads each output before the next command leaves \E{Z}$\times$, where the condition predicts no gain from either.
 % SOURCE: controls through the generic composer front end (vault decisions log, 2026-10-24), \E{pending}.
 
 % VALUE: the consequence: the order is fixed in the artifact while the work it lets overlap changes with the prompt, so the order that pays changes with the prompt; choosing it needs durations no compile has, which is why OPCORD prices the order and the split per prompt length

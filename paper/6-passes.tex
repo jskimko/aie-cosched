@@ -18,8 +18,8 @@ Because OPCORD rewrites designs it did not compile, checkers refuse, with a reas
 % VALUE: the composer reorders issue across operators: it list-schedules the host program's dependency graph chunk by chunk rather than stage by stage, pairing each attention operator with ready GEMMs of matching work; a composed command keeps each operator's segments in order and every instruction once, so only when work is issued and awaited changes
 \label{subsec:compose}
 % DECISION: subsec:compose names the composer's part of the reorder and resolves to this subsection; the conditions the former composing subsection stated are in Section~\ref{sec:order}.
-Our \emph{composer} list-schedules the host program's dependency graph chunk by chunk, from the design's per-operator streams and probes, and emits commands that we call the \emph{composed schedule}.
-The existing host program runs a layer stage by stage instead, so no GEMM is ready to run beside attention.
+Our \emph{composer} list-schedules the producer-consumer order between the host program's operators chunk by chunk, from the design's per-operator streams and probes, and emits commands that we call the \emph{composed schedule}.
+The existing host program runs a layer stage by stage instead, so the CP issues no GEMM beside attention (Section~\ref{subsec:losses}).
 The composer thus changes the design's cut into commands (Section~\ref{subsec:spectrum}) while keeping its configuration.
 Each command pairs the ready attention operator of the lowest layer and chunk with ready GEMMs whose estimated work matches it.
 A command concatenates its operators' segments under the conditions of Section~\ref{subsec:legality}, so composing changes when work is issued and awaited, never what the work is.
@@ -110,7 +110,7 @@ No constant is fitted to an LLM's end-to-end runs, so every configuration of Sec
 % COMMENT: bib entries needed (read each source first): Hockney's model, LogP / LogGP, the roofline model.
 
 % VALUE: before a prompt length runs, the composer prices every candidate (split, existing or composed order, host policy) with the event model and runs the cheapest, settling near-ties by a short measurement; more attention columns shorten attention and lengthen the GEMMs, so the split that pays moves with the balance of the two groups; because the existing order is a candidate, the composer keeps it where composing is priced higher, as at prompts of one or two chunks
-Before a prompt length runs, the composer prices every candidate with the event model, namely each split, the existing order and the composed one, and each number $D$ of commands in flight and packing of commands, and it runs the cheapest unless the next rule applies.
+Before a prompt length runs, the composer prices every candidate with the event model, namely each split, the existing order and the composed one, and each number $D$ of commands in flight and packing of commands, and it runs the cheapest unless the near-tie rule below applies.
 More attention columns shorten attention, whose time grows with the prompt, but lengthen every GEMM, so the split that pays moves with the balance between the two groups (Section~\ref{subsec:pays}).
 Because the existing order is among the candidates, the composer keeps it wherever composing is priced higher, as at prompts of one or two chunks.
 % SOURCE: opcord/plan/planner.py choose(model, L, N): candidates every split with a committed probe (S1, S2, S4), arms ship / shipar / comp, composer policies depth {1, 2, 4, 8} x GEMM cap {none, 4} x packing {1, 4}, each priced by event_model.predict, cheapest returned with the whole table; measure-when-close (planner.decide) as in Section~\ref{subsec:pricing}.
