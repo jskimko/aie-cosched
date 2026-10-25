@@ -24,7 +24,8 @@ Nor does a second hardware context, because the driver gives every context all e
 % VALUE: one command that issues all of one group's work before any synchronization runs the pair at the longer one's time; the cost appears near the DRAM read cap; because the CP is in order, the order inside a command is itself a scheduling decision, so serial execution is a property of composition, not of the array
 In contrast, one command that issues all of the GEMM's work, then the attention operator's stream, and only then the GEMM's synchronizations runs the pair within 6\% of the longer operator's time alone on each of nine pairs (Figure~\ref{fig:order}b).
 The small excess appears where the pair's DRAM reads approach the \emph{read cap}, which is the maximum DRAM read rate that the column groups together sustain.
-Because a synchronization on one group delays every later issue to the other (Section~\ref{subsec:platform}), the order of instructions within a command, and not only which operators share it, is a scheduling decision, and the serial execution of the existing prefill is a property of how its commands are composed, not of the array.
+Because a synchronization on one group delays every later issue to the other (Section~\ref{subsec:platform}), the order of instructions within a command, and not only which operators share it, is a scheduling decision.
+The serial execution of the existing program is thus a property of how its commands are composed, not of the array.
 % SOURCE: interleaved / max(A, G) = 0.998-1.058 over 10 pair runs = 9 pairs (c8 + lm measured twice, 1.054 and 1.058; the figure keeps each pair's first measurement); GEMM shapes up, LM head chunk, down; attention chunks 0, 4, 8, 12, 15 (lab-prefill-overlap (3)).
 % SOURCE: DRAM rate during the interleaved command 52.2 GB/s against a same-batch 8x2 cap of 53.9-55.3 GB/s for c8 + lm, the costliest overlap (1.054-1.058) (lab-prefill-overlap (3)); the cap is the 8x2 bracket's read of 256 MiB (7-eval Setup SOURCE).
 
@@ -33,14 +34,17 @@ Because a synchronization on one group delays every later issue to the other (Se
 
 % VALUE: in the fused LLM designs we study, the waits recur at three places, each a textbook false dependence (cited): an order dependence where the instruction order puts a wait data does not require, a name dependence where work shares storage it need not share
 At three places in the fused LLM designs we study, from the CP's stream down to one operator's loop, work waits on other work whose results it does not consume, which is a \emph{false dependence} in the textbook sense~\citep{bernstein1966analysis,kuck1981dependence}.
-It is an \emph{order} dependence where the instruction order alone places the wait, which reordering removes, or a \emph{name} dependence where two uses share storage they need not share, which renaming removes~\citep{tomasulo1967,lam1988software}, and we call either kind a \emph{false order}.
+It is an \emph{order} dependence where the instruction order alone places the wait, which reordering removes, or a \emph{name} dependence where two uses share storage they need not share, which renaming removes~\citep{tomasulo1967,lam1988software}.
+We call either kind a \emph{false order}.
 % DECISION: false dependences, the order and name causes, reordering, and renaming are textbook and cited; the paper claims their analysis on this platform, never the classes. Section 4 classes each wait formally.
 
 \textbf{Column Groups in Prefill.}
 % VALUE: one operator per command and no overlap across commands make the prefill's column groups take turns, an order dependence in the CP's stream between operators; the array idles while the device reads busy: the computable occupancy reads 92-97% of TTFT and counts neither idle group; attention's share grows 12% -> 49%; the counters show the cores waiting
 The existing program issues one operator per command, about 1{,}500 commands for a 2{,}048-token prompt, so its column groups take turns (Figure~\ref{fig:timeline}), which is an order dependence in the CP's stream between operators.
-Attention on one chunk reads the QKV projections of that chunk and earlier ones, and only that chunk's output projection reads its result, so the GEMMs of the layer's later chunks could run beside it, but the host runs each layer stage by stage (Section~\ref{subsec:prefill}), so the CP issues no GEMM beside attention.
-The runtime reports nothing per column, and the one occupancy a developer can compute, which sums each operator's time when dispatched alone less the dispatch floor, reads 92--97\% of TTFT, yet columns 1--6 idle while attention runs and columns 0 and 7 idle while the GEMMs run.
+Attention on one chunk reads the QKV projections of that chunk and earlier ones, and only that chunk's output projection reads its result, so the GEMMs of the layer's later chunks could run beside it.
+The host, however, runs each layer stage by stage (Section~\ref{subsec:prefill}), so the CP issues no GEMM beside attention.
+The runtime reports nothing per column, and the one occupancy a developer can compute, which sums each operator's time when dispatched alone less the dispatch floor, reads 92--97\% of TTFT.
+Yet columns 1--6 idle while attention runs, and columns 0 and 7 idle while the GEMMs run.
 Attention's share of TTFT, and with it the GEMM columns' idle time, grows from 12\% to 49\% between 512 and 4{,}096 tokens of the Llama-3.2-1B prefill.
 In the tiles' performance counters, attention's cores stall on a lock for 81--83\% of a 2{,}048-token prefill and the GEMMs' cores for 44\%, which shows that the cores wait, though not when.
 % SOURCE: commands = 16 layers x chunks x 6 + 11 LM-head commands = 1,547 at 2,048 tokens (vault lab-prefill-census (1)).
@@ -52,7 +56,7 @@ In the tiles' performance counters, attention's cores stall on a lock for 81--83
 
 \textbf{Columns of One Operator.}
 % VALUE: the same order dependence inside one operator: attention issues column 7 only after waiting on column 0, and alternating the columns lowers attention's device-busy time to 0.67x with equal work per column, so the CP's order is the cause
-The existing attention stream issues column~7's inputs only after two synchronizations on column~0's key and value transfers, which complete when column~0 is about half done.
+The existing program's attention stream issues column~7's inputs only after two synchronizations on column~0's key and value transfers, which complete when column~0 is about half done.
 Alternating the two columns' work so that both start before the CP waits on either reduces attention's device-busy time to $0.67\times$ at each of seven chunks of a 2{,}048-token prompt, with the same instructions and bit-identical outputs.
 Each column's half alone takes the same time, so the loss comes from the CP's order rather than an imbalance of work.
 % SOURCE: decoded from the shipped a_32_4_0_0 stream, mid-stream synchronizations at ops 70, 75 (column 0) and 92, 97 (column 7); column 7's issue (ops 81-91) follows column 0's two mid-stream synchronizations (vault lab-prefill-overlap (4)).
@@ -62,7 +66,8 @@ Each column's half alone takes the same time, so the loss comes from the CP's or
 % VALUE: a name dependence inside decode attention's loop: attention grows to most of the time per token and reads KV at half the cap; neither the transfer alone nor the CP's order limits it (the measurement chain: appendix-body.tex, app:decode-chain (cut 2026-10-24)); the loop's keys, values, and scores sit in one buffer each, so each block's transfer waits for the previous block's compute (+41% per position), and MLIR-AIR's double-buffering pass declines the loop because the running max and accumulator live across blocks
 In decode, attention takes up to 70\% of the time per token at long contexts, yet reads the KV cache at only half the DRAM read cap.
 Neither the transfer alone, which runs near the cap when measured by itself, nor the CP's order, which issues the next weights before it waits on any KV transfer, limits it.
-Instead, its loop holds the keys, the values, and the scores passed between its two cores in one buffer each, so each block's transfer waits for the compute on the previous block, which makes up 41\% of the time per position, or 0.71 of the transfer time.
+Instead, its loop holds the keys, the values, and the scores passed between its two cores in one buffer each, so each block's transfer waits for the compute on the previous block.
+That compute makes up 41\% of the time per position, or 0.71 of the transfer time.
 MLIR-AIR's double-buffering transformation declines the loop because its running maximum and accumulator live across blocks, so all three buffers, whose waits are name dependences, stay single.
 % SOURCE: per-token time = 15.94 ms + 1.156 us x L, max residual 0.2% over L = 2,048-32,704 (Llama-3.2-1B, one 32k-window build, median of 3); 32 KiB per position / 1.156 us = 28.4 GB/s against a same-batch 8x2 cap of 55.2 GB/s; attention 13/23/37/54/70% of per-token time at 2k/4k/8k/16k/32k (vault lab-decode-long-context (5)).
 % SOURCE: bytes-only discriminator: ELF window 32,768 vs 2,048 at the same small L, 20.81 ms / 30,720 positions = 0.677 us = 48.4 GB/s = 88% of the 55.2 GB/s cap and 104% of the two-shim probe; serialized compute 1.156 - 0.677 = 0.478 us = 41% of the per-position time (vault lab-decode-long-context (7)).
@@ -76,11 +81,14 @@ MLIR-AIR's double-buffering transformation declines the loop because its running
 % DECISION: the critical-path condition is textbook and cited; the paper's claim is the condition's platform terms (non-duplicable resources, the host as an agent) and its dependence on the cut and the prompt length, never "false dependences cost time".
 Removing a false order frees overlap only where the work it frees runs on core tiles and DMA channels that the work it waited on does not use, resources a rewrite cannot duplicate, since every engine runs its own work in order and a buffer can be renamed into several slots whereas a core tile or a DMA channel cannot.
 It also frees overlap only where no true dependence, on the device or through a host step that reads one command's output before it issues the next, separates the two pieces of work.
-We call these two checkable clauses together the \emph{condition}, and they refine the textbook rule that removing a false dependence gains time only where it lies on the critical path~\citep{fields2003interaction}, since on this platform removing a false order shortens that path only when both hold.
-Both clauses name resources and dependences that the analysis reads from the artifacts and the host's accesses (Section~\ref{sec:order}), so the condition screens out the false orders that cannot free overlap before any duration is measured, whereas the critical-path rule needs durations to say which do.
+We call these two checkable clauses together the \emph{condition}.
+They refine the textbook rule that removing a false dependence gains time only where it lies on the critical path~\citep{fields2003interaction}, since on this platform removing a false order shortens that path only when both hold.
+Both clauses name resources and dependences that the analysis reads from the artifacts and the host's accesses (Section~\ref{sec:order}).
+The condition therefore screens out the false orders that cannot free overlap before any duration is measured, whereas the critical-path rule needs durations to say which do.
 How much each remaining one frees, whether that exceeds its cost, and what a rewrite saves beyond overlap, such as a dispatch, need durations, which the bound of Section~\ref{subsec:removal} and the event model of Section~\ref{subsec:pricing} supply.
 
-How much work meets both clauses is set by how the design cuts its work, into configurations, into commands, and into buffers, and by the prompt length, which sets the balance between attention and the GEMMs, and so they set what rescheduling can recover.
+How much work meets both clauses is set by how the design cuts its work, into configurations, into commands, and into buffers, and by the prompt length, which sets the balance between attention and the GEMMs.
+The cut and the prompt length thus set what rescheduling can recover.
 The issue order that pays therefore changes with the prompt and must be priced per length rather than fixed.
 The split that pays moves with the same balance, because more attention columns shorten attention but lengthen every GEMM.
 We call the designs we read from three stacks our \emph{census}, and Section~\ref{subsec:pays} tests the condition across its design classes, across prompt lengths, on a synthetic design, and with one control per clause.
