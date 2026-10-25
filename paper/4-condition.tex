@@ -37,7 +37,7 @@ The split moves this balance, so the split that minimizes TTFT also changes with
 % DECISION: the shape rule is an estimate for a middle range of lengths, never a bound: a plain cap of 2x is contradicted by Llama-3.2-1B's 2.07-2.17x, because it omits the host time the composer hides; at few chunks only the event model prices the per-command costs, and at long prompts where the groups balance, overlap within one command stays short of perfect (Gemma3-4B at 16-32K), which only the event model's per-command composition captures (group-term fit 6c5b666).
 
 % VALUE: the consequence: the order is fixed in the artifact while the exposed work changes with the shape, so the order that pays changes with the shape; choosing it needs durations, which no XDNA 2 compile has, and no compile sees the host's order across commands; so the order and the split must be priced per shape
-Because the order is fixed in the artifact while the work it exposes changes with the shape, and choosing it needs durations that no compile has, OPCORD prices the order and the split per shape from timings of each operator run alone (Section~\ref{sec:pricing}).
+The order is fixed in the artifact while the work it exposes changes with the shape, so the order that pays changes with the shape, and because choosing it needs durations that no compile has, OPCORD prices the order and the split per shape from timings of each operator run alone (Section~\ref{sec:pricing}).
 
 \subsection{Where the Stacks Meet It}
 \label{subsec:observed}
@@ -46,7 +46,7 @@ Because the order is fixed in the artifact while the work it exposes changes wit
 Across the 112 designs that we read on three stacks, the condition holds in one family of designs, which is where we measure the gains.
 MLIR-AIR's chunked fused prefill issues one command per operator and chunk, with attention and the GEMMs on disjoint column groups, so its column groups take turns on work that meets both clauses (Section~\ref{subsec:losses}).
 FastFlowLM's flash prefill, taken as released, spends 82--87\% of its time in commands whose configuration holds several operators, yet the false orders inside them bound at $1.000\times$, because its streams already keep every column busy at once, so deleting those orders lets no further work overlap.
-Between its commands, most waits are true, since the host reads each command's output before it issues the next, and the false ones bound below $1.05\times$ on measured terms on every scored request.
+Between its commands, most waits are true, since the host reads each command's output before it issues the next, and the false ones bound below $1.05\times$ on measured terms on every request we price.
 Its decode runs one command per step, whose false pairs all share a core tile or a DMA channel, and bounds at $1.000$--$1.009\times$.
 IRON's designs run one operator per configuration, and each of the non-LLM designs we read runs as one command whose stages already overlap through the array's own dataflow, so neither meets the condition.
 We therefore evaluate every design in the census that meets the condition, and a synthetic LLM on the same engine varies the balance and the number of chunks directly (Section~\ref{subsec:shape-eval}).

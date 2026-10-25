@@ -10,7 +10,7 @@ It runs each operator of an LLM on a group of columns of a spatial array, and on
 In the prefill that MLIR-AIR builds for Llama-3.2-1B~\citep{wang2026mlirair}, which we call the \emph{existing program}, attention's columns and the columns of the matrix multiplications (GEMMs) take turns, although neither consumes the other's current work (Figure~\ref{fig:timeline}, top).
 The measure a developer can compute, which divides the operators' summed time by the wall time, still reads the device as busy for 92--97\% of the time to first token (TTFT).
 % SOURCE: busy 92-97% of TTFT at 512 / 2,048 / 4,096 tokens, each operator's isolated time less the dispatch floor, summed over the prefill (amd-npu e3acc8a prefill-e2/decomp.txt; Section 3.3).
-Issued in another order, the same operators run together and reach the first token \E{X}$\times$ sooner on the same split (Figure~\ref{fig:timeline}, bottom).
+Issued in another order, the same operators run together and reach the first token \E{X}$\times$ sooner on the same \emph{split}, which is the number of columns that attention takes (Figure~\ref{fig:timeline}, bottom).
 However, while compilers and mapping frameworks~\citep{hunhoff2025iron,symons2025stream} optimize what each operator computes and where it runs, how operators are composed and issued through the CP has received far less attention.
 
 \begin{figure}[t]
