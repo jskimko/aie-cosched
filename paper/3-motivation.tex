@@ -14,10 +14,10 @@ Concurrency on the array comes from one command that issues two groups' work bef
 We pair one attention operator of the existing prefill with one GEMM on disjoint column groups, with outputs bit-identical to those of the operators run alone (Figure~\ref{fig:pairs}).
 Two commands queued on one hardware context, like one command that holds both streams in sequence, take the sum of the two operators' times less at most one dispatch floor.
 Packing operators into one command, which CUDA Graphs~\citep{nvidia-cudagraphs}, XRT's run lists~\citep{xrt-repo}, and MLIR-AIR's multi-launch programs~\citep{wang2026mlirair} use to amortize launch cost, therefore creates no overlap on the NPU (Figure~\ref{fig:order}b).
-Nor does a second hardware context, because the driver gives every context all eight columns and shares them in time (Appendix~\ref{app:contexts}).
+Nor does a second hardware context, because the driver gives every context all eight columns and shares them in time.
 % SOURCE: queued / in-sequence = 1.007-1.029 on 7 pairs (amd-npu 17f7ec3 prefill-overlap/ovl4/, lab-prefill-overlap (5)b); in-sequence / (A + G - F) = 0.996-1.021 over 17 pair runs (ovl/, ovl2/ at 8f13e05 and ovl4/; report.txt H1 column).
 % SOURCE: XRT run list, /opt/xilinx/xrt/include/xrt/experimental/xrt_kernel.h:21 (XRT 2.25.0); MLIR-AIR stitch_elf (vault src-mlir-air-llms).
-% SOURCE: amd-npu d8c63fb1 roofline/two-ctx-hold/two_ctx.json: rho 1.970, 95% bootstrap CI [1.955, 1.976], same-context ratio 1.970; medians solo 19.76 / 19.81 ms, pair 39.10 ms, same 39.09 ms (vault lab-prefill-overlap (34)); driver allocation amdxdna 2.25.0 npu4_regs.c:94-106, aie2_ctx.c:604-608 (vault lab-prefill-overlap (31)). Full SOURCE lines in Appendix app:contexts.
+% SOURCE: amd-npu d8c63fb1 roofline/two-ctx-hold/two_ctx.json: rho 1.970, 95% bootstrap CI [1.955, 1.976], same-context ratio 1.970; medians solo 19.76 / 19.81 ms, pair 39.10 ms, same 39.09 ms (vault lab-prefill-overlap (34)); driver allocation amdxdna 2.25.0 npu4_regs.c:94-106, aie2_ctx.c:604-608 (vault lab-prefill-overlap (31)). Full SOURCE lines in appendix-body.tex, app:contexts (cut 2026-10-24).
 % DECISION: packing several operators per command (batching) is cited as standard practice, never presented as ours.
 
 \begin{figure}[t]
@@ -91,9 +91,9 @@ Each column's half alone takes the same time, so the loss comes from the CP's or
 % SOURCE: (alternated - F) / (existing - F) = 0.666-0.668 on 7 pairs, chunks 2-14 at 2,048 tokens; column 7 alone / column 0 alone = 0.994-1.010 (amd-npu 17f7ec3 ovl4/, vault lab-prefill-overlap (5)c); at absolute chunks 16-255: Qwen3-4B 0.66-0.68; Llama-3.2-1B 0.66 / 0.57 / 0.41 / 0.43 / 0.68 / 0.67 / 0.66, lower at its mid-range chunks (vault lab-agent-step (4)).
 
 \textbf{Transfers in Decode.}
-% VALUE: a name dependence inside decode attention's loop: attention grows to most of the time per token and reads KV at half the cap; neither the transfer alone nor the CP's order limits it (the measurement chain in the appendix); the loop's keys, values, and scores sit in one buffer each, so each block's transfer waits for the previous block's compute (+41% per position), and MLIR-AIR's double-buffering pass declines the loop because the running max and accumulator live across blocks
+% VALUE: a name dependence inside decode attention's loop: attention grows to most of the time per token and reads KV at half the cap; neither the transfer alone nor the CP's order limits it (the measurement chain: appendix-body.tex, app:decode-chain (cut 2026-10-24)); the loop's keys, values, and scores sit in one buffer each, so each block's transfer waits for the previous block's compute (+41% per position), and MLIR-AIR's double-buffering pass declines the loop because the running max and accumulator live across blocks
 In decode, attention takes up to 70\% of the time per token at long contexts, yet reads the KV cache at only half the DRAM read cap.
-Neither the transfer alone nor the CP's order limits it (Appendix~\ref{app:decode-chain}).
+Neither the transfer alone nor the CP's order limits it.
 Instead, its loop holds the keys, the values, and the scores passed between its two cores in one buffer each, so each block's transfer waits for the compute on the previous block, which adds 41\% to the time per position.
 MLIR-AIR's double-buffering transformation declines the loop because its running maximum and accumulator live across blocks, so all three buffers, whose waits are name dependences, stay single.
 % SOURCE: per-token time = 15.94 ms + 1.156 us x L, max residual 0.2% over L = 2,048-32,704 (Llama-3.2-1B, one 32k-window build, median of 3); 32 KiB per position / 1.156 us = 28.4 GB/s against a same-batch 8x2 cap of 55.2 GB/s; attention 13/23/37/54/70% of per-token time at 2k/4k/8k/16k/32k (vault lab-decode-long-context (5)).

@@ -128,8 +128,8 @@ Across balances from one eighth to eight and from 1 to 32 chunks, the gain peaks
 Three small designs of our own put the two remaining cells of Table~\ref{tab:grid} on the critical path.
 Where two name dependences close one cycle through a core, removing either alone gains nothing measurable, whereas removing both gains up to $1.60\times$.
 An order dependence inside a loop gains $2.00\times$ where it closes the producer--consumer cycle, and nothing where each core's own loop binds instead.
-Each outcome follows from whether the removal cuts the binding cycle (Appendix~\ref{app:synthetic}).
-% SOURCE: re-derived from the committed scores (amd-npu 2ea67242 and c4f9a19d, runs-2026-10-22/{aon,ns,ol}/score.json; designs c423a98b, 9c94988a, ea3316e4; all three holds rc 0, no faults, every per-tile output check true). s1 by level, g(2,1) / g(1,2) / g(2,2): m256p1 1.0096 / 1.0031 / 1.5970; s3: stream-s2 3.610, pair-s2 7.235, stream-s4 11.653, pair-s4 11.643 ms, g 2.0044 and 0.9991 (vault lab-synthetic-classes (4)-(6)). The 1.60x rests on a depth-one baseline whose repetitions span 193% of their median (Appendix synthetic).
+Each outcome follows from whether the removal cuts the binding cycle.
+% SOURCE: re-derived from the committed scores (amd-npu 2ea67242 and c4f9a19d, runs-2026-10-22/{aon,ns,ol}/score.json; designs c423a98b, 9c94988a, ea3316e4; all three holds rc 0, no faults, every per-tile output check true). s1 by level, g(2,1) / g(1,2) / g(2,2): m256p1 1.0096 / 1.0031 / 1.5970; s3: stream-s2 3.610, pair-s2 7.235, stream-s4 11.653, pair-s4 11.643 ms, g 2.0044 and 0.9991 (vault lab-synthetic-classes (4)-(6)). The 1.60x rests on a depth-one baseline whose repetitions span 193% of their median (appendix-body.tex, app:synthetic (cut 2026-10-24)).
 
 \subsection{Sources of the Gains}
 \label{subsec:ablation}
@@ -137,7 +137,7 @@ Each outcome follows from whether the removal cuts the binding cycle (Appendix~\
 % VALUE: at OPCORD's choices, nearly all of the prefill gain is the composer's reorder across column groups: the stream pass changes nothing at four columns and finds no move at one, and at the default two-column split it contributes a within-operator share that grows with the prompt; packing alone contributes nothing; decode's gain needs the whole cycle renamed
 At the splits OPCORD chooses, nearly all of the prefill gain comes from the composer's reorder across column groups.
 The stream pass changes nothing on the four-column split, whose attention stream already issues each column's work before it waits, and finds no move on the one-column split.
-On the default two-column split, the stream pass alone gains \E{1.21--1.60}$\times$ at 16K tokens over the existing program, and the composer adds the reorder across groups on top (Appendix~\ref{app:percell}).
+On the default two-column split, the stream pass alone gains \E{1.21--1.60}$\times$ at 16K tokens over the existing program, and the composer adds the reorder across groups on top.
 None of the gain comes from packing alone (Section~\ref{subsec:semantics}).
 % SOURCE: at the picks the stream arm measures 1.000 at S4 and the pass makes no move at S1 (amd-npu s4-cells, s1-cells NOTES; vault decisions log, issue check); stream-pass-only at S2 1.21-1.60x at 16K on three LLMs, a same-split figure, pre-final (development grids).
 

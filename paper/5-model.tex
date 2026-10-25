@@ -70,7 +70,7 @@ We use it as a test on the recovered graph with measured costs, which discards e
 
 % VALUE: because the groups share the DRAM read rate, two overlapped groups take at least their total bytes over the read cap, so overlap costs little where attention holds the critical path and costs the GEMMs, which read near the cap, a share of their partner's time; in a prefill the GEMMs are the operators near the cap
 Because the column groups share the DRAM read rate, two groups that overlap take at least their total bytes divided by the read cap (Section~\ref{subsec:semantics}).
-Overlap therefore costs almost nothing where attention, which reads little, holds the critical path, but it costs a GEMM that reads near the cap a share of its partner's time, and in a whole prefill the GEMMs are the operators near the cap (Appendix~\ref{app:dram-regimes}).
+Overlap therefore costs almost nothing where attention, which reads little, holds the critical path, but it costs a GEMM that reads near the cap a share of its partner's time, and in a whole prefill the GEMMs are the operators near the cap.
 % SOURCE: GEMM-only commands read 90-93% of the cap and attention-only about 15% during Llama-3.2-1B's 4,096-token prefill (amd-npu 71901c50 metrics/retro-2026-10-21/dram-retro.txt; vault lab-metric-fields (1) and its amendment 1); the read cap from the 8x2 bracket, 53.93 GB/s at the calibration hold (amd-npu d94266bf prefill-overlap/calib/run-2026-10-22/batch.log), re-read at every batch.
 
 % VALUE: the bound is prescriptive (build a removal only where its bound exceeds its cost); since it never falls below one it cannot predict a loss, which the event model prices instead (the short prompts, in the evaluation)
@@ -118,6 +118,6 @@ Where the top candidates fall inside a band of 5\% for orders of one kind or 15\
 % SOURCE: measure-when-close, implemented test-first in opcord (planner.CLOSE_BAND, close_candidates, decide; test_measure_close 10/10); bands same 5%, cross 15%, tie 0.5%, one warm and three kept runs per candidate; about 19 min of device time over the whole grid, once per shape (vault decisions log, "Spine v18 drafted; amendment-1 batch and measure-when-close approved").
 
 % VALUE: decode is priced by a two-term time per token whose per-position cost is the KV transfer and compute in series when the loop is single-buffered and the larger of the two when double-buffered
-For decode, we price the time per token with two terms instead, as $T_0 + c\,L$ over $L$ cached positions, whose per-position cost $c$ is the KV transfer plus the compute when the loop is single-buffered and the larger of the two when it is double-buffered (Appendix~\ref{app:pricing-derivations}).
+For decode, we price the time per token with two terms instead, as $T_0 + c\,L$ over $L$ cached positions, whose per-position cost $c$ is the KV transfer plus the compute when the loop is single-buffered and the larger of the two when it is double-buffered.
 % SOURCE: T0 = 15.94 ms, c = 1.156 us (Llama-3.2-1B); B = 0.677 us at the two-shim rate, C = 0.478 us; the cap gives B >= 0.596 us (vault lab-decode-long-context (5), (7)).
 % DECISION: the per-model terms for the other models come from the same two probes per model (vault paper-cosched-plan).
