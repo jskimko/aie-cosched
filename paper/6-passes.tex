@@ -4,10 +4,10 @@
 % VALUE: design opener: OPCORD removes the false dependences of §3.3 in steps, each answering a property of the platform: a blocking in-order CP (reorder issue, by the composer across operators and the stream pass within one), one buffer per role in decode's loop (the loop pass's rings), an order and a split that pay differently with the prompt length (both chosen per length by the event model), designs it did not compile (checkers that refuse with a reason)
 % DECISION: the opener follows the FPGA'27 design opener, each property of the platform followed by the mechanism that answers it, with one subsection per property (STYLE.md, Paper structure, Design; contract §6).
 % DECISION: the legality conditions themselves live in Section~\ref{sec:order}; this section states only how OPCORD acts on them, namely checkers that accept a rewrite or refuse it with a reason (contract §6).
-OPCORD runs the analysis of Section~\ref{sec:order} on each design, takes from it the segments and the legality conditions, provides a rewrite only for the kinds of false order whose bound exceeds the rewrite's cost, and answers each property of the platform behind the waits of Section~\ref{subsec:losses} with one mechanism.
+OPCORD runs the analysis of Section~\ref{sec:order} on each design, takes from it the segments and the legality conditions, provides a rewrite only for the kinds of false order whose bound leaves room, and answers each property of the platform behind the waits of Section~\ref{subsec:losses} with one mechanism.
 Because a synchronization blocks the in-order CP, our composer and stream pass issue every group's work before the CP waits on any (Section~\ref{subsec:order}).
 Because decode attention's loop keeps one buffer per role, our loop pass renames those buffers into rings (Section~\ref{subsec:rings}).
-Because the order that pays and the best split change with the prompt length, the composer chooses both per length with an event model (Sections~\ref{subsec:split} and~\ref{subsec:pricing}).
+Because the issue order that pays and the best split change with the prompt length, the composer chooses both per length with an event model (Sections~\ref{subsec:split} and~\ref{subsec:pricing}).
 Because OPCORD rewrites designs it did not compile, checkers refuse, with a reason, any rewrite they cannot show legal (Section~\ref{subsec:checkers}).
 
 \subsection{Reordering Issue}
@@ -62,7 +62,7 @@ The prefill needs no renaming, because the existing host program already gives e
 \label{subsec:split}
 
 % VALUE: the split is a build parameter of the existing design; the legal splits S1, S2 (default), S4 follow from the KV heads; each split is its own configuration built from the unchanged source, with outputs bit-identical to the default split, so the existing program and the composer each run on any of them
-The existing design fixes its split as a build parameter, and since each attention group serves an equal share of the KV heads, an LLM with 8 KV heads admits attention on 1, 2, or 4 columns, which are the shipped splits $S_1$, $S_2$, and $S_4$, with $S_2$ the default.
+The existing program fixes its split as a build parameter, and since each attention group serves an equal share of the KV heads, an LLM with 8 KV heads admits attention on 1, 2, or 4 columns, which are the shipped splits $S_1$, $S_2$, and $S_4$, with $S_2$ the default.
 We build each split as its own configuration with the design's own build, unchanged apart from its split parameter, with outputs bit-identical to those of the default split, so the existing program and the composed schedule can each run on any of them.
 % SOURCE: mlir-air a3e26261 fused_prefill/device.py: Attn(col=...) per group in Config.attn, GCOL0, GNC = 1, 6 as module constants; spec() splits kv_heads evenly, so 1, 2, or 4 attention columns with 8 KV heads (vault lab-split-sweep (1)).
 % SOURCE: out-of-tree split modules; logits bit-identical to the default split in every configuration on both models (vault lab-split-sweep (2), (4), (5)).
@@ -109,19 +109,19 @@ No constant is fitted to an LLM's end-to-end runs, so every configuration of Sec
 % SOURCE: microbenchmarks (npu-gap prefill-overlap/microbench.py): dispatch floor from empty commands; setup from back-to-back sequences mixing same-group and cross-group pairs, non-negative least squares on one set and checked on another; read cap from co-runs on both sides of the crossover between the longest group and bytes over the cap; per split build (S1, S2, S4 of Llama-3.2-1B) with a Qwen3-4B transfer check; values \E{pending}.
 % COMMENT: bib entries needed (read each source first): Hockney's model, LogP / LogGP, the roofline model.
 
-% VALUE: the event model's error is stated on the difference between candidates, so its choice is right whenever two candidates differ by more than about twice that error and costs at most about that much otherwise; where the top candidates fall inside a frozen band, a short measurement at plan time settles the tie, and the unaided choice is always reported
-Because a choice compares candidates, we state the event model's error on the difference between two candidates' times rather than on each time alone.
-Its choice is then right whenever two candidates differ by more than about twice that error, and otherwise costs at most about that much.
-Where the top candidates fall inside a band of 5\% for orders of one kind or 15\% between a composed and an existing order, the composer runs each candidate briefly when it plans the prompt length and keeps the faster, and we always report the event model's unaided choice beside it (Section~\ref{subsec:decision}).
-% SOURCE: measure-when-close, implemented test-first in opcord (planner.CLOSE_BAND, close_candidates, decide; test_measure_close 10/10); bands same 5%, cross 15%, tie 0.5%, one warm and three kept runs per candidate; about 19 min of device time over the whole grid, once per shape (vault decisions log, "Spine v18 drafted; amendment-1 batch and measure-when-close approved").
-
 % VALUE: before a prompt length runs, the composer prices every candidate (split, existing or composed order, host policy) with the event model and runs the cheapest, settling near-ties by a short measurement; more attention columns shorten attention and lengthen the GEMMs, so the split that pays moves with the balance of the two groups; because the existing order is a candidate, the composer keeps it where composing is priced higher, as at prompts of one or two chunks
-Before a prompt length runs, the composer prices every candidate with the event model, namely each split, the existing order and the composed one, and each number $D$ of commands in flight and packing of commands, and it runs the cheapest, settling a near-tie by a short measurement.
+Before a prompt length runs, the composer prices every candidate with the event model, namely each split, the existing order and the composed one, and each number $D$ of commands in flight and packing of commands, and it runs the cheapest unless the next rule applies.
 More attention columns shorten attention, whose time grows with the prompt, but lengthen every GEMM, so the split that pays moves with the balance between the two groups (Section~\ref{subsec:pays}).
 Because the existing order is among the candidates, the composer keeps it wherever composing is priced higher, as at prompts of one or two chunks.
 % SOURCE: opcord/plan/planner.py choose(model, L, N): candidates every split with a committed probe (S1, S2, S4), arms ship / shipar / comp, composer policies depth {1, 2, 4, 8} x GEMM cap {none, 4} x packing {1, 4}, each priced by event_model.predict, cheapest returned with the whole table; measure-when-close (planner.decide) as in Section~\ref{subsec:pricing}.
 % SOURCE: the four-column split's GEMMs are 27% (1B) and 35% (Qwen3-4B) slower than on six columns, and its attention slope per chunk 3.0-3.1x lower than the default split's existing stream (vault lab-split-sweep (4)-(5)).
 % DECISION: resident splits, switching at a turn boundary, and relayout belong to agent workloads, an extension under spine v18; their text is archived in the vault.
+
+% VALUE: the event model's error is stated on the difference between candidates, so its choice is right whenever two candidates differ by more than about twice that error and costs at most about that much otherwise; where the top candidates fall inside a frozen band, a short measurement at plan time settles the tie, and the unaided choice is always reported
+Because a choice compares candidates, we state the event model's error on the difference between two candidates' times rather than on each time alone.
+Its choice is then right whenever two candidates differ by more than about twice that error, and otherwise costs at most about that much.
+Where the top candidates fall inside a band of 5\% for orders of one kind or 15\% between a composed and an existing order, the composer runs each candidate briefly when it plans the prompt length and keeps the faster, and we always report the event model's unaided choice beside it (Section~\ref{subsec:decision}).
+% SOURCE: measure-when-close, implemented test-first in opcord (planner.CLOSE_BAND, close_candidates, decide; test_measure_close 10/10); bands same 5%, cross 15%, tie 0.5%, one warm and three kept runs per candidate; about 19 min of device time over the whole grid, once per shape (vault decisions log, "Spine v18 drafted; amendment-1 batch and measure-when-close approved").
 
 \subsection{Legality Checkers}
 \label{subsec:checkers}

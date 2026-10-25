@@ -22,7 +22,7 @@ Prompts run from 128 to 32{,}768 tokens in powers of two and one token past each
 
 % VALUE: one baseline: the existing program on the shipped split that minimizes its TTFT, with every split predicted within 5% of it measured, run on the faster of its own host code and our runner, so it differs from OPCORD only in the order and the split OPCORD chooses; the remedies are their own rows; FastFlowLM appears only as an observation for the condition
 Every result compares against one baseline, namely the existing program on the shipped split that minimizes its TTFT, which we find by measuring every shipped split that the event model places within 5\% of the fastest, an ordering whose error Section~\ref{subsec:decision} reports.
-The baseline runs on the faster of its own host code and our runner with the existing order, so it differs from OPCORD only in what OPCORD chooses, namely the order and the split for that order, and the baseline's own split is never handicapped.
+The baseline runs on the faster of its own host code and our runner with the existing order, so it differs from OPCORD only in what OPCORD chooses, namely the order and the split for that order.
 For decode, the baseline is the unmodified decode design.
 % SOURCE: the baseline rule (vault decisions log, the per-split cells' ruling and amendment 1, 2026-10-24); OPCORD's ratio = baseline / composed, at the event model's choice.
 % DECISION: the old hand-alternated baseline is retired; FastFlowLM, taken as released, is an observation for the condition (Section~\ref{subsec:pays}), never a speedup reference.
@@ -30,7 +30,7 @@ For decode, the baseline is the unmodified decode design.
 % VALUE: correctness gates, metrics, and the run protocol; defaults stated once
 Every run's logits and KV records are bit-identical to the existing program's, and the kernel log stays free of driver and IOMMU messages.
 TTFT is the wall time of the prefill call, and the time per token is the inverse of the decode rate over 256 greedy tokens.
-All versions of a cell run interleaved on one engine in one process, with one busy host core that keeps the CPU out of deep idle, and we report medians of at least five timed runs after a warm run, with 95\% bootstrap intervals.
+A \emph{cell} is one LLM at one prompt length, and all versions of a cell run interleaved in one runtime process, with one busy host core that keeps the CPU out of deep idle, and we report medians of at least five timed runs after a warm run, with 95\% bootstrap intervals.
 Because the DRAM read cap varies by up to 12\% between batches, every ratio pairs runs from one batch or chains two such ratios through a version both batches share.
 % SOURCE: protocol (amd-npu ab/FINAL-SWEEP.md: spinner, shared engine, gates; kept iterations max(5, the full spec); decode 5 ABBA repetitions of 256 tokens); 8x2 cap 49.9-55.7 GB/s over the batches (lab-prefill-device (1), lab-split-sweep (4)-(5)).
 
@@ -85,8 +85,8 @@ In decode, renaming the keys and values alone, as a production mapping of anothe
 
 % VALUE: the composer's choice of order and split stays within a small margin of the best measured option on every configuration, whereas each fixed rule loses badly somewhere: never reordering gives up the long-prompt gains, always reordering loses at one or two chunks, a fixed split loses where the balance moves, and even the rule that reorders from four chunks at the existing program's best split loses where the composed order's best split differs; the event model's unaided choice is reported beside the measured tie-break
 % COMMENT: the outcome stated in this paragraph is the hypothesis the table tests; reword to what the table shows (if a fixed rule ties the price, state the regret bound instead).
-To measure how well the composer chooses, we compare its choice on every configuration against the minimum measured over every shipped split and both orders, and against fixed rules (Table~\ref{tab:decision}).
-The composer's choice stays within \E{X}\% of the measured minimum on every configuration, and its unaided choice, before any tie is settled by measurement, within \E{Y}\%.
+To measure how well the composer chooses, we compare its choice on every cell against the minimum measured over every shipped split and both orders, and against fixed rules (Table~\ref{tab:decision}).
+The composer's choice stays within \E{X}\% of the measured minimum on every cell, and its unaided choice, before any tie is settled by measurement, within \E{Y}\%.
 Each fixed rule loses badly somewhere, since never reordering gives up the long prompts' gains, always reordering loses at one or two chunks, and a fixed split loses where the balance between the groups moves.
 Even reordering from four chunks on the existing program's best split loses \E{Z}\% where the composed order runs faster on another split.
 % SOURCE: per configuration, the measured best = the minimum over every shipped split of the composed and existing orders (final sweep: comp and orig at every shipped split); development data so far: Qwen3-4B 8,192 regret 2.6% (paired, 0.9739 [0.9729, 0.9743]); Qwen3-4B 512 3.1%, Gemma3-4B 512 4.0%, Llama-3.2-1B 512 3.3% (unaided, before measure-when-close and the model rebuild) (vault decisions log, issue check 8d2eac19; tmp/issue-check/rules.py).
@@ -106,7 +106,7 @@ Even reordering from four chunks on the existing program's best split loses \E{Z
         Always reorder & \E{} & \E{} \\
         Reorder from four chunks & \E{} & \E{} \\
         Fixed split $S_2$ & \E{} & \E{} \\
-        Four chunks, baseline's split & \E{} & \E{} \\
+        Four chunks, existing program's best split & \E{} & \E{} \\
         \bottomrule
     \end{tabular*}
 \end{table}
@@ -137,7 +137,7 @@ Over the 792 of them that fit within its graph's size limit, the analysis attrib
 
 % VALUE: our passes also judge MLIR-AIR designs of LLMs never run or examined, renaming their decodes as on the evaluated LLMs, with no gain claimed
 Our passes also judge the MLIR-AIR designs of five LLMs we never ran or examined, renaming attention's keys, values, and scores on their decodes as on the evaluated LLMs, but we claim no gain on any of them.
-The bound per false order stands beside a measured gain in FastFlowLM's merge replay (Section~\ref{subsec:observed}), and its critical-path test is checked in decode, where renaming only part of the critical cycle gains nothing (Section~\ref{subsec:ablation}).
+The bound per false order stands beside a measured gain in FastFlowLM's merge replay, which bounds at $1.075$--$1.093\times$ and saves \E{X}\% (Section~\ref{subsec:observed}), and its critical-path test is checked in decode, where renaming only part of the critical cycle gains 0.3\% (Section~\ref{subsec:ablation}).
 % COMMENT: verify how the 793-stream population relates to the 112 census designs (pass-0) before stating it.
 % SOURCE: P8 (a), the unexamined MLIR-AIR models Llama-3.2-3B, Phi-4-mini, Qwen2.5-3B and 7B, and Qwen3-8B (aie-cosched e5ad472; 0 accel opens; kernels byte-identical).
 
@@ -153,17 +153,18 @@ What rescheduling recovers is set by how a design cuts its work and by the promp
 How a design cuts its work into configurations, commands, and buffers sets how much of that work meets the condition.
 For the reorders available inside a design's existing commands, which are the part of a closed stack's rewrites that the exposure measures, we state per workload its \emph{exposure} $M$, the share of the wall time spent in commands whose configuration holds two or more operators, together with the bound $b$ on the gain inside those commands (Section~\ref{subsec:removal}).
 The two imply a ceiling on the end-to-end gain from inside commands of $1 / \bigl((1 - M) + M / b\bigr)$, which separates a design that exposes little work from one whose exposed work cannot overlap.
+MLIR-AIR's prefill spends nearly all of its time on one configuration that holds every operator, so its exposure is near one, but each of its commands issues one operator, so the room inside its commands is only the stream pass's alternation within attention (Section~\ref{subsec:ablation}).
 On an open fused design, OPCORD's composer also re-cuts the commands themselves, so that operators issued one per command come to share commands, a rewrite that the bound of each false order across commands covers, and on MLIR-AIR's prefill this re-cut carries nearly all of the gain (Section~\ref{subsec:ablation}).
 % SOURCE: exposure metric and ceiling (aie-cosched registered 2a7990a; script 3d11670; rows a3ef131; partb/README).
 
 \label{subsec:observed}
 % VALUE: the census by design class, each placed by its two cuts, with what the condition predicts and what the bounds and measurements show: MLIR-AIR's prefill (fused configuration, one operator per command) gains, as Section 6.2 measures; FastFlowLM's flash prefill (fused, several operators per command) has M 0.82-0.87 but b 1.000 because its streams already keep every column busy, its waits between commands are mostly true, its one rewrite worth measuring (merging commands at the shortest prompts) is measured against its bound, and its decode pairs share an engine; IRON's modular operator sequences share no command and their streams price at one; the non-LLM designs overlap through dataflow; so every design the condition says can gain is one whose gain we measure
-Across the 112 designs of our census (Table~\ref{tab:census}), the condition predicts gains only where a false order in a fused configuration holds back work that could overlap on resources a rewrite cannot duplicate, with no true dependence between, and measurement bears this out for MLIR-AIR's prefill and decode, FastFlowLM's merge replay, and the two controls, while the bounds bear it out for the rest.
+Across the 112 designs of our census (Table~\ref{tab:census}), the condition predicts gains only where a false order in a fused configuration holds back work that could overlap on resources a rewrite cannot duplicate, with no true dependence between, and measurement bears this out for MLIR-AIR's prefill and decode and for the two controls, while the bounds bear it out for the rest.
 MLIR-AIR's chunked fused prefill holds every operator in one configuration but issues one command per operator and chunk, with attention and the GEMMs on disjoint column groups, so its column groups take turns on work that meets both clauses (Section~\ref{subsec:losses}), and the gains of Section~\ref{subsec:e2e} are measured there.
 MLIR-AIR's fused decode keeps one buffer per role in its attention loop, so each block's transfer waits on the previous block's compute, and the loop pass's gain of Section~\ref{subsec:e2e} is measured there, whereas renaming only the keys and values, which leaves the score buffer closing the cycle, gains nothing (Section~\ref{subsec:ablation}).
-FastFlowLM's prefill, taken as released, holds several operators per command and has an exposure $M$ of 0.82--0.87, yet the false orders inside its commands bound at $b = 1.000\times$, because its streams already keep every column busy at once, so deleting those orders lets no further work overlap.
+FastFlowLM's prefill, taken as released, which MLIR-AIR's reimplements with one operator per command (Section~\ref{subsec:prefill}), spends most of its time on a configuration that holds several operators, for an exposure $M$ of 0.82--0.87, yet the false orders inside its commands bound at $b = 1.000\times$, because its streams already keep every column busy at once, so deleting those orders lets no further work overlap.
 Between its commands, most waits are true, since the host reads each command's output before it issues the next, and the false ones bound below $1.05\times$ with measured durations on every prompt we bound, except a merge of two commands at prompts of up to 128 tokens, which saves their dispatch and bounds at $1.075$--$1.093\times$.
-That merge, the one rewrite its bound leaves worth measuring, saves \E{X}\% when replayed on the device.
+That merge, the one rewrite its bound leaves worth measuring, saves \E{X}\% when replayed on the device, which checks the bound against measurement rather than the condition, since a merge saves a dispatch rather than freeing overlap.
 Its decode runs one command per step, whose false pairs all share a core tile or a DMA channel, and bounds at $1.000$--$1.009\times$.
 IRON's modular operator sequences give each operator its own configuration, so their operators share no command, their exposure is zero, and they pay reconfiguration between operators instead, and their 32 streams, which issue their transfers ahead of their waits, all bound at $1.000\times$.
 Each of the non-LLM designs we read runs as one command whose stages already overlap through the array's own dataflow, and the 3 that IRON builds also bound at $1.000\times$.
@@ -187,7 +188,7 @@ Every gain we measure therefore falls where the condition says one can arise, an
         \midrule
         MLIR-AIR prefill & fused; one operator per command & gain (Section~\ref{subsec:e2e}) \\
         MLIR-AIR decode & fused; one buffer per role & gain (Section~\ref{subsec:e2e}) \\
-        FastFlowLM prefill & fused; several operators per command & $b = 1.000\times$ inside commands; merge bound $1.075$--$1.093\times$, replay \E{X}\% \\
+        FastFlowLM prefill & fused; streams keep every column busy & $b = 1.000\times$ inside commands; merge bound $1.075$--$1.093\times$, replay \E{X}\% \\
         FastFlowLM decode & fused; false pairs share an engine & bound $1.000$--$1.009\times$ \\
         IRON LLM designs & modular & bound $1.000\times$ \\
         Non-LLM designs & one command, overlapped by dataflow & bound $1.000\times$ \\
@@ -223,4 +224,4 @@ Each clause also holds under direct test, since forcing the reordered groups ont
 % SOURCE: controls through the generic composer front end (vault decisions log, 2026-10-24), \E{pending}.
 
 % VALUE: the consequence: the order is fixed in the artifact while the work it lets overlap changes with the prompt, so the order that pays changes with the prompt; choosing it needs durations no compile has, which is why OPCORD prices the order and the split per prompt length
-Because the order is fixed in the artifact while the work it lets overlap changes with the prompt, the order that pays changes with the prompt as well, and choosing it needs durations that no compile has, which is why OPCORD prices the order and the split per prompt length (Section~\ref{subsec:pricing}).
+Because the order is fixed in the artifact while the work it lets overlap changes with the prompt, the issue order that pays changes with the prompt as well, and choosing it needs durations that no compile has, which is why OPCORD prices the order and the split per prompt length (Section~\ref{subsec:pricing}).
