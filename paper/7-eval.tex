@@ -97,8 +97,8 @@ The composer's choice stays within \E{X}\% of the measured minimum on every cell
 We compare its choice on every cell against the minimum measured over every shipped split and both orders, and against fixed rules.
 The tie-break fires on \E{X} of the cells, at the cost per prompt length that Section~\ref{subsec:impl} gives, whereas measuring every candidate on every cell would take \E{Z}.
 Each fixed rule loses badly somewhere, since never reordering gives up the long prompts' gains, always reordering ties at one chunk and loses at two, and a fixed split loses where the balance between the groups moves.
-% COMMENT: Table 1's row "Reorder from four chunks" needs its split named from the record (decision-quality scorer) and a mention here.
-Even reordering from four chunks on the baseline's split loses \E{Z}\% where the composed order runs faster on another split.
+% SOURCE: the two four-chunk rules (tmp/issue-check/rules.py): R3 composes from four chunks on the in-tree split S2, R5 from four chunks on the split of the fastest measured existing program.
+Reordering from four chunks loses \E{Y}\% on the default split, and even on the baseline's split it loses \E{Z}\% where the composed order runs faster on another split.
 % SOURCE: per configuration, the measured best = the minimum over every shipped split of the composed and existing orders (final sweep: comp and orig at every shipped split); development data so far: Qwen3-4B 8,192 regret 2.6% (paired, 0.9739 [0.9729, 0.9743]); Qwen3-4B 512 3.1%, Gemma3-4B 512 4.0%, Llama-3.2-1B 512 3.3% (unaided, before measure-when-close and the model rebuild) (vault decisions log, issue check 8d2eac19; tmp/issue-check/rules.py).
 
 \begin{table}[t]
@@ -114,7 +114,7 @@ Even reordering from four chunks on the baseline's split loses \E{Z}\% where the
         OPCORD, unaided & \E{} & \E{} \\
         Never reorder & \E{} & \E{} \\
         Always reorder & \E{} & \E{} \\
-        Reorder from four chunks & \E{} & \E{} \\
+        Four chunks, split $S_2$ & \E{} & \E{} \\
         Fixed split $S_2$ & \E{} & \E{} \\
         Four chunks, baseline's split & \E{} & \E{} \\
         \bottomrule
@@ -235,10 +235,10 @@ Every overlap gain we measure therefore falls where the condition says one can a
 \end{table}
 
 \label{subsec:shape-eval}
-% COMMENT: Section 3.2's shares look balanced at 4K on the default split (attention 49%, GEMMs 48% of TTFT), while the gain peaks at 8-16K; name the split behind "at one split" and check the balance against the grid data before the freeze.
+% COMMENT: check the peak and its reason against the final sweep's same-split cells. On S2 the frozen event model's group terms (attention with its columns alternated against the GEMMs; pass-0 results/2026-10-24-group-terms) put the two level near 4K for Llama-3.2-1B and Qwen3-4B (A/G 0.73-0.74 at 4K, 1.45-1.46 at 8K), 8K for Llama-3.1-8B (0.68 at 8K, 1.35 at 16K), 16K for LFM2-1.2B (1.03) and 32K for Gemma3-4B (1.01), so "about 2x at 8-16K where the groups balance" fits only some LLMs; at the gain's peak attention already outweighs the GEMMs on the 1B and Qwen3-4B, and the hidden host time adds to it. Reword the peak and the balance from the measured cells, not from these predictions.
 % VALUE: the prompt length sets the balance of the exposed work: attention per chunk grows with the chunk's position while the GEMMs' work per chunk is fixed; at one split on every LLM the reorder ties at one chunk and loses at two (per-command costs and the pipeline's fill and drain outweigh the overlap), gains from four and rises to about twice at 8-16K where the groups balance, and falls at 32K where attention outweighs the GEMMs; in the middle range an estimate from the groups' busy times and the hidden host time tracks the gain, while only the event model prices the few-chunk costs and the incomplete overlap at long balanced prompts; the split moves the balance, so the best split changes with the length
 The prompt length sets the balance of the work the two groups can overlap, since in a prefill cut into chunks of 128 tokens attention's work per chunk grows with the chunk's position while the GEMMs' work per chunk stays fixed, so overlapping the two column groups across chunks hides the shorter group's time behind the longer one's.
-At one split on every LLM, the reorder ties at one chunk and loses at two, because the per-command costs and the time to fill and drain the pipeline of commands outweigh the overlap, and it gains from four chunks, rising to about $2\times$ at 8--16K tokens where the groups' work balances, before it falls at 32K, where attention outweighs the GEMMs.
+At the default split on every LLM, the reorder ties at one chunk and loses at two, because the per-command costs and the time to fill and drain the pipeline of commands outweigh the overlap, and it gains from four chunks, rising to about $2\times$ at 8--16K tokens where the groups' work balances, before it falls at 32K, where attention outweighs the GEMMs.
 The balance alone accounts for this shape from 1K to 4K tokens, where an estimate from the two groups' busy times and the host time the overlap hides, a shape estimate rather than a bound, tracks the gain within 5\%, but only the event model, which composes each command, prices the dispatch costs at few chunks and the incomplete overlap at long balanced prompts.
 The split moves this balance, so the split that minimizes TTFT also changes with the prompt length.
 % SOURCE: same-split shape on the development grids, pre-final: one chunk 0.976-1.006, two chunks 0.945-0.972, four chunks 1.040-1.076 on all five LLMs, 1.13-1.18x at 1,024, 1.82-2.17x at 8-16K, falling at 32K (vault decisions log, grids of 2026-10-23/24; issue check 8d2eac19). The estimate with its host term against the event model and the measured cells: pass-0 group terms (registered 3fab31d) and the synthetic sweep (abaa3d9).
