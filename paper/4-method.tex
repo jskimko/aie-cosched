@@ -4,29 +4,28 @@
 \subsection{Overview}
 \label{subsec:overview}
 
-% VALUE: removing these waits from compiled designs poses four challenges, each with its reason and the section that answers it: tell which of a design's many false orders can pay (the bound, Section 4, and the evidence of Section 6.7); recover the order from binaries without their source, although even an open design spreads it over the CP's stream, DMA chains, and core loops (Section 4); price an order without running it, because the artifact fixes the order but not the durations and the candidates multiply (Section 5); show a rewrite legal without the compiler that built the design (Sections 4 and 5)
-Removing these waits from already compiled designs poses four challenges.
-First, a design holds many false orders, most of which cost nothing, so each must be bounded to tell which kinds are worth a rewrite (Section~\ref{subsec:removal}).
-Second, the order must be recovered from binaries without their source, and even an open design spreads it over the CP's stream, DMA chains, and core loops (Section~\ref{sec:order}).
-Third, an order must be priced without running it, because the artifact fixes the order of the work but not its durations, and the candidates multiply with chunks, column splits, and removals (Section~\ref{subsec:pricing}).
-Fourth, a reorder or a rename must be shown legal without the compiler that built the design, from what the instructions alone establish about buffers, locks, and routes (Section~\ref{subsec:legality}).
+\begin{figure*}[t]
+    \centering
+    % VALUE: OPCORD's components and the section that describes each: inputs (compiled design, open or closed; host program; operator probes; prompt length), the analysis (dependence graph with true, name and order edges; legality conditions; a bound per false order), the composer, stream pass and loop pass each behind its checker, the event model choosing order and split per prompt length for prefill, the output (rewritten design on its own hardware context, or a refusal with its reason); on closed binaries, read and bound, replaying only rewrites that leave the host program as it is
+    % DECISION: the overview figure (figs/diagrams.py fig_framework), full width as the comparable systems papers' overviews are (author, 2026-10-25); the loop pass's rings go straight to the output because the event model prices prefill only
+    \includegraphics[width=\textwidth]{fig/framework.pdf}
+    \caption{OPCORD's components, each with the section that describes it. The analysis reads a compiled design into a dependence graph whose edges are true, name, or order dependences and bounds each false order. Each reorder or rename runs only behind a legality check, which otherwise refuses with its reason. The event model prices each candidate order and split of prefill per prompt length.}
+    \label{fig:framework}
+\end{figure*}
 
-% VALUE: design opener: OPCORD removes the false dependences of §3.3 in steps, each answering a property of the platform: a blocking in-order CP (reorder issue, by the composer across operators and the stream pass within one), one buffer per role in decode's loop (the loop pass's rings), an order and a split that pay differently with the prompt length (both chosen per length by the event model), designs it did not compile (checkers that refuse with a reason)
+% VALUE: OPCORD's components (the figure), each with the property of the design or platform that requires it: the order is read from binaries, since even open designs spread it over the CP's stream, DMA chains, and core loops; most false orders cost nothing, so each is bounded and a rewrite is provided only where the bound leaves room; legality comes from the instructions alone, since OPCORD did not compile the design, and checkers refuse with a reason; the composer and stream pass answer the blocking in-order CP and the loop pass decode's one buffer per role; the order and split that pay change with the prompt length, so the event model prices both per length, since the artifact fixes the order but not the durations and the candidates multiply
 % DECISION: the opener follows the FPGA'27 design opener, each property of the platform followed by the mechanism that answers it, with one subsection per property (STYLE.md, Paper structure, Design; contract §6).
 % DECISION: the legality conditions and the checkers live together in Section~\ref{subsec:legality}; this section states only how OPCORD acts on them, namely checkers that accept a rewrite or refuse it with a reason (contract §6).
-OPCORD runs the analysis of Section~\ref{sec:order} on each design, takes from it the legality conditions, and provides a rewrite only for the kinds of false order whose bound leaves room.
-It answers each property of the platform behind the waits of Section~\ref{subsec:losses} with one mechanism.
+Figure~\ref{fig:framework} shows OPCORD's components over a design that its stack has already compiled.
+OPCORD's analysis recovers the order from the design's binaries, without their source where it is closed, because even an open design spreads that order over the CP's stream, DMA chains, and core loops (Section~\ref{sec:order}).
+A design holds many false orders, most of which cost nothing, so the analysis bounds each one, and OPCORD provides a rewrite only for the kinds of false order whose bound leaves room (Section~\ref{subsec:removal}).
+Because OPCORD rewrites designs it did not compile, it takes the legality conditions from what the instructions alone establish about buffers, locks, and routes (Section~\ref{subsec:legality}).
+Its checkers refuse, with a reason, any rewrite they cannot show legal (Section~\ref{subsec:checkers}).
+Each rewrite answers a property of the platform behind the waits of Section~\ref{subsec:losses}.
 Because a synchronization blocks the in-order CP, our composer and stream pass issue every group's work before the CP waits on any (Section~\ref{subsec:order}).
 Because decode attention's loop keeps one buffer per role, our loop pass renames those buffers into rings (Section~\ref{subsec:rings}).
-Because the issue order and the split that pay change with the prompt length, the composer chooses both per length with an event model (Section~\ref{subsec:pricing}).
-Because OPCORD rewrites designs it did not compile, checkers refuse, with a reason, any rewrite they cannot show legal (Section~\ref{subsec:checkers}).
-\begin{figure}[t]
-    \centering
-    % DECISION: the overview figure (figs/diagrams.py fig_framework), added after the 2026-10-25 independent review (both reviewers asked for a system overview); the bound sits with the dependence graph, the event model prices per length
-    \includegraphics[width=\linewidth]{fig/framework.pdf}
-    \caption{OPCORD over a compiled design: the analysis reads its streams into a dependence graph whose edges are true, name, or order dependences and bounds each false order, the event model prices each candidate order and split per prompt length, and each reorder or rename runs only behind a legality check, which otherwise refuses with its reason.}
-    \label{fig:framework}
-\end{figure}
+The issue order and the split that pay change with the prompt length, so the composer chooses both per length with an event model (Section~\ref{subsec:pricing}).
+The event model prices an order without running it, because the artifact fixes the order of the work but not its durations, and the candidates multiply with chunks, column splits, and removals.
 
 \subsection{Reading Compiled Designs}
 \label{sec:order}

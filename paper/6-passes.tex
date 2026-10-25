@@ -15,7 +15,7 @@ A command concatenates its operators' segments under the conditions of Section~\
 % SOURCE: txn.segments and txn.compose (a0ee2ed prefill-overlap/txn.py, now opcord/compose/txn.py); compose asserts each stream's segment order, every op kept once, and equal headers.
 
 \begin{algorithm}[t]
-% VALUE: the composer's steps exactly as the prose states them: ready operators by layer and chunk; the lowest ready attention with ready GEMMs of matching estimated work, or the packing's GEMMs without attention; every group's opening segment first, attention's two columns as two groups; each synchronization in predicted-completion order, followed by the issue it gates; each command checked, a failure refusing with its condition
+% VALUE: the composer's steps, whose reasons the prose gives: ready operators by layer and chunk; the lowest ready attention with ready GEMMs of matching estimated work, or the packing's GEMMs without attention; every group's opening segment first, attention's two columns as two groups; each synchronization in predicted-completion order, followed by the issue it gates; each command checked, a failure refusing with its condition
 % SOURCE: merged.plan (ready set in (layer, chunk, stage) order; the first ready attention; GEMMs while their summed estimate is below attention's; without attention, up to batch GEMMs; readiness once every producer is posted) and merged.cp_order (both attention columns' openings and the first GEMM's, then every synchronization by predicted completion, each followed by the issue it gates; GEMM i's synchronization followed by GEMM i+1's opening) at opcord-runtime 446fa1c; txn.compose's checks and the composer's checks of Section 3.3 fail rather than drop.
 \caption{The composer, for one prompt length.}
 \label{alg:compose}
@@ -40,16 +40,13 @@ A command concatenates its operators' segments under the conditions of Section~\
 \end{algorithmic}
 \end{algorithm}
 
-% VALUE: across commands, each command takes the ready attention of the lowest layer and chunk with ready GEMMs of matching estimated work, or without ready attention the next ready GEMMs up to the packing; an operator is ready once its producers' commands and the host work after them have completed; matching, because a command in which both groups run lasts about as long as the longer group alone
-Each command pairs the ready attention operator of the lowest layer and chunk with ready GEMMs whose estimated work matches it, or takes the next ready GEMMs up to the packing that the host policy sets (Section~\ref{subsec:formulation}) where no attention operator is ready (lines~\mbox{3--4}).
-An operator is ready once the commands that hold its producers have completed, with the host work between them (Section~\ref{subsec:formulation}).
-Because a command in which both groups run lasts about as long as the longer group alone (Section~\ref{subsec:semantics}), matching the estimates keeps neither group idle for long.
+% VALUE: the reasons behind Algorithm 1's steps across commands: GEMMs matched to attention by estimated work, because a command in which both groups run lasts about as long as the longer group alone; without ready attention, the packing the host policy sets bounds the GEMMs per command
+The composer matches each command's GEMMs to its attention operator by estimated work (lines~\mbox{3--4}), because a command in which both groups run lasts about as long as the longer group alone (Section~\ref{subsec:semantics}), so matched estimates keep neither group idle for long.
+Where no attention operator is ready, the packing that the host policy sets (Section~\ref{subsec:formulation}) bounds the GEMMs per command.
 
-% VALUE: within a command, the composer opens every group's work and then places each synchronization at its predicted completion, followed by the issue it gates, so no synchronization holds back another group's work; attention's two columns count as two groups; the order is fixed at build time and runs without the host; each command is checked against the whole-operator condition and a failure stops the composition with its reason; its price is the shared DRAM read rate, priced in Section 5.4
-Packing the operators into one command in turn would still leave the GEMM group idle while the CP walks attention's synchronizations (Figure~\ref{fig:order}a), so the composer issues the opening segments of every group first.
-It then places each synchronization in the order in which the probes predict its transfer completes, followed by the issue it gates.
-Where the predictions hold, the CP waits on the transfers in their order of completion, so each gated issue follows its own transfer rather than another group's later one.
-Attention's two columns count as two groups for this order, so their segments alternate as well.
+% VALUE: the reasons behind Algorithm 1's steps within a command: packing in turn leaves the GEMMs idle while the CP walks attention's synchronizations, so every group's work opens first, attention's two columns as two groups; synchronizations in predicted-completion order let each gated issue follow its own transfer; the order is fixed at build time and runs without the host; a command failing the whole-operator condition stops the composition with its reason; its price is the shared DRAM read rate
+Packing the operators into one command in turn would still leave the GEMM group idle while the CP walks attention's synchronizations (Figure~\ref{fig:order}a), so the composer opens every group's work first, counting attention's two columns as two groups, whose segments then alternate as well (lines~\mbox{5--6}).
+It then places the CP's synchronizations in the order in which the probes predict their transfers complete, so where the predictions hold, each gated issue follows its own transfer rather than another group's later one (lines~\mbox{7--9}).
 The estimates fix this order when the command is built, and the CP executes it without the host.
 A command that fails the condition of Section~\ref{subsec:legality} for whole operators stops the composition, with that condition as its reason (line~10).
 Running both groups at once makes a group that reads at the shared DRAM read cap also carry its co-runner's reads (Section~\ref{subsec:semantics}), so a design already near the cap gains little.
@@ -58,15 +55,15 @@ Running both groups at once makes a group that reads at the shared DRAM read cap
 
 \begin{figure}[t]
     \centering
-    % VALUE: what each rewrite does, drawn in fig:order's vocabulary with illustrative durations: (a) the stream pass issues both of attention's columns before any wait, where the existing stream issues column 7 after the CP's synchronization on column 0; (b) the loop pass's two-slot ring lets block i+1's transfer overlap block i's compute, where one buffer per role makes it wait
+    % VALUE: what the loop pass does, drawn in fig:order's vocabulary with illustrative durations: its two-slot ring lets block i+1's transfer overlap block i's compute, where one buffer per role makes it wait; the stream pass's reorder within one operator is fig:order's move, stated in the text
     \includegraphics[width=\linewidth]{fig/rewrites.pdf}
-    \caption{Each rewrite against the existing order, with illustrative durations, for (a) one attention operator's two columns and (b) decode attention's block loop, in which the transfer brings a block's keys and values and the compute is both cores' work on that block. Each dotted arrow ends at work that waits on work whose results it does not read, namely column~7's issue on the CP's synchronization on column~0 and block $i{+}1$'s transfer on block $i$'s compute.}
+    \caption{Decode attention's block loop with one buffer per role and after our loop pass renames its buffers into two-slot rings, with illustrative durations. The transfer brings a block's keys and values, and the compute is both cores' work on that block. Each dotted arrow ends at block $i{+}1$'s transfer, which waits on block $i$'s compute although it does not read its results.}
     \label{fig:rewrites}
 \end{figure}
 
 % VALUE: within one operator's stream, the stream pass (an MLIR-AIE pass on the runtime sequence, compiled or lifted) applies the same reorder: column 7's work waits behind the CP's synchronization on column 0 although it reads none of its results; the pass orders the segments by their index within their column, alternating the columns, so the opening segments come first and so each column's work is issued before the CP waits on another; its checker tests every inverted pair and leaves the stream unchanged on a finding; it is the rule by which Section 2.5's columns were alternated, and it emits that alternation byte for byte rather than discovering it
 Our \emph{stream pass} applies the same reorder within one operator's stream, as an MLIR-AIE pass on its runtime sequence, whether compiled or lifted from a recording.
-In the existing attention stream, column~7's work waits behind the CP's synchronizations on column~0, although it reads none of column~0's results (Figure~\ref{fig:rewrites}a).
+In the existing attention stream, column~7's work waits behind the CP's synchronizations on column~0, although it reads none of column~0's results, as the GEMMs wait behind attention in Figure~\ref{fig:order}a.
 The pass orders the segments by their index within their column and alternates the columns at each index, so the opening segments of all columns come first and each column's work is issued before the CP waits on another.
 Its checker tests every pair of instructions that the new order inverts (Section~\ref{subsec:legality}) and leaves the stream unchanged on any finding.
 This is the rule by which we alternated attention's columns in Section~\ref{subsec:losses}, and the pass emits that alternation byte for byte on all 42 streams we alternated by hand.
@@ -78,7 +75,7 @@ This is the rule by which we alternated attention's columns in Section~\ref{subs
 \label{subsec:rings}
 
 % VALUE: decode attention's keys, values, and scores each sit in one buffer, so each block's transfer waits for the previous block's compute, a name dependence; only the running maximum and accumulator carry; the loop pass renames every other buffer into a two-slot ring: a second slot on the same tile, the free lock's initial count raised to two, each BD chain and core loop alternating the slots; it classes buffers by their conflicts across iterations and leaves the carried state, which is why the compiler's transformation declines the loop and ours does not
-With one buffer per role, each block's transfer in decode attention waits until the previous block's compute releases the buffer, although it reads none of that compute's results (Figure~\ref{fig:rewrites}b).
+With one buffer per role, each block's transfer in decode attention waits until the previous block's compute releases the buffer, although it reads none of that compute's results (Figure~\ref{fig:rewrites}).
 Of the buffers in its loop (Section~\ref{subsec:losses}), only the running maximum and the accumulator carry data across blocks.
 Our \emph{loop pass} therefore renames each of the others, namely the keys, the values, and the scores passed between the two cores, into a \emph{ring} of two slots.
 Whereas MLIR-AIR's double-buffering transformation declines the whole loop for its carried state, our pass classes every buffer of the lowered loop by its conflicts across iterations and leaves the carried state in place.

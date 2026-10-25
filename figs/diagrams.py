@@ -4,18 +4,18 @@
   FIGS_OUT=paper/fig .venv/bin/python figs/diagrams.py
 
 Outputs:
-  framework.pdf  OPCORD's pipeline over a compiled design: graph, prices, checked rewrites, output
+  framework.pdf  OPCORD's components over a compiled design, full width: inputs, analysis, checked rewrites, event
+                 model, output, each with its section
   arch.pdf  the XDNA 2 NPU as the paper uses it: host, hardware context, the CP's in-order instruction stream, the
             array of shim, memory and compute tiles over DRAM, and one compute tile and one shim tile magnified
-  rewrites.pdf  what each rewrite does: (a) the stream pass on one attention operator's two columns, (b) the loop pass's
-                two-slot ring on decode attention's block loop, each against the existing order
+  rewrites.pdf  what the loop pass does: its two-slot ring on decode attention's block loop, against one buffer per role
 """
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import make_figs as _m  # noqa: E402  (style, palette, OUT)
-from make_figs import COLUMN, GRAY, INK, OUT, plt  # noqa: E402
+from make_figs import COLUMN, GRAY, INK, ORANGE, OUT, plt  # noqa: E402
 from matplotlib.patches import FancyArrowPatch, Rectangle  # noqa: E402
 
 MIST, STONE = "#E4E4E4", "#707070"
@@ -161,149 +161,136 @@ def _stage(ax, x, y, w, h, title, ours=True):
 
 
 def fig_framework():
-    """OPCORD as a pipeline over a design its stack has already compiled: read its instruction streams into a dependence
-    graph whose edges are true, name or order dependences; price candidate schedules from per-operator probes; reorder
-    issue and rename buffers, each rewrite admitted only by a legality check; emit the rewritten design or refuse."""
-    W, H = COLUMN - 0.04, 1.62
+    """OPCORD's components over a design its stack has already compiled, full width, with the section that describes each:
+    the analysis reads the design and the host program into a dependence graph whose edges are true, name or order
+    dependences, with legality conditions and a bound per false order; the composer and the stream pass reorder issue
+    and the loop pass renames buffers into rings, each behind its checker; the event model prices each candidate order
+    and split per prompt length from the probes, for prefill; the runtime package runs the result on the design's own
+    hardware context, or the checkers refuse with a reason. On closed binaries OPCORD reads and bounds, and replays only
+    rewrites that leave the host program as it is."""
+    W, H = _m.WIDE - 0.04, 1.62
     fig, ax = _canvas(W, H)
-    # ---- row 1: compiled design -> dependence graph -> event model
-    y1, h1 = 0.88, 0.70
-    _stage(ax, 0.02, y1, 0.86, h1, "Compiled design", ours=False)
+    fs = FS + 0.5
+    top, bot = H - 0.02, 0.30  # the panels' common top and bottom; the probe rail runs beneath them
+    # ---- inputs
+    xi, wi = 0.02, 1.08
+    _stage(ax, xi, bot, wi, top - bot, "Inputs", ours=False)
     for k, kinds in enumerate(("iisiis", "isiiis", "iiisis")):
-        _strip(ax, 0.10, y1 + 0.42 - k * 0.14, kinds)
-    _stage(ax, 1.08, y1, 1.0, h1, "Dependence graph, bounds")
-    nodes = {"a": (1.22, 1.32), "b": (1.22, 1.06), "c": (1.50, 1.30), "d": (1.50, 1.04), "e": (1.78, 1.32),
-             "f": (1.78, 1.06), "g": (1.96, 1.19)}
+        _strip(ax, xi + 0.08, 1.20 - k * 0.13, kinds, cw=0.055, h=0.09)
+    ax.text(xi + 0.08 + 6 * 0.055 + 0.05, 1.11, "compiled design,\nopen or closed", ha="left", va="center", fontsize=fs,
+            linespacing=1.1)
+    rows_in = ((0.80, "host program"), (0.60, "operator probes"), (0.42, "prompt length"))
+    for y, label in rows_in:
+        ax.text(xi + 0.08, y, label, ha="left", va="center_baseline", fontsize=fs)
+    # ---- the analysis: dependence graph, legality, bound
+    xa, wa = 1.26, 1.52
+    _stage(ax, xa, bot, wa, top - bot, r"Analysis (\S3.2--3.3)")
+    ox, oy = xa + 0.10, 0.92
+    nodes = {"a": (0.0, 0.30), "b": (0.0, 0.04), "c": (0.28, 0.28), "d": (0.28, 0.02), "e": (0.56, 0.30),
+             "f": (0.56, 0.04), "g": (0.74, 0.17)}
+    nodes = {k: (ox + x, oy + y) for k, (x, y) in nodes.items()}
     edges = (("a", "c", "true"), ("b", "d", "true"), ("c", "e", "true"), ("d", "f", "true"), ("e", "g", "true"),
              ("a", "d", "order"), ("c", "f", "order"), ("b", "c", "name"), ("f", "g", "name"))
-    style = {"true": dict(color=INK, ls="-"), "name": dict(color=MAGENTA, ls=(0, (3, 1.5))),
-             "order": dict(color=MAGENTA, ls=(0, (1, 1.2)))}
+    style = {"true": dict(color=INK, ls="-"), "name": dict(color=INK, ls=(0, (3, 1.5))),
+             "order": dict(color=INK, ls=(0, (1, 1.2)))}  # magenta is reserved for ours
     for u, v, kind in edges:
         (x1, y1_), (x2, y2) = nodes[u], nodes[v]
         ax.plot([x1, x2], [y1_, y2], lw=0.7, zorder=3, **style[kind])
     for x, y in nodes.values():
         ax.add_patch(plt.Circle((x, y), 0.033, facecolor="white", edgecolor=INK, linewidth=0.5, zorder=4))
-    _stage(ax, 2.28, y1, W - 2.30, h1, "Event model")
-    # two lanes of operators, the bound as a dashed line; the probes come from each operator alone
-    for lane, bars in ((1.30, ((2.36, 0.22), (2.62, 0.30))), (1.12, ((2.36, 0.40), (2.80, 0.18)))):
-        for x0, w in bars:
-            ax.add_patch(Rectangle((x0, lane), w, 0.10, facecolor=GRAY, edgecolor="white", linewidth=0.5, zorder=3))
-    ax.plot([3.02, 3.02], [1.06, 1.46], color=INK, lw=0.6, linestyle=(0, (2, 1.2)), zorder=4)
-    ax.text(3.0, 0.98, "priced per length", ha="right", va="center_baseline", fontsize=FS - 0.5)
-    _arrow(ax, (0.88, y1 + h1 / 2), (1.08, y1 + h1 / 2))
-    _arrow(ax, (2.08, y1 + h1 / 2), (2.28, y1 + h1 / 2))
-    # ---- row 2: the two rewrites, each behind a legality check, and what comes out
-    y2, h2 = 0.04, 0.70
-    _stage(ax, 0.02, y2, 2.06, h2, "Rewrite, each checked for legality")
-    # reorder issue: issue every group's work before any synchronization
-    xa = _strip(ax, 0.10, y2 + 0.38, "isis", cw=0.09)
-    _arrow(ax, (xa + 0.04, y2 + 0.43), (xa + 0.24, y2 + 0.43), lw=0.5)
-    ax.text(xa + 0.14, y2 + 0.50, r"\checkmark", ha="center", va="center_baseline", fontsize=FS + 1, color=MAGENTA)
-    _strip(ax, xa + 0.28, y2 + 0.38, "iiss", cw=0.09)
-    ax.text(0.10, y2 + 0.27, "reorder issue", ha="left", va="center_baseline", fontsize=FS)
-    # rename: one buffer per role becomes a ring of two
-    bx = 1.24
-    _box(ax, bx, y2 + 0.36, 0.14, 0.14, fc=MIST, lw=0.5, z=4)
-    _arrow(ax, (bx + 0.18, y2 + 0.43), (bx + 0.38, y2 + 0.43), lw=0.5)
-    ax.text(bx + 0.28, y2 + 0.50, r"\checkmark", ha="center", va="center_baseline", fontsize=FS + 1, color=MAGENTA)
-    _box(ax, bx + 0.42, y2 + 0.36, 0.14, 0.14, fc=MIST, lw=0.5, z=4)
-    _box(ax, bx + 0.58, y2 + 0.36, 0.14, 0.14, fc=MIST, lw=0.5, z=4)
-    ax.add_patch(FancyArrowPatch((bx + 0.70, y2 + 0.52), (bx + 0.44, y2 + 0.52), connectionstyle="arc3,rad=0.5",
-                                 arrowstyle="-|>,head_length=1.8,head_width=1.0", color=INK, linewidth=0.5, zorder=5))
-    ax.text(bx, y2 + 0.27, "rename into a ring", ha="left", va="center_baseline", fontsize=FS)
-    _stage(ax, 2.28, y2, W - 2.30, h2, "Output", ours=False)
-    _strip(ax, 2.36, y2 + 0.40, "iiiss", cw=0.075)
-    ax.text(2.36, y2 + 0.28, "rewritten design", ha="left", va="center_baseline", fontsize=FS)
-    ax.text(2.36, y2 + 0.16, "or a refusal", ha="left", va="center_baseline", fontsize=FS)
-    ax.text(2.36, y2 + 0.07, "with its reason", ha="left", va="center_baseline", fontsize=FS)
-    _arrow(ax, (2.08, y2 + h2 / 2), (2.28, y2 + h2 / 2))
-    # the graph and the model drive the rewrites
-    _arrow(ax, (1.58, y1), (1.58, y2 + h2))
-    ax.plot([2.65, 2.65, 1.95], [y1, y1 - 0.07, y1 - 0.07], color=INK, lw=0.6, zorder=2)
-    _arrow(ax, (1.95, y1 - 0.07), (1.95, y2 + h2))
-    # legend for the graph's edges
-    lg_y = y1 + 0.08
     for k, (kind, label) in enumerate((("true", "true"), ("name", "name"), ("order", "order"))):
-        x = 1.12 + k * 0.30
-        ax.plot([x, x + 0.09], [lg_y, lg_y], lw=0.7, zorder=3, **style[kind])
-        ax.text(x + 0.11, lg_y, label, ha="left", va="center_baseline", fontsize=FS - 0.5)
+        lx, ly = ox + 0.92, 1.24 - k * 0.11
+        ax.plot([lx, lx + 0.09], [ly, ly], lw=0.7, zorder=3, **style[kind])
+        ax.text(lx + 0.12, ly, label, ha="left", va="center_baseline", fontsize=fs - 0.5)
+    for y, label in ((0.70, "dependence graph over every agent"), (0.56, "legality conditions"),
+                     (0.42, "a bound per false order")):
+        ax.text(xa + 0.10, y, label, ha="left", va="center_baseline", fontsize=fs)
+    # ---- the rewrites, each behind its checker
+    xr, wr = 2.96, 1.80
+    _stage(ax, xr, bot, wr, top - bot, r"Rewrites, each behind a checker (\S3.3--3.5)")
+    rew = ((1.16, "Composer", "reorder across operators"), (0.86, "Stream pass", "reorder within a stream"),
+           (0.50, "Loop pass", "rename into rings"))
+    for y, name, what in rew:
+        _box(ax, xr + 0.08, y - 0.10, wr - 0.16, 0.20, fc="white", lw=0.4, z=3)
+        ax.text(xr + 0.17, y, r"\checkmark", ha="center", va="center_baseline", fontsize=fs + 1, color=MAGENTA,
+                zorder=5)
+        ax.text(xr + 0.26, y, name, ha="left", va="center_baseline", fontsize=fs, fontweight="bold", zorder=5)
+        ax.text(xr + 0.82, y, what, ha="left", va="center_baseline", fontsize=fs, zorder=5)
+    # ---- the event model, prefill only
+    xe, we, be = 4.94, 0.88, 0.70
+    _stage(ax, xe, be, we, top - be, r"Event model (\S3.6)")
+    for lane, bars in ((1.22, ((xe + 0.08, 0.20), (xe + 0.32, 0.28))), (1.06, ((xe + 0.08, 0.36), (xe + 0.48, 0.16)))):
+        for x0, w in bars:
+            ax.add_patch(Rectangle((x0, lane), w, 0.09, facecolor=GRAY, edgecolor="white", linewidth=0.5, zorder=3))
+    ax.text(xe + 0.08, 0.90, "order and split", ha="left", va="center_baseline", fontsize=fs)
+    ax.text(xe + 0.08, 0.78, "per prompt length", ha="left", va="center_baseline", fontsize=fs)
+    # ---- output
+    xo = 5.98
+    wo = W - xo
+    _stage(ax, xo, bot, wo, top - bot, r"Output (\S3.7)", ours=False)
+    _strip(ax, xo + 0.07, 1.16, "iiiss", cw=0.075, h=0.09)
+    for k, label in enumerate(("rewritten design", "on its own", "hardware context,", "or a refusal", "with its reason")):
+        ax.text(xo + 0.07, 0.98 - k * 0.12, label, ha="left", va="center_baseline", fontsize=fs)
+    # ---- flows
+    _arrow(ax, (xi + wi, 1.0), (xa, 1.0))
+    _arrow(ax, (xa + wa, 1.0), (xr, 1.0))
+    for y, _, _ in rew[:2]:
+        _arrow(ax, (xr + wr - 0.08, y), (xe, y))
+    _arrow(ax, (xe + we, 1.10), (xo, 1.10))
+    _arrow(ax, (xr + wr - 0.08, rew[2][0]), (xo, rew[2][0]))  # decode: the loop pass's rings go straight to the output
+    # the probes and the prompt length feed the event model along a rail beneath the panels
+    ry, rx = 0.15, xe + we / 2
+    ax.plot([xi + wi / 2, xi + wi / 2, rx], [bot, ry, ry], color=INK, lw=0.6, solid_joinstyle="miter", zorder=2)
+    _arrow(ax, (rx, ry), (rx, be))
+    ax.text(xa + 0.10, ry + 0.06, "probes, prompt length", ha="left", va="center_baseline", fontsize=fs - 0.5)
+    ax.text(xa + 0.10, 0.05, "closed binaries: read and bounded, replaying only rewrites that leave the host program as it is",
+            ha="left", va="center_baseline", fontsize=fs - 0.5, style="italic")
     fig.savefig(OUT / "framework.pdf", metadata={"CreationDate": None})
     plt.close(fig)
 
 
-TRANSFER = "#F0B6D0"  # pastel step of MAGENTA: attention's transfers, beside its compute in MAGENTA
-
-
 def fig_rewrites():
-    """What each rewrite does, in fig_order's vocabulary, with illustrative durations. (a) The stream pass on one attention
-    operator: the existing stream issues column 7's work only after the CP's synchronizations on column 0's key and value
-    transfers, which complete when column 0 is about half done; the rewritten stream issues both columns' work before any
-    wait. (b) The loop pass on decode attention's block loop: with one buffer per role, block i+1's transfer waits until
-    block i's compute releases the buffer; with a two-slot ring, block i+1's transfer fills the other slot while block i
-    computes. A dotted arrow marks each wait that the rewrite removes."""
-    A, ISS = 3.0, 0.22  # one column's run and the width of an issue
+    """What the loop pass does to decode attention's block loop, in fig_order's vocabulary, with illustrative durations:
+    with one buffer per role, block i+1's transfer waits until block i's compute releases the buffer; with a two-slot
+    ring, block i+1's transfer fills the other slot while block i computes. A dotted arrow marks each such wait, a false
+    order. Attention's transfers are drawn in the pastel step of its compute's ORANGE, as in the architecture figure."""
     T, C, NB = 1.0, 0.71, 3  # a block's transfer and compute (compute is 0.71 of the transfer, as measured in decode), blocks
-    ex_c7 = A / 2 + ISS
-    stream = {
-        "ex": dict(c0=(0.0, A), c7=(ex_c7, A),
-                   cp=[(0.0, ISS, 0), (ISS, A / 2 - ISS, 1), (A / 2, ISS, 0), (ex_c7, A, 1)], end=ex_c7 + A),
-        "rw": dict(c0=(0.0, A), c7=(ISS, A), cp=[(0.0, ISS, 0), (ISS, ISS, 0), (2 * ISS, A - ISS, 1)], end=ISS + A),
-    }
     loop = {
         "ex": dict(tr=[(k * (T + C), T) for k in range(NB)], co=[(k * (T + C) + T, C) for k in range(NB)],
                    end=NB * (T + C)),
         "rw": dict(tr=[(k * T, T) for k in range(NB)], co=[((k + 1) * T, C) for k in range(NB)], end=NB * T + C),
     }
-    fig, axes = plt.subplots(2, 2, figsize=(COLUMN, 1.95), sharex="row", sharey="row",
-                             gridspec_kw=dict(hspace=0.45, wspace=0.06, height_ratios=(3, 2.2)))
+    fig, axes = plt.subplots(1, 2, figsize=(COLUMN, 0.98), sharex=True, sharey=True, gridspec_kw=dict(wspace=0.06))
 
     def wait(ax, x, y0, y1):  # a dotted shaft with a solid head, vertical from y0 to y1
         ax.plot([x, x], [y0, y1], color=INK, linewidth=0.6, linestyle=(0, (1, 1.2)), zorder=10)
         ax.add_patch(FancyArrowPatch((x, y1 + 0.02 * (y0 - y1)), (x, y1), arrowstyle="-|>,head_length=2.2,head_width=1.2",
                                      color=INK, linewidth=0.6, shrinkA=0, shrinkB=0, zorder=10))
-    titles = (("(a) Existing attention stream", "Stream pass"), ("(b) One buffer per role", "Loop pass, two-slot ring"))
-    for row, (data, lanes) in enumerate(((stream, ("Col.~0", "Col.~7", "CP")), (loop, ("Transfer", "Compute")))):
-        for col, key in enumerate(("ex", "rw")):
-            ax, d = axes[row][col], data[key]
-            if row == 0:
-                for t0, w, y in ((*d["c0"], 1.0), (*d["c7"], 0.0)):
-                    ax.broken_barh([(t0, w)], (y - 0.32, 0.64), facecolors=MAGENTA, edgecolor=INK, linewidth=0.4)
-                for t0, w, kind in d["cp"]:
-                    ax.broken_barh([(t0, w)], (-1.32, 0.5), facecolors=INK if kind == 0 else GRAY, edgecolor=INK,
-                                   linewidth=0.3)
-                if key == "ex":  # the CP's synchronization on column 0 gates column 7's issue
-                    wait(ax, A / 2, 1.0 - 0.32, -0.82)
-                ax.set_yticks([1.0, 0.0, -1.07], lanes)
-                ax.set_ylim(-1.75, 1.6)
-            else:
-                labels = (r"$i$", r"$i{+}1$", r"$i{+}2$")
-                for k, (t0, w) in enumerate(d["tr"]):
-                    ax.broken_barh([(t0, w)], (1.0 - 0.32, 0.64), facecolors=TRANSFER, edgecolor=INK, linewidth=0.4)
-                    ax.text(t0 + w / 2, 1.0, labels[k], ha="center", va="center_baseline", fontsize=FS)
-                    if key == "rw":
-                        ax.text(t0 + w / 2, 1.0 + 0.52, f"slot {k % 2}", ha="center", va="center_baseline",
-                                fontsize=FS - 0.5)
-                for k, (t0, w) in enumerate(d["co"]):
-                    ax.broken_barh([(t0, w)], (-0.32, 0.64), facecolors=MAGENTA, edgecolor=INK, linewidth=0.4)
-                    ax.text(t0 + w / 2, 0.0, labels[k], ha="center", va="center_baseline", fontsize=FS,
-                            color="white")
-                    if key == "ex" and k + 1 < NB:  # block k's compute releases the buffer block k+1's transfer fills
-                        wait(ax, t0 + w, 0.32, 1.0 - 0.32)
-                ax.set_yticks([1.0, 0.0], lanes)
-                ax.set_ylim(-0.6, 1.75)
-            ax.axvline(d["end"], color="black", linewidth=0.5, linestyle=(0, (4, 2)))
-            ax.set_xlim(-0.1, max(v["end"] for v in data.values()) + 0.25)
-            ax.set_title(titles[row][col], fontsize=7, pad=2, loc="left")
-            ax.tick_params(left=False, right=False, top=False, bottom=False, labelleft=col == 0)
-            ax.set_xticks([])
-            for side in ("top", "right", "bottom"):
-                ax.spines[side].set_visible(False)
-    handles = [plt.Rectangle((0, 0), 1, 1, facecolor=INK, edgecolor=INK, linewidth=0.3),
-               plt.Rectangle((0, 0), 1, 1, facecolor=GRAY, edgecolor=INK, linewidth=0.3),
-               plt.Line2D([], [], color=INK, linewidth=0.6, linestyle=(0, (1, 1.2)))]
-    fig.legend(handles, ["CP issuing", "CP blocked", "wait removed"], ncol=3, loc="lower center",
-               bbox_to_anchor=(0.5, 0.93), handlelength=1.2, columnspacing=1.0)
-    fig.supxlabel("Time (illustrative)", fontsize=8, y=0.04)
+    labels = (r"$i$", r"$i{+}1$", r"$i{+}2$")
+    for col, (key, title) in enumerate((("ex", "One buffer per role"), ("rw", "Loop pass, two-slot ring"))):
+        ax, d = axes[col], loop[key]
+        for k, (t0, w) in enumerate(d["tr"]):
+            ax.broken_barh([(t0, w)], (1.0 - 0.32, 0.64), facecolors=ATTN_PASTEL, edgecolor=INK, linewidth=0.4)
+            ax.text(t0 + w / 2, 1.0, labels[k], ha="center", va="center_baseline", fontsize=FS)
+            if key == "rw":
+                ax.text(t0 + w / 2, 1.0 + 0.52, f"slot {k % 2}", ha="center", va="center_baseline", fontsize=FS - 0.5)
+        for k, (t0, w) in enumerate(d["co"]):
+            ax.broken_barh([(t0, w)], (-0.32, 0.64), facecolors=ORANGE, edgecolor=INK, linewidth=0.4)
+            ax.text(t0 + w / 2, 0.0, labels[k], ha="center", va="center_baseline", fontsize=FS)
+            if key == "ex" and k + 1 < NB:  # block k's compute releases the buffer block k+1's transfer fills
+                wait(ax, t0 + w, 0.32, 1.0 - 0.32)
+        ax.set_yticks([1.0, 0.0], ("Transfer", "Compute"))
+        ax.set_ylim(-0.6, 1.75)
+        ax.axvline(d["end"], color="black", linewidth=0.5, linestyle=(0, (4, 2)))
+        ax.set_xlim(-0.1, max(v["end"] for v in loop.values()) + 0.25)
+        ax.set_title(title, fontsize=7, pad=2, loc="left")
+        ax.tick_params(left=False, right=False, top=False, bottom=False, labelleft=col == 0)
+        ax.set_xticks([])
+        for side in ("top", "right", "bottom"):
+            ax.spines[side].set_visible(False)
+    handles = [plt.Line2D([], [], color=INK, linewidth=0.6, linestyle=(0, (1, 1.2)))]
+    fig.legend(handles, ["false order"], loc="lower right", bbox_to_anchor=(0.99, -0.13), handlelength=1.2)
+    fig.supxlabel("Time (illustrative)", fontsize=8, y=-0.06)
     fig.savefig(OUT / "rewrites.pdf", metadata={"CreationDate": None})
     plt.close(fig)
 

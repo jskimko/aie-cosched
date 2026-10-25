@@ -272,7 +272,7 @@ def fig_order():
     fig, axes = plt.subplots(2, 1, figsize=(COLUMN, 1.85))
     span = max(p[4] for p in panels)
     for ax, (title, attn, gemm, cp, end) in zip(axes, panels):
-        for color, bars, y in ((MAGENTA, attn, 1.0), (BLUE, gemm, 0.0)):
+        for color, bars, y in ((ORANGE, attn, 1.0), (BLUE, gemm, 0.0)):
             ax.broken_barh([(t0, d) for t0, d in bars], (y - 0.32, 0.64),
                            facecolors=color, edgecolor=INK, linewidth=0.4)
         for t0, d, kind in cp:
@@ -365,7 +365,7 @@ def fig_decode():
     Both arms emit bit-identical logits at every point. The fitted slope per position is annotated, because
     what the renaming removes is the part of each position's cost that waited on the previous block."""
     panels = [("Llama-3.2-1B", "decode-1b.json", MAGENTA, "o"),
-              ("Qwen3-4B", "decode-qwen.json", BLUE, "s")]
+              ("Qwen3-4B", "decode-qwen.json", MAGENTA, "o")]  # one encoding per series in every panel
     fig, axes = plt.subplots(1, 2, figsize=(COLUMN, 1.6), sharex=True)
     for ax, (model, name, color, marker) in zip(axes, panels):
         d = json.loads((DATA / name).read_text())
