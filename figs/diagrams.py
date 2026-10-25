@@ -7,6 +7,8 @@ Outputs:
   framework.pdf  OPCORD's pipeline over a compiled design: graph, prices, checked rewrites, output
   arch.pdf  the XDNA 2 NPU as the paper uses it: host, hardware context, the CP's in-order instruction stream, the
             array of shim, memory and compute tiles over DRAM, and one compute tile and one shim tile magnified
+  rewrites.pdf  what each rewrite does: (a) the stream pass on one attention operator's two columns, (b) the loop pass's
+                two-slot ring on decode attention's block loop, each against the existing order
 """
 import sys
 from pathlib import Path
@@ -229,7 +231,85 @@ def fig_framework():
     plt.close(fig)
 
 
+TRANSFER = "#F0B6D0"  # pastel step of MAGENTA: attention's transfers, beside its compute in MAGENTA
+
+
+def fig_rewrites():
+    """What each rewrite does, in fig_order's vocabulary, with illustrative durations. (a) The stream pass on one attention
+    operator: the existing stream issues column 7's work only after the CP's synchronizations on column 0's key and value
+    transfers, which complete when column 0 is about half done; the rewritten stream issues both columns' work before any
+    wait. (b) The loop pass on decode attention's block loop: with one buffer per role, block i+1's transfer waits until
+    block i's compute releases the buffer; with a two-slot ring, block i+1's transfer fills the other slot while block i
+    computes. A dotted arrow marks each wait that the rewrite removes."""
+    A, ISS = 3.0, 0.22  # one column's run and the width of an issue
+    T, C, NB = 1.0, 0.71, 3  # a block's transfer and compute (compute is 0.71 of the transfer, as measured in decode), blocks
+    ex_c7 = A / 2 + ISS
+    stream = {
+        "ex": dict(c0=(0.0, A), c7=(ex_c7, A),
+                   cp=[(0.0, ISS, 0), (ISS, A / 2 - ISS, 1), (A / 2, ISS, 0), (ex_c7, A, 1)], end=ex_c7 + A),
+        "rw": dict(c0=(0.0, A), c7=(ISS, A), cp=[(0.0, ISS, 0), (ISS, ISS, 0), (2 * ISS, A - ISS, 1)], end=ISS + A),
+    }
+    loop = {
+        "ex": dict(tr=[(k * (T + C), T) for k in range(NB)], co=[(k * (T + C) + T, C) for k in range(NB)],
+                   end=NB * (T + C)),
+        "rw": dict(tr=[(k * T, T) for k in range(NB)], co=[((k + 1) * T, C) for k in range(NB)], end=NB * T + C),
+    }
+    fig, axes = plt.subplots(2, 2, figsize=(COLUMN, 1.95), sharex="row", sharey="row",
+                             gridspec_kw=dict(hspace=0.45, wspace=0.06, height_ratios=(3, 2.2)))
+
+    def wait(ax, x, y0, y1):  # a dotted shaft with a solid head, vertical from y0 to y1
+        ax.plot([x, x], [y0, y1], color=INK, linewidth=0.6, linestyle=(0, (1, 1.2)), zorder=10)
+        ax.add_patch(FancyArrowPatch((x, y1 + 0.02 * (y0 - y1)), (x, y1), arrowstyle="-|>,head_length=2.2,head_width=1.2",
+                                     color=INK, linewidth=0.6, shrinkA=0, shrinkB=0, zorder=10))
+    titles = (("(a) Existing attention stream", "Stream pass"), ("(b) One buffer per role", "Loop pass, two-slot ring"))
+    for row, (data, lanes) in enumerate(((stream, ("Col.~0", "Col.~7", "CP")), (loop, ("Transfer", "Compute")))):
+        for col, key in enumerate(("ex", "rw")):
+            ax, d = axes[row][col], data[key]
+            if row == 0:
+                for t0, w, y in ((*d["c0"], 1.0), (*d["c7"], 0.0)):
+                    ax.broken_barh([(t0, w)], (y - 0.32, 0.64), facecolors=MAGENTA, edgecolor=INK, linewidth=0.4)
+                for t0, w, kind in d["cp"]:
+                    ax.broken_barh([(t0, w)], (-1.32, 0.5), facecolors=INK if kind == 0 else GRAY, edgecolor=INK,
+                                   linewidth=0.3)
+                if key == "ex":  # the CP's synchronization on column 0 gates column 7's issue
+                    wait(ax, A / 2, 1.0 - 0.32, -0.82)
+                ax.set_yticks([1.0, 0.0, -1.07], lanes)
+                ax.set_ylim(-1.75, 1.6)
+            else:
+                labels = (r"$i$", r"$i{+}1$", r"$i{+}2$")
+                for k, (t0, w) in enumerate(d["tr"]):
+                    ax.broken_barh([(t0, w)], (1.0 - 0.32, 0.64), facecolors=TRANSFER, edgecolor=INK, linewidth=0.4)
+                    ax.text(t0 + w / 2, 1.0, labels[k], ha="center", va="center_baseline", fontsize=FS)
+                    if key == "rw":
+                        ax.text(t0 + w / 2, 1.0 + 0.52, f"slot {k % 2}", ha="center", va="center_baseline",
+                                fontsize=FS - 0.5)
+                for k, (t0, w) in enumerate(d["co"]):
+                    ax.broken_barh([(t0, w)], (-0.32, 0.64), facecolors=MAGENTA, edgecolor=INK, linewidth=0.4)
+                    ax.text(t0 + w / 2, 0.0, labels[k], ha="center", va="center_baseline", fontsize=FS,
+                            color="white")
+                    if key == "ex" and k + 1 < NB:  # block k's compute releases the buffer block k+1's transfer fills
+                        wait(ax, t0 + w, 0.32, 1.0 - 0.32)
+                ax.set_yticks([1.0, 0.0], lanes)
+                ax.set_ylim(-0.6, 1.75)
+            ax.axvline(d["end"], color="black", linewidth=0.5, linestyle=(0, (4, 2)))
+            ax.set_xlim(-0.1, max(v["end"] for v in data.values()) + 0.25)
+            ax.set_title(titles[row][col], fontsize=7, pad=2, loc="left")
+            ax.tick_params(left=False, right=False, top=False, bottom=False, labelleft=col == 0)
+            ax.set_xticks([])
+            for side in ("top", "right", "bottom"):
+                ax.spines[side].set_visible(False)
+    handles = [plt.Rectangle((0, 0), 1, 1, facecolor=INK, edgecolor=INK, linewidth=0.3),
+               plt.Rectangle((0, 0), 1, 1, facecolor=GRAY, edgecolor=INK, linewidth=0.3),
+               plt.Line2D([], [], color=INK, linewidth=0.6, linestyle=(0, (1, 1.2)))]
+    fig.legend(handles, ["CP issuing", "CP blocked", "wait removed"], ncol=3, loc="lower center",
+               bbox_to_anchor=(0.5, 0.93), handlelength=1.2, columnspacing=1.0)
+    fig.supxlabel("Time (illustrative)", fontsize=8, y=0.04)
+    fig.savefig(OUT / "rewrites.pdf", metadata={"CreationDate": None})
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     fig_arch()
     fig_framework()
+    fig_rewrites()

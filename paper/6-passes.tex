@@ -3,51 +3,102 @@
 
 
 
-% VALUE: the composer reorders issue across operators: it list-schedules the host program's dependency graph chunk by chunk rather than stage by stage, pairing each attention operator with ready GEMMs of matching work; a composed command keeps each operator's segments in order and every instruction once, so only when work is issued and awaited changes
+% VALUE: why reorder: a synchronization blocks the in-order CP, so a wait on one group holds back every later issue to the others, an order dependence where that work does not read the awaited result; across operators, the existing program runs a layer stage by stage, so the composer list-schedules the host program's dependency graph chunk by chunk instead (Algorithm 1); a composed command keeps each operator's segments in order and every instruction once, so only when work is issued and awaited changes
 \label{subsec:compose}
 % DECISION: subsec:compose names the composer's part of the reorder and resolves to this subsection; the conditions the former composing subsection stated are in Section~\ref{sec:order}.
-Our \emph{composer} list-schedules the producer-consumer order between the host program's operators chunk by chunk, from the design's per-operator streams and probes, and emits commands whose order we call the \emph{composed order}.
-The existing program runs a layer stage by stage instead, so the CP issues no GEMM beside attention (Section~\ref{subsec:losses}).
+A synchronization on one group holds back every later issue to the others (Section~\ref{subsec:platform}), which is an order dependence wherever that work does not read the awaited result.
+Across operators, the existing program runs a layer stage by stage, so the CP issues no GEMM beside attention (Section~\ref{subsec:losses}).
+Our \emph{composer} instead list-schedules the producer-consumer order between the host program's operators chunk by chunk, from the design's per-operator streams and probes, and emits commands whose order we call the \emph{composed order} (Algorithm~\ref{alg:compose}).
 The composer thus changes the design's cut into commands (Section~\ref{subsec:spectrum}) while keeping its configuration.
-Each command pairs the ready attention operator of the lowest layer and chunk with ready GEMMs whose estimated work matches it.
 A command concatenates its operators' segments under the conditions of Section~\ref{subsec:legality}, so composing changes when work is issued and awaited, never what the work is.
 % SOURCE: merged.plan (amd-npu a0ee2ed prefill-overlap/merged.py, now opcord/compose/merged.py at aie-cosched opcord-runtime 446fa1c): qkv(L, c) after down(L-1, c); attn(L, c) after qkv(L, 0..c); o after attn; gate and up after o; down after gate and up; GEMMs added in the same order until their estimated work reaches the attention operator's; an optional cap on the GEMMs per attention command.
 % SOURCE: txn.segments and txn.compose (a0ee2ed prefill-overlap/txn.py, now opcord/compose/txn.py); compose asserts each stream's segment order, every op kept once, and equal headers.
 
-% VALUE: within a command, the composer opens every group's work and then places each synchronization at its predicted completion, followed by the issue it gates, so no synchronization holds back another group's work; attention's two columns count as two groups; the order is fixed at build time and runs without the host; its price is the shared DRAM read rate, priced in Section 5.4
+\begin{algorithm}[t]
+% VALUE: the composer's steps exactly as the prose states them: ready operators by layer and chunk; the lowest ready attention with ready GEMMs of matching estimated work, or the packing's GEMMs without attention; every group's opening segment first, attention's two columns as two groups; each synchronization in predicted-completion order, followed by the issue it gates; each command checked, a failure refusing with its condition
+% SOURCE: merged.plan (ready set in (layer, chunk, stage) order; the first ready attention; GEMMs while their summed estimate is below attention's; without attention, up to batch GEMMs; readiness once every producer is posted) and merged.cp_order (both attention columns' openings and the first GEMM's, then every synchronization by predicted completion, each followed by the issue it gates; GEMM i's synchronization followed by GEMM i+1's opening) at opcord-runtime 446fa1c; txn.compose's checks and the composer's checks of Section 3.3 fail rather than drop.
+\caption{The composer, for one prompt length.}
+\label{alg:compose}
+\small
+\begin{algorithmic}[1]
+\renewcommand{\algorithmiccomment}[1]{\hfill$\triangleright$~#1}
+\REQUIRE the operators' dependence graph; each operator's segments; estimated work $w(\cdot)$ from the probes
+\ENSURE commands in the composed order, or a refusal with its reason
+\STATE $R \gets$ the operators without producers, by layer and chunk
+\WHILE{an operator is in no command}
+\STATE $a \gets$ the first attention operator in $R$, if any
+\STATE $P \gets$ GEMMs from $R$, in order, until $\sum_{g \in P} w(g) \ge w(a)$, or as many as the packing allows if there is no $a$
+\STATE groups $\gets$ each column of $a$, and $P$ (its GEMMs in turn)
+\STATE $s \gets$ the opening segment of every group
+\FORALL{synchronizations $y$, by predicted completion}
+\STATE append $y$ to $s$, then the issue that $y$ gates
+\ENDFOR
+\STATE check $s$ (Section~\ref{subsec:legality}); \textbf{refuse} with any failed condition
+\STATE emit $s$ as one command; remove its operators from $R$
+\STATE add to $R$ each operator whose producers' commands, and the host work after them, have completed
+\ENDWHILE
+\end{algorithmic}
+\end{algorithm}
+
+% VALUE: across commands, each command takes the ready attention of the lowest layer and chunk with ready GEMMs of matching estimated work, or without ready attention the next ready GEMMs up to the packing; an operator is ready once its producers' commands and the host work after them have completed; matching, because a command in which both groups run lasts about as long as the longer group alone
+Each command pairs the ready attention operator of the lowest layer and chunk with ready GEMMs whose estimated work matches it, or takes the next ready GEMMs up to the packing that the host policy sets (Section~\ref{subsec:formulation}) where no attention operator is ready (lines~\mbox{3--4}).
+An operator is ready once the commands that hold its producers have completed, with the host work between them (Section~\ref{subsec:formulation}).
+Because a command in which both groups run lasts about as long as the longer group alone (Section~\ref{subsec:semantics}), matching the estimates keeps neither group idle for long.
+
+% VALUE: within a command, the composer opens every group's work and then places each synchronization at its predicted completion, followed by the issue it gates, so no synchronization holds back another group's work; attention's two columns count as two groups; the order is fixed at build time and runs without the host; each command is checked against the whole-operator condition and a failure stops the composition with its reason; its price is the shared DRAM read rate, priced in Section 5.4
 Packing the operators into one command in turn would still leave the GEMM group idle while the CP walks attention's synchronizations (Figure~\ref{fig:order}a), so the composer issues the opening segments of every group first.
 It then places each synchronization in the order in which the probes predict its transfer completes, followed by the issue it gates.
+Where the predictions hold, the CP waits on the transfers in their order of completion, so each gated issue follows its own transfer rather than another group's later one.
 Attention's two columns count as two groups for this order, so their segments alternate as well.
 The estimates fix this order when the command is built, and the CP executes it without the host.
+A command that fails the condition of Section~\ref{subsec:legality} for whole operators stops the composition, with that condition as its reason (line~10).
 Running both groups at once makes a group that reads at the shared DRAM read cap also carry its co-runner's reads (Section~\ref{subsec:semantics}), so a design already near the cap gains little.
 % SOURCE: merged.cp_order (a0ee2ed, now opcord/compose/merged.py): the opening segments of both attention columns and of the first GEMM, then synchronizations by predicted completion; mid-stream fractions (0.25, 0.5) of attention's estimate, the lowest of five placements tried; the in-turn order takes 1.26x as long on the same 38 commands (lab-prefill-overlap (16)).
 % DECISION: tradeoffs are stated beside the decision that incurs them rather than collected in a section (author, 2026-10-21).
 
-% VALUE: within one operator's stream, the stream pass (an MLIR-AIE pass on the runtime sequence, compiled or lifted) applies the same reorder, interleaving the columns' segments; it is the rule by which Section 3.2's columns were alternated, and it emits that alternation byte for byte rather than discovering it
+\begin{figure}[t]
+    \centering
+    % VALUE: what each rewrite does, drawn in fig:order's vocabulary with illustrative durations: (a) the stream pass issues both of attention's columns before any wait, where the existing stream issues column 7 after the CP's synchronization on column 0; (b) the loop pass's two-slot ring lets block i+1's transfer overlap block i's compute, where one buffer per role makes it wait
+    \includegraphics[width=\linewidth]{fig/rewrites.pdf}
+    \caption{Each rewrite against the existing order, with illustrative durations, for (a) one attention operator's two columns and (b) decode attention's block loop, in which the transfer brings a block's keys and values and the compute is both cores' work on that block. Each dotted arrow ends at work that waits on work whose results it does not read, namely column~7's issue on the CP's synchronization on column~0 and block $i{+}1$'s transfer on block $i$'s compute.}
+    \label{fig:rewrites}
+\end{figure}
+
+% VALUE: within one operator's stream, the stream pass (an MLIR-AIE pass on the runtime sequence, compiled or lifted) applies the same reorder: column 7's work waits behind the CP's synchronization on column 0 although it reads none of its results; the pass orders the segments by their index within their column, alternating the columns, so the opening segments come first and so each column's work is issued before the CP waits on another; its checker tests every inverted pair and leaves the stream unchanged on a finding; it is the rule by which Section 2.5's columns were alternated, and it emits that alternation byte for byte rather than discovering it
 Our \emph{stream pass} applies the same reorder within one operator's stream, as an MLIR-AIE pass on its runtime sequence, whether compiled or lifted from a recording.
-It interleaves the columns' segments so that each column's work is issued before the CP waits on another.
+In the existing attention stream, column~7's work waits behind the CP's synchronizations on column~0, although it reads none of column~0's results (Figure~\ref{fig:rewrites}a).
+The pass orders the segments by their index within their column and alternates the columns at each index, so the opening segments of all columns come first and each column's work is issued before the CP waits on another.
+Its checker tests every pair of instructions that the new order inverts (Section~\ref{subsec:legality}) and leaves the stream unchanged on any finding.
 This is the rule by which we alternated attention's columns in Section~\ref{subsec:losses}, and the pass emits that alternation byte for byte on all 42 streams we alternated by hand.
 % SOURCE: aie-cosched-schedule (mlir-aie 573e0140174, identical in f1725dae1f1; in place on cosched-flag), proposal format /2 at aie-cosched 8dee63f; 42 / 42 decoded order and bytes equal to the hand versions (vault lab-cosched-passes (35), (40)); in place and byte-identical to the Python-applied moves and to the hand template on 42 / 42 (decisions log D24, P4); monotone and full mode as built (lab-cosched-passes, "Scan and monotone" and "Full mode").
 % DECISION: the pass emits the alternation and the checker accepts it; it is never said to discover it, and full mode is never called a predicted-completion rule (Ruling D3, vault decisions log).
+% COMMENT: the lock move (order dependences in a core loop), once built, is described here after the stream pass, as the reorder within a loop: what it moves, why, how, and its legality by pointer to Section 3.3.
 
 \subsection{Renaming Buffers}
 \label{subsec:rings}
 
-% VALUE: decode attention's keys, values, and scores each sit in one buffer, so each block waits for the previous; only the running maximum and accumulator carry; the loop pass renames every other buffer into a two-slot ring that each core acquires once per block, so the cores pipeline across blocks; it classes buffers by their conflicts across iterations and leaves the carried state, which is why the compiler's transformation declines the loop and ours does not; kernels, arithmetic order, tokens, and logits unchanged
-Of the buffers in decode attention's loop (Section~\ref{subsec:losses}), only the running maximum and the accumulator carry data across blocks.
+% VALUE: decode attention's keys, values, and scores each sit in one buffer, so each block's transfer waits for the previous block's compute, a name dependence; only the running maximum and accumulator carry; the loop pass renames every other buffer into a two-slot ring: a second slot on the same tile, the free lock's initial count raised to two, each BD chain and core loop alternating the slots; it classes buffers by their conflicts across iterations and leaves the carried state, which is why the compiler's transformation declines the loop and ours does not
+With one buffer per role, each block's transfer in decode attention waits until the previous block's compute releases the buffer, although it reads none of that compute's results (Figure~\ref{fig:rewrites}b).
+Of the buffers in its loop (Section~\ref{subsec:losses}), only the running maximum and the accumulator carry data across blocks.
 Our \emph{loop pass} therefore renames each of the others, namely the keys, the values, and the scores passed between the two cores, into a \emph{ring} of two slots.
-Each core acquires and releases a slot once per block, so the first core computes block $i+1$ while the second folds block $i$.
 Whereas MLIR-AIR's double-buffering transformation declines the whole loop for its carried state, our pass classes every buffer of the lowered loop by its conflicts across iterations and leaves the carried state in place.
-The kernels and the order of their arithmetic are unchanged, so the decoded tokens and every step's logits stay bit-identical.
-The time per position falls from the KV transfer plus the compute to the larger of the two.
-% SOURCE: aie-cosched-rename (mlir-aie 41b4947f09e; on cosched-flag through the aiecc flag), classes and rings in vault lab-cosched-passes (33): 12 buffers renamed on the 1B census build (K, V, score per attention pair); the class rule renames only buffers whose every cross-iteration conflict is WAR or WAW (lab-cosched-passes (57), P6 plan); tokens and every step's logits bit-identical across the existing design, the hand edit, and the pass, 1B P = 0 to 32,517 and Qwen3-4B P = 2,048 to 28,800 (vault lab-decode-long-context (22), amd-npu a6bc94b and 455740b).
+For each buffer it renames, the pass adds a second slot on the same tile, raises the initial count of the lock that marks a slot free from one to two, and alternates the two slots in every BD chain and core loop that uses the buffer.
+% SOURCE: aie-cosched-rename (mlir-aie 41b4947f09e): each name-class buffer becomes a depth-2 ring, a second buffer on the same tile, the free-slot lock's init 1 -> 2, each BD chain extended (buffer -> its twin -> the old successor), and in each core loop the slot chosen per iteration (vault lab-cosched-passes (33), "The pass").
 % SOURCE: single buffering, the build's own comment ("air-label-scf-for-to-ping-pong declines it, because the running max and accumulator are live across blocks") (vault lab-decode-long-context (5)).
+
+% VALUE: each core acquires a slot once per block, so the cores pipeline across blocks and the time per position falls from transfer plus compute to the larger of the two; legality by pointer to the rename conditions, the output re-checked; kernels, arithmetic order, tokens, and logits unchanged
+Each core acquires and releases a slot once per block, so the first core computes block $i+1$ while the second folds block $i$.
+The time per position falls from the KV transfer plus the compute to the larger of the two.
+The pass renames only buffers that the conditions of Section~\ref{subsec:legality} admit and re-checks each ring and the carried state on its output.
+The kernels and the order of their arithmetic are unchanged, so the decoded tokens and every step's logits stay bit-identical.
+% SOURCE: aie-cosched-rename (mlir-aie 41b4947f09e; on cosched-flag through the aiecc flag), classes and rings in vault lab-cosched-passes (33): 12 buffers renamed on the 1B census build (K, V, score per attention pair); the class rule renames only buffers whose every cross-iteration conflict is WAR or WAW (lab-cosched-passes (57), P6 plan); tokens and every step's logits bit-identical across the existing design, the hand edit, and the pass, 1B P = 0 to 32,517 and Qwen3-4B P = 2,048 to 28,800 (vault lab-decode-long-context (22), amd-npu a6bc94b and 455740b).
 % DECISION: the rename is our loop pass's output on the lowered design, not a hand edit; the hand edit appears only as the reference the pass reproduces (appendix-body.tex, app:loop-pass (cut 2026-10-24)).
 
 % VALUE: the prefill needs no renaming: the existing program already gives each chunk its own buffers, so with commands in flight no use waits for another; the composer's rings only bound memory, at no change in time, and remove no dependence
 The prefill needs no renaming, because the existing program already gives every chunk its own buffers, so no use waits for another even with several chunks in flight.
 % SOURCE: shipped naming is one slot per role per chunk; R-ship (the composed schedule at shipped's per-chunk naming) equals the composer with rings within 0.1% (0.99996-1.00074, amd-npu 71081d1) and holds 4-7x the rings' buffer bytes (vault lab-prefill-overlap (29), third revision); merged.colour and Layout (a0ee2ed, now opcord/compose/merged.py).
 % DECISION: the prefill rings remove nothing and are never listed as a removal (decisions log D19, 2026-10-22).
+% COMMENT: the BD-slot rename and the host-buffer slot per use (name dependences in the stream), once built, are described here after the loop pass: what each renames, why, how, and its legality by pointer to Section 3.3.
 
 \subsection{Pricing and Choosing}
 \label{subsec:pricing}

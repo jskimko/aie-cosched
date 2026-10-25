@@ -33,7 +33,7 @@ The serial execution of the existing program is thus a property of how its comma
 \label{subsec:losses}
 
 % VALUE: in the fused LLM designs we study, the waits recur at three places, each a textbook false dependence (cited): an order dependence where the instruction order puts a wait data does not require, a name dependence where work shares storage it need not share
-At three places in the fused LLM designs we study, from the CP's stream down to one operator's loop, work waits on other work whose results it does not consume, which is a \emph{false dependence} in the textbook sense~\citep{bernstein1966analysis,kuck1981dependence}.
+At three places in the fused LLM designs we study, work waits on other work whose results it does not consume, which is a \emph{false dependence} in the textbook sense~\citep{bernstein1966analysis,kuck1981dependence}.
 It is an \emph{order} dependence where the instruction order alone places the wait, which reordering removes, or a \emph{name} dependence where two uses share storage they need not share, which renaming removes~\citep{tomasulo1967,lam1988software}.
 We call either kind a \emph{false order}.
 % DECISION: false dependences, the order and name causes, reordering, and renaming are textbook and cited; the paper claims their analysis on this platform, never the classes. Section 4 classes each wait formally.
@@ -43,8 +43,8 @@ We call either kind a \emph{false order}.
 The existing program issues one operator per command, about 1{,}500 commands for a 2{,}048-token prompt, so its column groups take turns (Figure~\ref{fig:timeline}), which is an order dependence in the CP's stream between operators.
 Attention on one chunk reads the QKV projections of that chunk and earlier ones, and only that chunk's output projection reads its result, so the GEMMs of the layer's later chunks could run beside it.
 The host, however, runs each layer stage by stage (Section~\ref{subsec:prefill}), so the CP issues no GEMM beside attention.
-The runtime reports nothing per column, and the one occupancy a developer can compute, which sums each operator's time when dispatched alone less the dispatch floor, reads 92--97\% of TTFT.
-Yet columns 1--6 idle while attention runs, and columns 0 and 7 idle while the GEMMs run.
+The runtime reports nothing per column.
+The one occupancy a developer can compute, which sums each operator's time when dispatched alone less the dispatch floor, reads 92--97\% of TTFT, although each column group idles while the other runs.
 Attention's share of TTFT, and with it the GEMM columns' idle time, grows from 12\% to 49\% between 512 and 4{,}096 tokens of the Llama-3.2-1B prefill.
 In the tiles' performance counters, attention's cores stall on a lock for 81--83\% of a 2{,}048-token prefill and the GEMMs' cores for 44\%, which shows that the cores wait, though not when.
 % SOURCE: commands = 16 layers x chunks x 6 + 11 LM-head commands = 1,547 at 2,048 tokens (vault lab-prefill-census (1)).
@@ -65,7 +65,7 @@ Each column's half alone takes the same time, so the loss comes from the CP's or
 \textbf{Transfers in Decode.}
 % VALUE: a name dependence inside decode attention's loop: attention grows to most of the time per token and reads KV at half the cap; neither the transfer alone nor the CP's order limits it (the measurement chain: appendix-body.tex, app:decode-chain (cut 2026-10-24)); the loop's keys, values, and scores sit in one buffer each, so each block's transfer waits for the previous block's compute (+41% per position), and MLIR-AIR's double-buffering pass declines the loop because the running max and accumulator live across blocks
 In decode, attention takes up to 70\% of the time per token at long contexts, yet reads the KV cache at only half the DRAM read cap.
-Neither the transfer alone, which runs near the cap when measured by itself, nor the CP's order, which issues the next weights before it waits on any KV transfer, limits it.
+Neither the transfer, which runs near the cap when measured alone, nor the CP's order, which issues the next weights before it waits on any KV transfer, limits it.
 Instead, its loop holds the keys, the values, and the scores passed between its two cores in one buffer each, so each block's transfer waits for the compute on the previous block.
 That compute makes up 41\% of the time per position, or 0.71 of the transfer time.
 MLIR-AIR's double-buffering transformation declines the loop because its running maximum and accumulator live across blocks, so all three buffers, whose waits are name dependences, stay single.
@@ -77,18 +77,17 @@ MLIR-AIR's double-buffering transformation declines the loop because its running
 \subsection{When Removing a Wait Frees Overlap}
 \label{subsec:question}
 
-% VALUE: the question the rest of the paper answers: removing a false order pays only where the work it frees can overlap on resources a rewrite cannot duplicate, with no true dependence between (each clause from a platform fact); how much work qualifies is set by how the design cuts its work and by the prompt length, so the order that pays changes with length and must be priced; the full claim and its tests are in Section 6.7
+% VALUE: the question the rest of the paper answers: removing a false order pays only where the work it frees can overlap on resources a rewrite cannot duplicate, with no true dependence between (each clause from a platform fact); how much work qualifies is set by how the design cuts its work and by the prompt length, so the order that pays changes with length and must be priced; the full claim and its tests are in Section 4.7
 % DECISION: the critical-path condition is textbook and cited; the paper's claim is the condition's platform terms (non-duplicable resources, the host as an agent) and its dependence on the cut and the prompt length, never "false dependences cost time".
 Removing a false order frees overlap only where the work it frees runs on core tiles and DMA channels that the work it waited on does not use, resources a rewrite cannot duplicate, since every engine runs its own work in order and a buffer can be renamed into several slots whereas a core tile or a DMA channel cannot.
 It also frees overlap only where no true dependence, on the device or through a host step that reads one command's output before it issues the next, separates the two pieces of work.
 We call these two checkable clauses together the \emph{condition}.
-They refine the textbook rule that removing a false dependence gains time only where it lies on the critical path~\citep{fields2003interaction}, since on this platform removing a false order shortens that path only when both hold.
+They refine the textbook rule that removing a false dependence gains time only on the critical path~\citep{fields2003interaction}, since on this platform removing a false order shortens that path only when both hold.
 Both clauses name resources and dependences that the analysis reads from the artifacts and the host's accesses (Section~\ref{sec:order}).
 The condition therefore screens out the false orders that cannot free overlap before any duration is measured, whereas the critical-path rule needs durations to say which do.
 How much each remaining one frees, whether that exceeds its cost, and what a rewrite saves beyond overlap, such as a dispatch, need durations, which the bound of Section~\ref{subsec:removal} and the event model of Section~\ref{subsec:pricing} supply.
 
 How much work meets both clauses is set by how the design cuts its work, into configurations, into commands, and into buffers, and by the prompt length, which sets the balance between attention and the GEMMs.
-The cut and the prompt length thus set what rescheduling can recover.
 The issue order that pays therefore changes with the prompt and must be priced per length rather than fixed.
 The split that pays moves with the same balance, because more attention columns shorten attention but lengthen every GEMM.
 We call the designs we read from three stacks our \emph{census}, and Section~\ref{subsec:pays} tests the condition across its design classes, across prompt lengths, on a synthetic design, and with one control per clause.
