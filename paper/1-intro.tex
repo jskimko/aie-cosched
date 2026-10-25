@@ -12,7 +12,7 @@ The measure a developer can compute, which divides the operators' summed time by
 % SOURCE: busy 92-97% of TTFT at 512 / 2,048 / 4,096 tokens, each operator's isolated time less the dispatch floor, summed over the prefill (amd-npu e3acc8a prefill-e2/decomp.txt; Section 3.2).
 Issued in another order, the same operators run together and reach the first token \E{X}$\times$ sooner on the same split, which is the number of columns that attention takes, fixed by the design's build among a few values its build supports (Figure~\ref{fig:timeline}, bottom).
 However, while compilers and mapping frameworks~\citep{hunhoff2025iron,symons2025stream} optimize what each operator computes and where it runs, how operators are composed and issued through the CP has received far less attention.
-The insight of this work is that, because the CP's instruction order is the array's schedule, fixed in the artifact a toolchain emits, every wait in a design, every column a wait holds idle, and which waits could free overlap can be read from that artifact, bounded, and removed from it after compilation.
+The insight of this work is that, because the CP's instruction order is the array's schedule, fixed in the artifact a toolchain emits, every wait in a design, every column a wait holds idle, and which waits could free overlap can be read from that artifact, so those that leave the array idle can be bounded and removed from it after compilation.
 
 \begin{figure}[t]
     \centering
@@ -40,7 +40,7 @@ What this platform adds is when removing one frees overlap, namely only where tw
 Both clauses name resources and dependences that the artifacts and the host's accesses, read from its program or observed at the runtime's boundary, establish, so they can be decided before any duration is measured.
 
 How a design cuts its work into configurations, commands, and buffers, and the length of the prompt, set how much work meets this condition.
-The released designs of a closed production stack, FastFlowLM~\citep{fastflowlm-repo}, take two other shapes: its per-operator engine, which runs our five LLMs, gives each operator its own configuration of nearly the whole array, and its flash designs run each layer's attention once over the whole prompt, so that every GEMM feeds or reads it.
+The released designs of a closed production stack, FastFlowLM~\citep{fastflowlm-repo}, take two other shapes: its per-operator engine, which runs our five LLMs, gives each operator its own configuration of nearly the whole array, so consecutive operators share their columns, and its flash designs run each layer's attention once over the whole prompt, so that every GEMM feeds or reads it.
 The existing prefill instead runs over fixed-size chunks, and attention's work per chunk grows with the chunk's position in the prompt while the GEMMs' work stays fixed, so the balance between the two groups shifts with the prompt length, and with it whether the overlap repays the per-command costs of a new order.
 The issue order that pays therefore changes with the prompt and must be priced per length rather than fixed, and the split that pays moves with the same balance, because more attention columns shorten attention but lengthen every GEMM.
 
@@ -54,7 +54,7 @@ Third, a composer reorders issue across commands, a stream pass within one opera
 Against the existing program on the supported split that minimizes its TTFT, OPCORD shortens TTFT across five LLMs by \E{X--Y}$\times$ at prompts of 1K to 32K tokens, and its loop pass shortens decode by \E{X--Y}$\times$ at 16K-token contexts against the unmodified decode design, with bit-identical outputs.
 Its choice of order and split stays within \E{X}\% of the measured minimum on every LLM and prompt length we measure, where every fixed rule we test loses up to \E{Y}\% somewhere.
 Its analysis re-emits every stream we read from three stacks byte for byte, and its checkers refuse every illegal rewrite we inject.
-Across the designs we read, every overlap gain we measure falls where the condition says one can arise, and FastFlowLM's designs leave almost no overlap to recover, as the condition predicts.
+Across the designs we read, every overlap gain we measure falls where the condition says one can arise, and FastFlowLM leaves almost no overlap to recover in either of its prefill engines, as the condition predicts.
 % DECISION: the census's counts are stated once, in Section 6.6, as distinct designs read (author, 2026-10-25: accurate, and not repeated everywhere).
 % COMMENT: this sentence states the decision-quality outcome; reword to what the table shows once the amendment-1 batch and the final sweep are in (if a fixed rule ties, state the regret bound instead).
 % COMMENT: add one sentence comparing OPCORD's absolute TTFT with what FastFlowLM's released engine reaches on the same LLM, worded as an observation and never as a baseline (contribution review, PC); needs a measured cell.

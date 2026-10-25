@@ -49,9 +49,6 @@ The prefill needs no renaming, because the existing host program already gives e
 \subsection{Pricing and Choosing}
 \label{subsec:pricing}
 \label{subsec:split}
-We build each split as its own configuration with the design's own build, unchanged apart from its split parameter, with outputs bit-identical to those of the default split, so the existing program and the composed order can each run on any of them.
-% SOURCE: mlir-air a3e26261 fused_prefill/device.py: Attn(col=...) per group in Config.attn, GCOL0, GNC = 1, 6 as module constants; spec() splits kv_heads evenly, so 1, 2, or 4 attention columns with 8 KV heads (vault lab-split-sweep (1)).
-% SOURCE: out-of-tree split modules; logits bit-identical to the default split in every configuration on both models (vault lab-split-sweep (2), (4), (5)).
 
 
 % VALUE: the problem in words: a schedule makes three essential decisions (the split; the order in which the CP interleaves each command's segments, each operator's kept in order; the buffer assignment); operators hand data over through DRAM, so a consumer issues after its producer's last synchronization and any host work, in a separate command; D and packing manage only the host boundary and are reported apart; the objective is the makespan
@@ -60,6 +57,9 @@ We build each split as its own configuration with the design's own build, unchan
 A schedule of a compiled design makes three essential decisions, namely the split, which sets which operators can run at once (Section~\ref{subsec:prefill}), the order in which the CP interleaves each command's segments, keeping every operator's segments in their own order, and the slot that each use of a buffer takes, since two uses of one slot run in turn even when neither consumes the other's data.
 Because operators hand data over through DRAM with no lock between them, a consumer issues only after its producer's final synchronization and any host work between the two, in a separate command.
 The number $D$ of commands in flight and the packing of commands manage only the boundary with the host, so we treat them as host policy, which the composer chooses with the split, and the objective is the makespan, which for prefill is the TTFT less the work before the first decoder layer and after the last.
+We build each split as its own configuration with the design's own build, unchanged apart from its split parameter, with outputs bit-identical to those of the default split, so the existing program and the composed order can each run on any of them.
+% SOURCE: mlir-air a3e26261 fused_prefill/device.py: Attn(col=...) per group in Config.attn, GCOL0, GNC = 1, 6 as module constants; spec() splits kv_heads evenly, so 1, 2, or 4 attention columns with 8 KV heads (vault lab-split-sweep (1)).
+% SOURCE: out-of-tree split modules; logits bit-identical to the default split in every configuration on both models (vault lab-split-sweep (2), (4), (5)).
 
 % VALUE: to choose among orders and splits without running each, an event simulation of the device, the CP, and the host prices a schedule; its form follows the platform (one in-order queue of commands, a host timeline with waits, column groups that overlap within a command) and its parameters are the operators' own timings plus a few machine constants measured once by microbenchmarks; the existing program runs through the same simulation, so both sides are priced alike; device time, host exposure, and head and tail reported apart
 % DECISION: this subsection states the frozen form (dev form, frozen 2026-10-25; amd-npu 12250226, FORM-A2.md; opcord-runtime 3bead38, opcord/model/event_model.py, constants opcord/model/constants/frozen.json), term by term as npu-gap checked it against the code; the rebuilt form (per-split setups and windows, overlap bounded by bytes over the read cap) scored worse and did not freeze (vault decisions log, event-model form, 2026-10-25).
