@@ -1,12 +1,10 @@
 \section{Scheduling a Compiled Design}
 \label{sec:order}
 
-% VALUE: the opening claim: nothing on XDNA 2 reorders work across engines, so a design's schedule and its waits can be read from the streams its stack emits; the CP's instruction order is the array's schedule, fixed in those streams and the host's dispatch order; arbitration is a resource and durations are left to measurement; so the input to scheduling is the compiled design, open or closed
-% DECISION: the lead insight is that the CP's instruction order is the array's schedule, fixed in the streams a toolchain emits; "rationed by false dependences" is its consequence and is never stated as the lead.
-Because no hardware or runtime scheduler on XDNA~2 reorders work across engines, a design's schedule and every wait in it can be read from the instruction streams its stack emits.
-Each engine runs its own program in order, so the CP's instruction order is the array's schedule, fixed in the emitted streams and in the order in which the host dispatches them.
+% VALUE: the opening claim: nothing on XDNA 2 reorders work across engines, so a design's schedule and its waits can be read from the streams its stack emits, and the compiled design, open or closed, is the input to scheduling (Figure framework); arbitration is a resource and durations are left to measurement
+% DECISION: the lead insight (the CP's instruction order is the array's schedule, fixed in the streams a toolchain emits) is stated in Sections 1 and 3; this opener states its consequence for the method; "rationed by false dependences" is never stated as the lead.
+Because no hardware or runtime scheduler on XDNA~2 reorders work across engines, a design's schedule and every wait in it can be read from the instruction streams its stack emits, so we take a compiled design, open or closed, as the input to scheduling (Figure~\ref{fig:framework}).
 Arbitration on shared ports and locks, which serializes some work at run time, enters the analysis as a resource, and only durations, including the host's work between commands, are left to measurement.
-We therefore take a compiled design, rather than the program it was compiled from, as the input to scheduling, so that one method reads open and closed stacks alike.
 
 \begin{figure}[t]
     \centering
@@ -15,12 +13,6 @@ We therefore take a compiled design, rather than the program it was compiled fro
     \caption{Scheduling a compiled design. The event model prices candidate schedules from probes of each operator alone, and the graph and the event model together drive both rewrites, each of which is applied only if it passes its legality check.}
     \label{fig:framework}
 \end{figure}
-
-% VALUE: orientation across §4-§6 along the figure: streams read into the happens-before graph and each wait classed (§4.1-4.3); a class names the rewrite, conditions from the streams alone decide legality (§4.4); the event model prices a candidate against a lower bound before it runs (§5); OPCORD reorders and renames, and emits only what every condition admits (§6)
-Following one compiled design through Figure~\ref{fig:framework}, we read its instruction streams into a happens-before graph, drawn as the figure's dependence graph, and class each wait in it as a true, name, or order dependence (Sections~\ref{subsec:model}--\ref{subsec:grid}).
-A class names the rewrite that could remove a wait, whereas conditions that the streams alone can check decide whether a given rewrite is legal (Section~\ref{subsec:legality}).
-The event model of Section~\ref{sec:pricing} then prices a candidate schedule from probes of each operator alone, against a lower bound on any schedule, so each choice is made before the candidate runs.
-Finally, OPCORD (Section~\ref{sec:method}) reorders issue and renames buffers, and it emits a rewritten design only where every legality condition holds.
 
 \subsection{Execution Semantics}
 \label{subsec:model}
@@ -45,42 +37,15 @@ An operator's stream is a sequence of \emph{segments}, where each segment is a r
 % VALUE: each direct edge is classed by the pairs of operations it alone orders: true if one is read after write, name if one is write after read or write, order otherwise, after Bernstein's conditions and compilers' anti and output dependences; renaming removes a name dependence, reordering an order dependence, a true one stays; loop-carried edges are classed alike (redundant and control counts in appendix-body.tex, cut 2026-10-24); a class assumes every other edge in place, which is why a rewrite is judged as a whole
 For each direct edge, the analysis computes the pairs of operations that the edge alone orders, namely those ordered with it and not without it.
 The edge is a true dependence if one of these pairs reads a location after the other writes it, a name dependence if none does but one writes after the other reads or writes, and an order dependence otherwise.
-The first two follow the conflicts that Bernstein's conditions exclude between pieces of work that run in parallel~\citep{bernstein1966analysis}, and the name class covers the anti and output dependences of compilers~\citep{kuck1981dependence}.
 As in Section~\ref{subsec:losses}, renaming can remove a name dependence and reordering an order dependence, whereas a true dependence stays.
 Loop-carried edges are classed in the same way on the loop's iterations.
 Because each class is computed with every other edge in place, it says what removing that one edge could free, not whether a rewrite that removes several is legal (Section~\ref{subsec:legality}).
 % SOURCE: classification by Lost(e), REDUNDANT, CONTROL, loop-carried distance (vault lab-cosched-passes (30), item 3); computed at stream granularity by aie-cosched-stream-deps (mlir-aie 2392abdc230 onward, fixture stream-turns with ORDER, NAME, RAW and REDUNDANT edges, lab-cosched-passes (49)), which agrees with its Python oracle on every compared count on 792 of 793 population streams, the 793rd too large for either (mlir-aie 0489d325082, lab-cosched-passes (53)); at loop granularity by AIECoschedDeps, whose buffer classes are the Lost-pair classes of the loop-carried edges (lab-cosched-passes (33)), with order edges and critical cycles computed in results/2026-10-23-order-loop (mlir-aie dev 58569749d3e..36f725e8e6e).
-% DECISION: the classes, the unattributed and redundant counts, and the pairs each edge alone orders are computed by the analysis (the stream graph and the loop library); the stream-granularity instances of Table~\ref{tab:grid} were identified by reading the designs and confirmed by measurement, so the text never says that the analysis found them. The census of Section~\ref{subsec:census} counts instances that the stream pass proposes and the device confirms; it never classifies edges, and the two quantities are never conflated in the text.
+% DECISION: the classes, the unattributed and redundant counts, and the pairs each edge alone orders are computed by the analysis (the stream graph and the loop library); the stream-granularity instances below were identified by reading the designs and confirmed by measurement, so the text never says that the analysis found them. The census of Section~\ref{subsec:census} counts instances that the stream pass proposes and the device confirms; it never classifies edges, and the two quantities are never conflated in the text.
 
-\subsection{Textbook Classes on a Grid}
-\label{subsec:grid}
-
-% VALUE: each of the two classes of false dependence (§3) occurs at two granularities (the CP's stream, an engine's loop), so every blocking edge that is not true falls in one cell of Table grid; a DMA chain counts as a loop; the table places every known instance in the designs our passes rewrite
-% DECISION: false dependences and the name class are textbook and cited; the paper claims their analysis on this platform, never the classes.
-Each of the two classes of false dependence (Section~\ref{sec:motivation}) occurs both in the CP's instruction stream and inside an engine's loop, where a BD chain with locks counts as a loop on its DMA engine, so every blocking edge that is not a true dependence falls into one cell of Table~\ref{tab:grid}.
-The table places each instance we know of in the MLIR-AIR designs, which our passes rewrite.
-% SOURCE: the grid and its instances (vault paper-cosched-direction-converged, Clarification (xiii), ruled on lab-cosched-passes (30)); the DMA row folded into the loop row (lab-cosched-passes (30), item 6).
-
-\begin{table}[t]
-    \centering
-    \caption{Known Instances by Cause and Granularity}
-    \label{tab:grid}
-    % VALUE: the grid with each known instance; two cells hold none that costs time in the existing designs
-    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}>{\raggedright\arraybackslash}p{0.17\linewidth}>{\raggedright\arraybackslash}p{0.36\linewidth}>{\raggedright\arraybackslash}p{0.36\linewidth}}
-        \toprule
-        & Order & Name \\
-        \midrule
-        Stream & column groups take turns in prefill; attention's two columns take turns & BD and queue-slot reuse, off every critical path \\
-        Loop & a channel sending a double buffer's two slots in turn, off every critical cycle & decode attention's keys, values, and scores, each in one buffer \\
-        \bottomrule
-    \end{tabular*}
-\end{table}
-
-% VALUE: the instances per cell: order x stream in prefill (groups take turns, attention's columns take turns; shared by the captured production prefill); name x loop in decode (keys, values, scores; the carried state is true); the other two cells hold none that costs time only because of what these stacks emit, as a design we write for each shows; stream name dependences exist but renaming them cuts no measured longest path; loop order dependences lie off decode's critical cycle and are not established for prefill
-In the prefill, order dependences in the stream hold back one column group behind another and one column of attention behind the other, and the one prefill we capture from FastFlowLM shares the first of these.
-In the decode, the attention loop holds name dependences on its keys, its values, and the one buffer through which its two cores pass scores, whereas its running maximum and accumulator carry true dependences across blocks.
-The other two cells hold instances only off every critical path or cycle we compute in these designs, namely the reuse of a channel's BDs and queue slots in the stream and a memory tile's channel sending a double buffer's two slots in turn.
-We therefore test both classes on designs of our own that put them on the critical path (Section~\ref{subsec:synthetic}).
+% VALUE: where the classes fall in the designs our passes rewrite: order dependences in the prefill's stream (groups and attention's columns take turns; shared by the captured production prefill) and name dependences in decode attention's loop (keys, values, scores; the carried state is true); stream name dependences and loop order dependences exist but lie off every longest path or critical cycle we compute
+In the MLIR-AIR designs our passes rewrite, the costly instances are order dependences in the prefill's stream, which hold back one column group behind another and one column of attention behind the other, as in the one prefill we capture from FastFlowLM, and name dependences in decode attention's loop on its keys, its values, and its scores, whereas its running maximum and accumulator carry true dependences.
+The other two combinations, the reuse of a channel's BDs and queue slots in the stream and a memory tile's channel sending a double buffer's two slots in turn, occur only off every longest path or critical cycle we compute in these designs.
 % SOURCE: aie-cosched 93f491b, mlir-aie f9ad95dc02f (lab-cosched-passes (62), P7c; lit 36/36): cost-free over 792 analysed streams, NAME edges on 543/543 MLIR-AIR streams (30,198 edges, 25,016 able to lie on a blocking path), 209/218 production-engine streams (272,582, all able), 6/31 IRON (504); kinds descriptor and control-register everywhere, configuration writes on the fused decode only (7,244), queue-slot reuse (104 MLIR-AIR, 27 IRON), dispatch end; with measured task costs (the S4 prefill cell, 34 streams) 246 end-kind NAME edges lie on a longest path but removing every NAME edge leaves every stream's length unchanged (34/34). Corrected 2026-10-23: the earlier text said no name dependence appears in the stream.
 % SOURCE: the score buffer shared_l10 is name x loop in the existing build (lab-cosched-passes (30), item 5).
 % SOURCE: aie-cosched results/2026-10-23-order-loop (registered ca13ac5, 579d8d1; results 579d8d1, 0ae7bc9; mlir-aie dev 58569749d3e..36f725e8e6e, lit 49/49): decode attention's 34 group leads carry #6 BD-chaining and #11 program-order edges; with (59)'s costs the critical cycle is 28 RAW + 12 name edges as shipped (1.1466 per iteration) and 36 RAW after the loop pass (0.6487), no order edge on either, and removing every order edge leaves both ratios unchanged; the steady-state order edges are memtile (3,1) MM2S channel 0's chain buf169 -> buf168 (census.mlir 4871-4883), two slots of one ring with separate locks. Decodes, structure only: in 9 groups (core 5_3) a memtile (4,1) #6 edge is on a critical cycle but removing order edges moves no group's ratio (an equal cycle remains). Prefill: 279 groups fail to fold to one steady edge set, the rest exceed the attribution cap, so no verdict.

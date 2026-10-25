@@ -1,54 +1,28 @@
 \section{Pricing Schedules}
 \label{sec:pricing}
 
-% VALUE: the order is read from the streams and only durations are unknown, so a schedule, its split, and the dependences it removes are priced from per-operator probes before it runs; the bounds limit what any candidate can gain, and the event model prices each candidate
+% VALUE: the order is read from the streams and only durations are unknown, so a schedule, its split, and the dependences it removes are priced from per-operator probes before it runs
 Because a compiled design's order is read from its instruction streams (Section~\ref{sec:order}), only the durations of its work are unknown, so we price a schedule, including its split and the dependences it removes, from probes of each operator dispatched alone, before the schedule runs.
-A lower bound and a bound per removal limit what any candidate can gain, and an event model prices each candidate.
 
 \subsection{Problem Formulation}
 \label{subsec:formulation}
 
-\textbf{Resources.}
-% VALUE: three resources: column groups (one operator at a time, sharing only the DRAM read rate), the CP (one in-order server that issues and blocks), and the host (work between commands)
+\textbf{Resources and Operators.}
+% VALUE: three resources: column groups (one operator at a time, sharing only the DRAM read rate), the CP (one in-order server that issues and blocks), and the host (work between commands); an operator is its group, its device time, its host work, and its stream's segments; operators hand data over through DRAM, so a consumer waits for its producer's last synchronization and for any host work between them
 The array offers a set $\mathcal{G}$ of disjoint column groups, each running one operator at a time, which in the open prefill share only the DRAM read rate.
-The CP is one in-order server that issues instructions at a small cost each and blocks at each synchronization until the transfer it names completes.
-The host runs the work between operators that the array does not, such as normalizations, and submits and collects commands.
-
-\textbf{Operators.}
-% VALUE: an operator is its group, its device time, its host work, and its stream's segments; operators hand data over through DRAM, so a consumer waits for its producer's last synchronization and for any host work between them
+The CP is one in-order server that issues instructions at a small cost each and blocks at each synchronization until the transfer it names completes, and the host runs the work between operators that the array does not, such as normalizations, and submits and collects commands.
 Each operator $o \in \mathcal{O}$ runs on group $g(o)$ for a device-busy time $p_o$, may need host work of duration $h_o$ after it completes, and issues the segments $s_{o,1}, \dots, s_{o,n_o}$ that Section~\ref{subsec:reading} defines on its stream.
 A dependency graph $E$ orders the operators, and because they hand data over through DRAM with no lock between them, a consumer's first issue must follow its producer's final synchronization and any host work between the two, which also keeps them in separate commands.
 
 \textbf{Decisions.}
-% VALUE: three essential decisions (the spatial assignment, which reduces to the split; the CP's instruction order; the buffer assignment); the queue depth and the packing manage only the host boundary and are reported apart
+% VALUE: three essential decisions (the spatial assignment, which reduces to the split; the CP's instruction order, within which a segment's work starts once issued and its predecessor has finished; the buffer assignment); the queue depth and the packing manage only the host boundary and are reported apart; the objective is the makespan, TTFT less the head and tail
+% DECISION: no NP-hardness claim until a reduction is written; with negligible issue cost and one layer's fixed per-chunk pattern the problem has the structure of a two-machine chain-reentrant shop (wang1997reentrant), and with non-negligible issue cost the CP acts as a shared server (glass2000dedicated, hall2000common) (vault ch3-formulation, Relation to classical scheduling).
 A schedule makes three essential decisions.
-The spatial assignment $g(\cdot)$ determines which operators can run at once, and in the LLMs we evaluate it reduces to the \emph{split}, namely the number of columns that attention takes.
-The CP's instruction order partitions $\mathcal{O}$ into commands $C_1, \dots, C_K$ and interleaves each command's segments in an order $\sigma_k$ that keeps every operator's segments in their own order.
+The spatial assignment $g(\cdot)$ determines which operators can run at once, and in the LLMs we evaluate it reduces to the split (Section~\ref{subsec:prefill}).
+The CP's instruction order partitions $\mathcal{O}$ into commands $C_1, \dots, C_K$ and interleaves each command's segments in an order $\sigma_k$ that keeps every operator's segments in their own order, and a segment's work starts once it is issued and its predecessor's work has finished.
 The buffer assignment maps each use of a buffer to a slot in memory, since two uses of one slot run in turn even when neither consumes the other's data.
 The number $D$ of commands in flight and the packing of commands manage only the boundary with the host and would disappear if the host's work moved onto the array, so we report their effect apart.
-
-\textbf{Timing.}
-% VALUE: the command semantics as rules: commands in sequence after a setup or the dispatch floor; within a command, a segment's work starts once issued and its predecessor has finished; co-running operators share the DRAM read rate
-A command starts once its predecessor completes, after the \emph{setup} of its first operator if it was already queued, or after the dispatch floor $F$ if it reaches an idle device.
-Within a command, the CP walks $\sigma_k$ in order, and the work of segment $s_{o,j}$ starts once it is issued and $s_{o,j-1}$'s work has finished, and a synchronization completes once it is reached and the work it names has finished.
-Operators running at once on different groups share the DRAM read rate (Section~\ref{subsec:removal}).
-
-\textbf{Objective.}
-% VALUE: minimize the makespan, which for prefill is TTFT less the head and tail (the work before the first decoder layer and after the last)
-The objective is the makespan (i.e., the completion time of the last command), which for prefill is the TTFT less the work before the first decoder layer and after the last, which we call the \emph{head and tail}.
-
-\subsection{Lower Bound}
-\label{subsec:bound}
-% VALUE: each resource bounds the makespan, so their maximum bounds any schedule on a given assignment; it needs only the probes and the graph
-Each resource bounds the makespan from below:
-\begin{equation}
-\label{eq:lb}
-T \;\ge\; \max\Bigl(\max_{g \in \mathcal{G}} \sum_{o:\,g(o)=g} p_o,\;\; L_E,\;\; \sum_{k} c_k\Bigr),
-\end{equation}
-where $L_E$ is the longest path through $E$ weighted by $p_o$, plus $h_o$ on the edges that cross the host, and $c_k$ is the CP's own work in command $k$.
-Since no schedule on a fixed assignment beats its busiest group's work, the bound measures how far a schedule lies from what that assignment allows, from the probes and the graph alone.
-% DECISION: the bound's value for the studied instances, from the measured per-operator times, is stated with the evaluation's gap.
-% DECISION: no NP-hardness claim until a reduction is written; with negligible issue cost and one layer's fixed per-chunk pattern the problem has the structure of a two-machine chain-reentrant shop (wang1997reentrant), and with non-negligible issue cost the CP acts as a shared server (glass2000dedicated, hall2000common) (vault ch3-formulation, Relation to classical scheduling).
+The objective is the makespan, which for prefill is the TTFT less the work before the first decoder layer and after the last, which we call the \emph{head and tail}.
 
 \subsection{Bounding a Removal}
 \label{subsec:removal}
@@ -67,11 +41,6 @@ We use it as a test on the recovered graph with measured costs, which discards e
 % DECISION: the critical-path condition is textbook and stated once, here, with its citation; it is a tool, never a finding, and the decode partial-rename instance and the 8B at the cap live in Section 7 (section contract; outline v10.1).
 % DECISION: the condition is stated as necessary only: a longest-path or cycle criterion is valid on an uncapacitated graph, and this machine has a shared DRAM cap, a shared command processor and a per-command boundary cost; the capacity half is the measured regime of this section, and the 8B at cap and the loss at 512-token appends are the two negative instances inside the paper.
 % DECISION: the bound's sentences follow outline v9 section 3's rows (P4 withdraws them, P4u marks them untested); the critical-cycle sentences follow the W1-W5 table.
-
-% VALUE: because the groups share the DRAM read rate, two overlapped groups take at least their total bytes over the read cap, so overlap costs little where attention holds the critical path and costs the GEMMs, which read near the cap, a share of their partner's time; in a prefill the GEMMs are the operators near the cap
-Because the column groups share the DRAM read rate, two groups that overlap take at least their total bytes divided by the read cap (Section~\ref{subsec:semantics}).
-Overlap therefore costs almost nothing where attention, which reads little, holds the critical path, but it costs a GEMM that reads near the cap a share of its partner's time, and in a whole prefill the GEMMs are the operators near the cap.
-% SOURCE: GEMM-only commands read 90-93% of the cap and attention-only about 15% during Llama-3.2-1B's 4,096-token prefill (amd-npu 71901c50 metrics/retro-2026-10-21/dram-retro.txt; vault lab-metric-fields (1) and its amendment 1); the read cap from the 8x2 bracket, 53.93 GB/s at the calibration hold (amd-npu d94266bf prefill-overlap/calib/run-2026-10-22/batch.log), re-read at every batch.
 
 % VALUE: the bound is prescriptive (build a removal only where its bound exceeds its cost); since it never falls below one it cannot predict a loss, which the event model prices instead (the short prompts, in the evaluation)
 A removal is therefore worth building only where its bound exceeds its cost, which for a rename is the local memory, BDs, locks, and channels it takes, and for a reorder the synchronization and planning it adds.
@@ -101,6 +70,7 @@ Whether a group runs at the cap is measured, by comparing its bytes over $R$ wit
 On the host side, each command costs an issue and each operator a post-processing step, and the host waits on the oldest command once $D$ are in flight.
 The existing program runs through the same simulation as its own host program, so both sides of every comparison are priced alike.
 Finally, the event model adds the work before the first decoder layer and after the last, which it prices as ordinary operators, and reports the device time, the host's exposed time, and that work separately, so an error in one term cannot hide behind another.
+% SOURCE: GEMM-only commands read 90-93% of the cap and attention-only about 15% during Llama-3.2-1B's 4,096-token prefill (amd-npu 71901c50 metrics/retro-2026-10-21/dram-retro.txt; vault lab-metric-fields (1) and its amendment 1); the read cap from the 8x2 bracket, 53.93 GB/s at the calibration hold (amd-npu d94266bf prefill-overlap/calib/run-2026-10-22/batch.log), re-read at every batch.
 % SOURCE: the overlap form (ruling 2026-10-24): moved read bytes from the dispatched streams (aie-cosched f7eedbc, README 7e00ac9); bytes over R against time alone 0.87-1.06 for every GEMM set and about 0.15 for attention, so any threshold between 0.2 and 0.87 classifies alike; on the 30-cell co-run grid of 2026-10-22 the residual is a median 0.016 ms, the rest a fixed part of 0.030-0.041 ms carried by the transition term (npu-gap, 2026-10-24). The transition form (ruling 2026-10-24): s = s_same within a group, max(0, s_g - w_h) across groups; from the 10-22 sequences a GEMM after attention waits about 47 us and attention after a GEMM starts about 8 us early (npu-gap, device.json fit), to be pinned by microbenchmark v2. opcord/model/event_model.py simulate() (one in-order queue; host program with waits); the rebuilt form, constants schema version 2 (npu-gap, opcord dev checkout; vault decisions log "The model rebuilt from a logical base", 2026-10-24); bytes per operator instance from the instruction streams' buffer descriptors (pass-0 tools/bprime_check byte model).
 
 % VALUE: the operators' timings and bytes depend on the LLM and the split and are measured once per configuration by running each operator alone or read from its streams; the few machine constants (dispatch floor, setup within and across groups, host issue and post, read cap) are measured once by microbenchmarks, all non-negative, none fitted to an LLM's end-to-end runs; precedent: analytical models whose parameters are machine constants measured by microbenchmarks

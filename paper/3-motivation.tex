@@ -1,9 +1,8 @@
 \section{Motivation}
 \label{sec:motivation}
 
-% VALUE: the CP's instruction order decides which column groups work at once, and the existing designs serialize groups that could run together; three observations and three challenges follow
+% VALUE: the CP's instruction order decides which column groups of the array work at once, and the existing designs serialize groups that could run together; two observations and the challenges they pose follow
 The CP's instruction order decides which column groups of the array work at once, and the existing designs serialize groups that could run together.
-Three observations show how, and they pose the challenges that the rest of the paper answers.
 % DECISION: the lead insight is that the CP's instruction order is the array's schedule and is fixed in the emitted streams; "rationed by false dependences" is its consequence and is never stated as the lead.
 
 \subsection{Command Semantics}
@@ -11,62 +10,30 @@ Three observations show how, and they pose the challenges that the rest of the p
 
 % VALUE: observation 1: concurrency comes from one command issuing two groups' work before it waits on either, not from queued commands (packing is neutral) or a second hardware context; measured on the existing prefill's own operators with bit-identical outputs
 Concurrency on the array comes from one command that issues two groups' work before it waits on either, not from queued commands or a second hardware context.
-We pair one attention operator of the existing prefill with one GEMM on disjoint column groups, with outputs bit-identical to those of the operators run alone (Figure~\ref{fig:pairs}).
-Two commands queued on one hardware context, like one command that holds both streams in sequence, take the sum of the two operators' times less at most one dispatch floor.
-Packing operators into one command, which CUDA Graphs~\citep{nvidia-cudagraphs}, XRT's run lists~\citep{xrt-repo}, and MLIR-AIR's multi-launch programs~\citep{wang2026mlirair} use to amortize launch cost, therefore creates no overlap on the NPU (Figure~\ref{fig:order}b).
+We pair one attention operator of the existing prefill with one GEMM on disjoint column groups, with outputs bit-identical to those of the operators run alone.
+Two commands queued on one hardware context, like one command that holds both streams in sequence, take the sum of the two operators' times less at most one dispatch floor, within 3\% on each of seven pairs.
+Packing operators into one command, as MLIR-AIR's multi-launch programs~\citep{wang2026mlirair} also do, therefore creates no overlap on the NPU (Figure~\ref{fig:order}b).
 Nor does a second hardware context, because the driver gives every context all eight columns and shares them in time.
-% SOURCE: queued / in-sequence = 1.007-1.029 on 7 pairs (amd-npu 17f7ec3 prefill-overlap/ovl4/, lab-prefill-overlap (5)b); in-sequence / (A + G - F) = 0.996-1.021 over 17 pair runs (ovl/, ovl2/ at 8f13e05 and ovl4/; report.txt H1 column).
+% SOURCE: queued / in-sequence = 1.007-1.029 on 7 pairs, 20 runs per pair (amd-npu 17f7ec3 prefill-overlap/ovl4/, lab-prefill-overlap (5)b); in-sequence / (A + G - F) = 0.996-1.021 over 17 pair runs (ovl/, ovl2/ at 8f13e05 and ovl4/; report.txt H1 column).
 % SOURCE: XRT run list, /opt/xilinx/xrt/include/xrt/experimental/xrt_kernel.h:21 (XRT 2.25.0); MLIR-AIR stitch_elf (vault src-mlir-air-llms).
 % SOURCE: amd-npu d8c63fb1 roofline/two-ctx-hold/two_ctx.json: rho 1.970, 95% bootstrap CI [1.955, 1.976], same-context ratio 1.970; medians solo 19.76 / 19.81 ms, pair 39.10 ms, same 39.09 ms (vault lab-prefill-overlap (34)); driver allocation amdxdna 2.25.0 npu4_regs.c:94-106, aie2_ctx.c:604-608 (vault lab-prefill-overlap (31)). Full SOURCE lines in appendix-body.tex, app:contexts (cut 2026-10-24).
 % DECISION: packing several operators per command (batching) is cited as standard practice, never presented as ours.
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=\linewidth]{fig/pairs.pdf}
-    % VALUE: queued commands take the sum of the two operators, one command that issues both before waiting takes the longer one
-    \caption{Median time of one attention and one GEMM operator on disjoint column groups, normalized to the longer operator alone, over 20 runs per pair. Holding both streams in one command saves one dispatch floor against the sum.}
-    \label{fig:pairs}
-\end{figure}
-
-\begin{figure}[t]
-    \centering
-    % VALUE: the mechanism behind Figure pairs: one operator per command (a) and packing in turn (b) leave one group idle while the CP blocks on the other; issuing every group's work before any wait (c) runs the groups together
+    % VALUE: the mechanism behind the paired measurements: one operator per command (a) and packing in turn (b) leave one group idle while the CP blocks on the other; issuing every group's work before any wait (c) runs the groups together
     \includegraphics[width=\linewidth]{fig/order.pdf}
     \caption{CP instruction order and the activity of the column groups for one attention operator and three GEMMs, with illustrative durations. An issue returns at once and a synchronization blocks the CP, so packing the operators into one command (b) runs them exactly as one command each does (a), with the CP blocked on one group while the other is idle. Issuing every group's work before waiting on any (c) lets the groups run together.}
     \label{fig:order}
 \end{figure}
-% DECISION: the schematic moves here from the introduction, whose Figure 1 is the measured timeline; it explains why packing creates no overlap, which Figure pairs measures but does not show, and Section 6 refers to it for the composer's order.
+% DECISION: the schematic moves here from the introduction, whose Figure 1 is the measured timeline; it explains why packing creates no overlap, which the paired measurements show but do not explain, and Section 7 refers to it for the composer's order.
 
 % VALUE: one command that issues all of one group's work before any synchronization runs the pair at the longer one's time; the cost appears near the DRAM read cap; because the CP is in order, the order inside a command is itself a scheduling decision, so serial execution is a property of composition, not of the array
-In contrast, one command that issues all of the GEMM's work, then the attention operator's stream, and only then the GEMM's synchronizations runs the pair within 6\% of the longer operator's time alone (Figure~\ref{fig:order}c).
-The small excess appears where the pair's DRAM reads approach the \emph{read cap}, which is the maximum DRAM read rate that the column groups together sustain (Section~\ref{subsec:removal}).
-Because a synchronization on one group delays every later issue to the other (Section~\ref{subsec:platform}), the order of instructions within a command, and not only which operators share it, is a scheduling decision.
-The serial execution of the existing prefill is therefore a property of how its commands are composed, not of the array.
+In contrast, one command that issues all of the GEMM's work, then the attention operator's stream, and only then the GEMM's synchronizations runs the pair within 6\% of the longer operator's time alone on each of nine pairs (Figure~\ref{fig:order}c).
+The small excess appears where the pair's DRAM reads approach the \emph{read cap}, which is the maximum DRAM read rate that the column groups together sustain (Section~\ref{subsec:pricing}).
+The order of instructions within a command, and not only which operators share it, is therefore a scheduling decision, and the serial execution of the existing prefill is a property of how its commands are composed, not of the array.
 % SOURCE: interleaved / max(A, G) = 0.998-1.058 over 10 pair runs = 9 pairs (c8 + lm measured twice, 1.054 and 1.058; the figure keeps each pair's first measurement); GEMM shapes up, LM head chunk, down; attention chunks 0, 4, 8, 12, 15 (lab-prefill-overlap (3)).
 % SOURCE: DRAM rate during the interleaved command 52.2 GB/s against a same-batch 8x2 cap of 53.9-55.3 GB/s for c8 + lm, the costliest overlap (1.054-1.058) (lab-prefill-overlap (3)); the cap is the 8x2 bracket's read of 256 MiB (7-eval Setup SOURCE).
-
-\subsection{The Idle Array}
-\label{subsec:idle}
-
-% VALUE: observation 2: the array idles while the device reads busy: busy almost all the time but on one group at a time; the computable occupancy reads 92-97% of TTFT and counts neither idle group; attention's share grows 12% -> 49%; the counters show the cores waiting
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=\linewidth]{fig/busy.pdf}
-    % VALUE: in the existing prefill, attention's share grows with prompt length, and each column group idles while the other computes
-    \caption{Share of TTFT of the existing Llama-3.2-1B prefill by prompt length. Device-busy parts are each operator's time when dispatched alone, less the dispatch floor, summed over the prefill.}
-    \label{fig:busy}
-\end{figure}
-
-In the existing Llama-3.2-1B prefill, the device is busy almost all of the time, but on only one column group at a time.
-The runtime reports nothing per column, and the one occupancy a developer can compute, which sums each operator's time when dispatched alone less the dispatch floor, reads 92--97\% of TTFT (Figure~\ref{fig:busy}).
-Since the commands run one at a time, columns 1--6 idle while attention runs and columns 0 and 7 idle while the GEMMs run, and that sum counts neither idle group.
-Attention's share of TTFT, and with it the GEMM columns' idle time, grows from 12\% to 49\% between 512 and 4{,}096 tokens.
-In the tiles' performance counters, attention's cores stall on a lock for 81--83\% of a 2{,}048-token prefill and the GEMMs' cores for 44\%, which shows that the cores wait, though not when.
-% SOURCE: no occupancy counter: xrt-smi reports "Estimated Power : N/A" and has no telemetry report on this device (XRT 2.25.0, examined 2026-10-21) (vault lab-decode-long-context (39), lab-metric-fields (1)).
-% SOURCE: amd-npu e3acc8a prefill-e2/decomp.txt via figs/make_figs.py: busy = isolated time - dispatch floor = 92/95/97% of TTFT at 512/2k/4k; of TTFT, attention 12.2/32.9/49.1%, GEMMs 70.1/60.3/47.6%, LM head 9.7/2.1/0.8%.
-% SOURCE: serial execution, the isolated busy times sum to at most TTFT (vault lab-prefill-device (4)); queued commands do not overlap (Section 3.1).
-% SOURCE: npu-gap hold 11:42-11:46 (amd-npu outputs 3031e9f8, HEAD ea56fcf8; vault lab-bound-validation, per-tile counters): Performance_Control0/1 armed by TXN write32 in the prefill's first command on all 32 cores, controls and a positive-control word read back as written; TRUE counts 0.9996-0.9999 of the core timer; LOCK_STALL / timer 0.815-0.831 on attention columns 0 and 7 (falling with row; median 0.823), 0.442-0.444 on GEMM columns 1-6; MEMORY_STALL 0.0039 / 0.0064, STREAM_STALL 0; ACTIVE (event 28) tracks TRUE, so it is not used; logits identical over 24 runs; lock stalls include waits between commands and waits on true dependences. Shipped 1B prefill, in-tree S2.
-% DECISION: not "invisible to every metric": the metric a developer can compute reads 92-97% busy, the runtime reports nothing per column, and the counters show the waits.
 
 \subsection{Recurring Waits}
 \label{subsec:losses}
@@ -77,10 +44,17 @@ It is an \emph{order} dependence where the instruction order alone places the wa
 % DECISION: false dependences, the order and name causes, reordering, and renaming are textbook and cited; the paper claims their analysis on this platform, never the classes. Section 4 classes each wait formally.
 
 \textbf{Column Groups in Prefill.}
-% VALUE: one operator per command and no overlap across commands make the prefill's column groups take turns, an order dependence in the CP's stream between operators
-The existing prefill issues one operator per command, about 1{,}500 commands for a 2{,}048-token prompt, so its column groups take turns although neither consumes the other's current work (Sections~\ref{subsec:semantics} and~\ref{subsec:idle}).
-This order dependence sits in the CP's stream, between operators.
+% VALUE: one operator per command and no overlap across commands make the prefill's column groups take turns, an order dependence in the CP's stream between operators; the array idles while the device reads busy: the computable occupancy reads 92-97% of TTFT and counts neither idle group; attention's share grows 12% -> 49%; the counters show the cores waiting
+The existing prefill issues one operator per command, about 1{,}500 commands for a 2{,}048-token prompt, so its column groups take turns although neither consumes the other's current work, which is an order dependence in the CP's stream between operators.
+The runtime reports nothing per column, and the one occupancy a developer can compute, which sums each operator's time when dispatched alone less the dispatch floor, reads 92--97\% of TTFT, yet columns 1--6 idle while attention runs and columns 0 and 7 idle while the GEMMs run.
+Attention's share of TTFT, and with it the GEMM columns' idle time, grows from 12\% to 49\% between 512 and 4{,}096 tokens of the Llama-3.2-1B prefill.
+In the tiles' performance counters, attention's cores stall on a lock for 81--83\% of a 2{,}048-token prefill and the GEMMs' cores for 44\%, which shows that the cores wait, though not when.
 % SOURCE: commands = 16 layers x chunks x 6 + 11 LM-head commands = 1,547 at 2,048 tokens (vault lab-prefill-census (1)).
+% SOURCE: no occupancy counter: xrt-smi reports "Estimated Power : N/A" and has no telemetry report on this device (XRT 2.25.0, examined 2026-10-21) (vault lab-decode-long-context (39), lab-metric-fields (1)).
+% SOURCE: amd-npu e3acc8a prefill-e2/decomp.txt via figs/make_figs.py: busy = isolated time - dispatch floor = 92/95/97% of TTFT at 512/2k/4k; of TTFT, attention 12.2/32.9/49.1%, GEMMs 70.1/60.3/47.6%, LM head 9.7/2.1/0.8%.
+% SOURCE: serial execution, the isolated busy times sum to at most TTFT (vault lab-prefill-device (4)); queued commands do not overlap (Section 3.1).
+% SOURCE: npu-gap hold 11:42-11:46 (amd-npu outputs 3031e9f8, HEAD ea56fcf8; vault lab-bound-validation, per-tile counters): Performance_Control0/1 armed by TXN write32 in the prefill's first command on all 32 cores, controls and a positive-control word read back as written; TRUE counts 0.9996-0.9999 of the core timer; LOCK_STALL / timer 0.815-0.831 on attention columns 0 and 7 (falling with row; median 0.823), 0.442-0.444 on GEMM columns 1-6; MEMORY_STALL 0.0039 / 0.0064, STREAM_STALL 0; ACTIVE (event 28) tracks TRUE, so it is not used; logits identical over 24 runs; lock stalls include waits between commands and waits on true dependences. Shipped 1B prefill, in-tree S2.
+% DECISION: not "invisible to every metric": the metric a developer can compute reads 92-97% busy, the runtime reports nothing per column, and the counters show the waits.
 
 \textbf{Columns of One Operator.}
 % VALUE: the same order dependence inside one operator: attention issues column 7 only after waiting on column 0, and alternating the columns lowers attention's device-busy time to 0.67x with equal work per column, so the CP's order is the cause
@@ -101,12 +75,5 @@ MLIR-AIR's double-buffering transformation declines the loop because its running
 % SOURCE: per layer, the QKV weight streams are awaited, then the KV readbacks start, and the next projection's weight streams are issued before any KV await; weight progress during attention is bounded by buffering and back-pressure (vault lab-decode-long-context (2), amended in (4)).
 % SOURCE: single buffering, the build's own comment ("air-label-scf-for-to-ping-pong declines it, because the running max and accumulator are live across blocks") (vault lab-decode-long-context (5)).
 
-\subsection{Challenges}
-\label{subsec:challenges}
-
 % VALUE: removing these waits from compiled designs poses four challenges, one per section: decide which false orders can pay at all (Section 4), recover the order from binaries without source (Section 5), price an order without running it (Section 6), rewrite legally without the compiler that built the design (Section 7)
-Removing these waits from already compiled designs poses four challenges.
-First, a design holds many false orders, most of which cost nothing, so we need a condition that says which can pay before any is removed (Section~\ref{sec:condition}).
-Second, the order must be recovered from binaries without their source, although even an open design spreads it over the CP's stream, DMA chains, and core loops (Section~\ref{sec:order}).
-Third, an order must be priced without running it, because the artifact fixes the order of the work but not its durations, and the candidates multiply with chunks, column splits, and removals (Section~\ref{sec:pricing}).
-Fourth, a reorder or a rename must be shown legal without the compiler that built the design, from what the instructions alone establish about buffers, locks, and routes (Section~\ref{sec:method}).
+Removing these waits from already compiled designs poses four challenges, namely to tell which of a design's many false orders can pay at all (Section~\ref{sec:condition}), to recover the order from binaries without their source (Section~\ref{sec:order}), to price an order without running it, since the artifact fixes the order of the work but not its durations (Section~\ref{sec:pricing}), and to show a reorder or a rename legal without the compiler that built the design (Section~\ref{sec:method}).
