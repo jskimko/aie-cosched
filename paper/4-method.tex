@@ -8,7 +8,7 @@ Arbitration on shared ports and locks, which serializes some work at run time, e
 
 % VALUE: the validity assumption, stated up front: every buffer a DMA shares with a core is touched by the core only between the lock operations its BDs name (the lockset discipline, cited; MLIR-AIE's object FIFOs guarantee it); every synchronization the CP and the DMAs take part in is in what we read, and cores reach host memory and memory tiles only through DMAs, so this suffices on XDNA 2; an access the analysis cannot observe is assumed to conflict
 % SOURCE: spine v18, "The system", the principle and the validity assumption (vault paper-cosched-spine-v18).
-The analysis rests on one assumption, that a core touches a buffer it shares with a DMA only between the lock operations that the buffer's BDs name, which is the lockset discipline~\E{cite: Eraser} and which MLIR-AIE's object FIFOs guarantee.
+The analysis rests on one assumption, that a core touches a buffer it shares with a DMA only between the lock operations that the buffer's BDs name, which is the locking discipline that Eraser checks~\citep{savage1997eraser} and which MLIR-AIE's object FIFOs guarantee.
 Because every synchronization in which the CP and the DMAs take part appears in the streams we read, and the cores reach host memory and memory tiles only through DMAs, this assumption suffices on XDNA~2, and any access the analysis cannot observe is treated as a conflict.
 
 \subsection{Reading a Stream}

@@ -709,3 +709,161 @@
   url          = {https://developer.download.nvidia.com/CUDA/training/StreamsAndConcurrencyWebinar.pdf},
   year         = {2012}
 }
+
+% ---- Added 2026-10-25: twelve entries for the citation placeholders, each source read (subagent check; Hockney and jax-pgle carry VERIFY notes) ----
+
+
+% ---- Lockset discipline (Section: legality assumption) ----
+
+% Metadata checked against Crossref (DOI 10.1145/265924.265927) and the first page of the TOCS PDF
+% (homes.cs.washington.edu/~tom/pubs/eraser.pdf), read 2026-10-25. Archival version of the SOSP'97 paper.
+% Eraser's term is "locking discipline", checked by its "Lockset algorithm" (Sections 1 and 2).
+@article{savage1997eraser,
+  author  = {Savage, Stefan and Burrows, Michael and Nelson, Greg and Sobalvarro, Patrick and Anderson, Thomas},
+  title   = {Eraser: A Dynamic Data Race Detector for Multithreaded Programs},
+  journal = {ACM Transactions on Computer Systems},
+  volume  = {15},
+  number  = {4},
+  pages   = {391--411},
+  year    = {1997},
+  doi     = {10.1145/265924.265927}
+}
+
+% ---- Analytical models whose constants are measured once ----
+
+% Metadata checked against Crossref (DOI 10.1016/S0167-8191(06)80021-9), 2026-10-25.
+% VERIFY: full text not read (ScienceDirect returned 403); that it reports measured r_inf / n_1/2 for both machines is from the
+% title and the model's standard use, not from the paper's text.
+@article{hockney1994communication,
+  author  = {Hockney, Roger W.},
+  title   = {The Communication Challenge for {MPP}: {Intel} {Paragon} and {Meiko} {CS-2}},
+  journal = {Parallel Computing},
+  volume  = {20},
+  number  = {3},
+  pages   = {389--398},
+  year    = {1994},
+  doi     = {10.1016/S0167-8191(06)80021-9}
+}
+
+% Metadata checked against Crossref (DOI 10.1145/155332.155333); full text read from the Berkeley course copy
+% (people.eecs.berkeley.edu/~kubitron/cs258/handouts/papers/logp.pdf), 2026-10-25: L, o, g are the model's parameters and
+% o and L for the CM-5 are taken from "previous experiments on the CM-5" (Section 4).
+@inproceedings{culler1993logp,
+  author    = {Culler, David and Karp, Richard and Patterson, David and Sahay, Abhijit and Schauser, Klaus Erik and Santos, Eunice and Subramonian, Ramesh and von Eicken, Thorsten},
+  title     = {{LogP}: Towards a Realistic Model of Parallel Computation},
+  booktitle = {Fourth ACM SIGPLAN Symposium on Principles and Practice of Parallel Programming (PPoPP)},
+  pages     = {1--12},
+  publisher = {ACM},
+  year      = {1993},
+  doi       = {10.1145/155332.155333}
+}
+
+% Metadata checked against Crossref (DOI 10.1145/1498765.1498785), 2026-10-25. Text read from the companion tech report
+% UCB/EECS-2008-134 (the CACM text was not reachable): peak bandwidth from STREAM, ceilings "measured once per multicore computer".
+@article{williams2009roofline,
+  author  = {Williams, Samuel and Waterman, Andrew and Patterson, David},
+  title   = {Roofline: An Insightful Visual Performance Model for Multicore Architectures},
+  journal = {Communications of the ACM},
+  volume  = {52},
+  number  = {4},
+  pages   = {65--76},
+  year    = {2009},
+  doi     = {10.1145/1498765.1498785}
+}
+
+% ---- Workload ----
+
+% Release date from the GitHub release v2.0 ("MLPerf Client 2.0.0", published 2026-08-18; v2.0.1 followed 2026-09-24);
+% task token counts from mlcommons.org/benchmarks/client, read 2026-10-25.
+@misc{mlcommons2026mlperfclient,
+  author       = {{MLCommons}},
+  title        = {{MLPerf} {Client} v2.0},
+  howpublished = {\url{https://mlcommons.org/benchmarks/client/}},
+  year         = {2026},
+  note         = {Released 2026-08-18; source at \url{https://github.com/mlcommons/mlperf_client}; accessed 2026-10-25}
+}
+
+% ---- Related work: dynamic shapes and inter-operator scheduling ----
+
+% Authors and title from the first page of the proceedings PDF (f89b79c9...-Paper.pdf), read 2026-10-25; volume 4 from the
+% proceedings abstract page. Section 4.3 "Automatic Dispatching": a decision tree dispatches each shape to a generated micro-kernel at runtime.
+@inproceedings{zheng2022dietcode,
+  author    = {Zheng, Bojian and Jiang, Ziheng and Yu, Cody Hao and Shen, Haichen and Fromm, Josh and Liu, Yizhi and Wang, Yida and Ceze, Luis and Chen, Tianqi and Pekhimenko, Gennady},
+  title     = {{DietCode}: Automatic Optimization for Dynamic Tensor Programs},
+  booktitle = {Proceedings of Machine Learning and Systems (MLSys)},
+  volume    = {4},
+  address   = {Santa Clara, CA, USA},
+  year      = {2022}
+}
+
+% Authors and title from the first page of the MLSys'26 PDF (~/docs/mlsys26/DynaFlow_...__bbd7d8bd.pdf, "Proceedings of the 9th
+% MLSys Conference, Bellevue, WA, USA, 2026"); volume 8 from the proceedings abstract page, read 2026-10-25.
+@inproceedings{pan2026dynaflow,
+  author    = {Pan, Yi and Gu, Yile and Luo, Jinbin and Wu, Yibo and Wang, Ziren and Zhang, Hongtao and Xu, Ziyi and Lin, Shengkai and Kasikci, Baris and Wang, Stephanie},
+  title     = {{DynaFlow}: Transparent and Flexible Intra-Device Parallelism via Programmable Operator Scheduling},
+  booktitle = {Proceedings of Machine Learning and Systems (MLSys)},
+  volume    = {8},
+  address   = {Bellevue, WA, USA},
+  year      = {2026}
+}
+
+% No paper describes XLA's latency-hiding scheduler with PGLE; the JAX documentation is the primary public description of PGLE
+% ("the profile information is fed back into XLA compiler for a better scheduling decision"; section "Auto and manual PGLE"),
+% read 2026-10-25. The OpenXLA page "LHS Cost Model" (https://openxla.org/xla/lhs_cost_model) describes the scheduler itself
+% but does not mention PGLE.
+% VERIFY: author string; the page as fetched showed no copyright footer ("The JAX Authors" is the project's usual attribution).
+@misc{jax-pgle,
+  author       = {{The JAX Authors}},
+  title        = {{GPU} Performance Tips: Auto and Manual {PGLE}},
+  howpublished = {JAX documentation, \url{https://docs.jax.dev/en/latest/gpu_performance_tips.html}},
+  year         = {2026},
+  note         = {Profile-guided latency estimation for {XLA}'s latency-hiding scheduler; accessed 2026-10-25}
+}
+
+% Authors and title from the first page of the MLSys'26 PDF (~/docs/mlsys26/Dataflow_Is_All_You_Need__f502981c.pdf,
+% "Proceedings of the 9th MLSys Conference (Industry Track), Bellevue, WA, USA, 2026"); author list and volume 8 match the
+% proceedings abstract page (hash f502981cbe221d857ad409450a7917c3), read 2026-10-25.
+@inproceedings{gandhi2026dataflow,
+  author    = {Gandhi, Darshan and Nandkar, Pushkar and Koeplinger, David and Farahini, Nasim and Tsoupidi, Romy and Rydh, Samuel and Musaddiq, Matheen and Zhao, Tuowen and Goodbar, Reid and Sheeley, Nathan and Zhang, Leon and Shaffer, Matthew and Long, John and Wang, Han and Wang, Angela and Sabnis, Arjun and Brot, Joshua and Du, Yun and Zeffer, Hakan and Wang, Mingran and Prabhakar, Raghu},
+  title     = {Dataflow Is All You Need},
+  booktitle = {Proceedings of Machine Learning and Systems (MLSys), Industry Track},
+  volume    = {8},
+  address   = {Bellevue, WA, USA},
+  year      = {2026}
+}
+
+% ---- Related work: post-compilation analysis and rewriting ----
+
+% Metadata checked against Crossref (DOI 10.1109/MICRO.2010.27), 2026-10-25; abstract via academia.edu listing (serial binary in,
+% parallel binary out; affine analysis without symbolic information).
+@inproceedings{kotha2010automatic,
+  author    = {Kotha, Aparna and Anand, Kapil and Smithson, Matthew and Yellareddy, Greeshma and Barua, Rajeev},
+  title     = {Automatic Parallelization in a Binary Rewriter},
+  booktitle = {43rd Annual IEEE/ACM International Symposium on Microarchitecture (MICRO)},
+  pages     = {547--557},
+  publisher = {IEEE},
+  year      = {2010},
+  doi       = {10.1109/MICRO.2010.27}
+}
+
+% Metadata checked against Crossref (DOI 10.1109/CGO.2019.8661201), abstract read from arXiv 1807.06735, 2026-10-25.
+@inproceedings{panchenko2019bolt,
+  author    = {Panchenko, Maksim and Auler, Rafael and Nell, Bill and Ottoni, Guilherme},
+  title     = {{BOLT}: A Practical Binary Optimizer for Data Centers and Beyond},
+  booktitle = {IEEE/ACM International Symposium on Code Generation and Optimization (CGO)},
+  pages     = {2--14},
+  publisher = {IEEE},
+  year      = {2019},
+  doi       = {10.1109/CGO.2019.8661201}
+}
+
+% Metadata checked against Crossref (DOI 10.1145/3696443.3708943, ACM, pp. 493-506), abstract read from arXiv 2501.08071, 2026-10-25.
+@inproceedings{he2025cuasmrl,
+  author    = {He, Guoliang and Yoneki, Eiko},
+  title     = {{CuAsmRL}: Optimizing {GPU} {SASS} Schedules via Deep Reinforcement Learning},
+  booktitle = {IEEE/ACM International Symposium on Code Generation and Optimization (CGO)},
+  pages     = {493--506},
+  publisher = {ACM},
+  year      = {2025},
+  doi       = {10.1145/3696443.3708943}
+}
