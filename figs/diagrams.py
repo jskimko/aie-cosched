@@ -17,6 +17,8 @@ from make_figs import COLUMN, GRAY, INK, OUT, plt  # noqa: E402
 from matplotlib.patches import FancyArrowPatch, Rectangle  # noqa: E402
 
 MIST, STONE = "#E4E4E4", "#707070"
+# pastel steps of make_figs' ORANGE (attention) and BLUE (GEMMs), for the column groups of the default split
+ATTN_PASTEL, GEMM_PASTEL = "#F5BC9C", "#B6CAF7"
 FS = 6  # label size, pt
 
 
@@ -46,7 +48,9 @@ def fig_arch():
     """The host submits commands to a hardware context, whose CP executes each command's instruction stream in order:
     an issue pushes a BD into a shim tile's DMA queue and returns at once, a synchronization blocks the CP until a
     transfer completes. The array runs data-driven: each tile's DMA moves blocks between local memory and the stream
-    switch along a chain of BDs, and locks hand each buffer between its producer and its consumer."""
+    switch along a chain of BDs, and locks hand each buffer between its producer and its consumer. The compute tiles
+    are tinted by the column group that the existing prefill's default split gives them: attention on columns 0 and 7,
+    the GEMMs on columns 1-6."""
     W, H = COLUMN - 0.04, 1.86
     fig, ax = _canvas(W, H)
     # ---- the submission path along the top: host -> hardware context -> CP -> its instruction stream
@@ -73,9 +77,16 @@ def fig_arch():
     xs = [x0 + c * (t + g) for c in range(8)]
     ys = [y0 + r * (t + g) for r in range(6)]
     fills = [GRAY, MIST] + ["white"] * 4
-    for x in xs:
+    for c, x in enumerate(xs):
+        group = ATTN_PASTEL if c in (0, 7) else GEMM_PASTEL
         for r, y in enumerate(ys):
-            _box(ax, x, y, t, t, fc=fills[r], lw=0.4)
+            _box(ax, x, y, t, t, fc=fills[r] if r < 2 else group, lw=0.4)
+    # the default split's column groups, labelled above the array
+    gy = ys[5] + t + 0.045
+    for c in (0, 7):
+        ax.text(xs[c] + t / 2, gy, "Attn.", ha="center", va="center_baseline", fontsize=FS - 0.5)
+    ax.text((xs[1] + xs[6] + t) / 2, gy, "GEMMs", ha="center", va="center_baseline", fontsize=FS - 0.5)
+    ax.plot([xs[1], xs[6] + t], [gy - 0.035, gy - 0.035], color=INK, lw=0.4, zorder=3)
     for r, label in ((0, "Shim"), (1, "Memory")):
         ax.text(x0 - 0.05, ys[r] + t / 2, label, ha="right", va="center_baseline", fontsize=FS)
     ax.text(x0 - 0.05, (ys[2] + ys[5] + t) / 2, "Compute", ha="right", va="center_baseline", fontsize=FS)
