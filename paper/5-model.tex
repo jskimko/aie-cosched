@@ -89,7 +89,7 @@ Queued commands run one at a time (Section~\ref{subsec:semantics}), so command $
 \label{eq:cmd}
 e_k = \max\bigl(e_{k-1} + s_k,\; q_k + F\bigr) + b_k,
 \end{equation}
-where $q_k$ is the time the host queues it and $s_k$ is the setup of its first operator, which depends only on whether that operator runs on the same column group as the operator before it, since setup on another group can proceed while the previous command finishes.
+where $q_k$ is the time the host queues it and $s_k$ is the transition into it, which is the setup $s_\mathrm{same}$ within one column group, and otherwise the setup $s_g$ of its group less the window $w_h$ at the end of the previous command, on group $h$, during which other columns can already start, never below zero.
 Within a command, each column group's time is the sum of its operators' timings alone, with the same-group setup between consecutive operators, and two groups that overlap take
 \begin{equation}
 \label{eq:overlap}
@@ -99,12 +99,12 @@ where $t_{k,g}$ and $\beta_{k,g}$ are group $g$'s time and DRAM bytes in command
 On the host side, each command costs an issue and each operator a post-processing step, and the host waits on the oldest command once $D$ are in flight.
 The existing program runs through the same simulation as its own host program, so both sides of every comparison are priced alike.
 Finally, the event model adds the work before the first decoder layer and after the last, which it prices as ordinary operators, and reports the device time, the host's exposed time, and that work separately, so an error in one term cannot hide behind another.
-% SOURCE: opcord/model/event_model.py simulate() (one in-order queue; host program with waits); the rebuilt form, constants schema version 2 (npu-gap, opcord dev checkout; vault decisions log "The model rebuilt from a logical base", 2026-10-24); bytes per operator instance from the instruction streams' buffer descriptors (pass-0 tools/bprime_check byte model).
+% SOURCE: the transition form (ruling 2026-10-24): s = s_same within a group, max(0, s_g - w_h) across groups; from the 10-22 sequences a GEMM after attention waits about 47 us and attention after a GEMM starts about 8 us early (npu-gap, device.json fit), to be pinned by microbenchmark v2. opcord/model/event_model.py simulate() (one in-order queue; host program with waits); the rebuilt form, constants schema version 2 (npu-gap, opcord dev checkout; vault decisions log "The model rebuilt from a logical base", 2026-10-24); bytes per operator instance from the instruction streams' buffer descriptors (pass-0 tools/bprime_check byte model).
 
 % VALUE: the operators' timings and bytes depend on the LLM and the split and are measured once per configuration by running each operator alone or read from its streams; the few machine constants (dispatch floor, setup within and across groups, host issue and post, read cap) are measured once by microbenchmarks, all non-negative, none fitted to an LLM's end-to-end runs; precedent: analytical models whose parameters are machine constants measured by microbenchmarks
 Only the operators' timings and bytes depend on the LLM and the split, so we measure the timings once per configuration by dispatching each GEMM alone and each attention chunk alone at several cached-context lengths, and read the bytes from the operators' streams.
 Between measured points the event model interpolates, and beyond them it refuses to price.
-The machine constants, namely $F$, the setup within and across groups, the host's issue and post-processing costs, and $R$, are measured once by microbenchmarks on dummy data, as analytical models of communication and of memory-bound kernels measure theirs~\E{cite: Hockney; LogP; roofline}.
+The machine constants, namely $F$, the setups and windows of the transitions, the host's issue and post-processing costs, and $R$, are measured once by microbenchmarks on dummy data, as analytical models of communication and of memory-bound kernels measure theirs~\E{cite: Hockney; LogP; roofline}.
 No constant is fitted to an LLM's end-to-end runs, so every configuration of Section~\ref{subsec:accuracy} tests the event model rather than supplying its constants.
 % SOURCE: microbenchmarks (npu-gap prefill-overlap/microbench.py): dispatch floor from empty commands; setup from back-to-back sequences mixing same-group and cross-group pairs, non-negative least squares on one set and checked on another; read cap from co-runs on both sides of the crossover between the longest group and bytes over the cap; per split build (S1, S2, S4 of Llama-3.2-1B) with a Qwen3-4B transfer check; values \E{pending}.
 % COMMENT: bib entries needed (read each source first): Hockney's model, LogP / LogGP, the roofline model.
