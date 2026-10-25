@@ -17,8 +17,7 @@ We therefore take a compiled design, rather than the program it was compiled fro
 \end{figure}
 
 % VALUE: orientation across §4-§6 along the figure: streams read into the happens-before graph and each wait classed (§4.1-4.3); a class names the rewrite, conditions from the streams alone decide legality (§4.4); the event model prices a candidate against a lower bound before it runs (§5); OPCORD reorders and renames, and emits only what every condition admits (§6)
-Figure~\ref{fig:framework} traces the method through one compiled design.
-We read its instruction streams into a happens-before graph, drawn as the dependence graph of the figure, and class each wait in it as a true, name, or order dependence (Sections~\ref{subsec:model}--\ref{subsec:grid}).
+Following one compiled design through Figure~\ref{fig:framework}, we read its instruction streams into a happens-before graph, drawn as the figure's dependence graph, and class each wait in it as a true, name, or order dependence (Sections~\ref{subsec:model}--\ref{subsec:grid}).
 A class names the rewrite that could remove a wait, whereas conditions that the streams alone can check decide whether a given rewrite is legal (Section~\ref{subsec:legality}).
 The event model of Section~\ref{sec:pricing} then prices a candidate schedule from probes of each operator alone, against a lower bound on any schedule, so each choice is made before the candidate runs.
 Finally, OPCORD (Section~\ref{sec:method}) reorders issue and renames buffers, and it emits a rewritten design only where every legality condition holds.
@@ -39,9 +38,8 @@ A loop with data-dependent control is reported and left out, whereas every loop 
 % VALUE: happens-before is completion before start, not issue order; each direct edge comes from one of 11 mechanisms at the stream, data-movement, or loop granularity and is attributed to exactly one (the attribution choices, edges per gated operation, and uncovered operations in appendix-body.tex, cut 2026-10-24); a segment is a run of synchronizations with the issue they gate; the evaluation checks the reading
 From these operations, the analysis builds a \emph{happens-before} graph, in which an edge from $a$ to $b$ means that $b$ cannot start until $a$ has completed.
 Issue order alone does not create such an edge, because a queue push is issued in order but its transfer completes later.
-Each direct edge comes from one of 11 ordering mechanisms, such as a synchronization, a BD chain, or a lock, at the granularity of the CP's stream, of data movement, or of a core loop, and is attributed to exactly one of them.
+Each direct edge comes from exactly one of 11 ordering mechanisms, such as a synchronization, a BD chain, or a lock, at the granularity of the CP's stream, of data movement, or of a core loop, and Section~\ref{subsec:census} checks this reading against what each stack dispatches.
 An operator's stream is a sequence of \emph{segments}, where each segment is a run of synchronizations followed by the issue instructions they gate and the first segment has none.
-Section~\ref{subsec:census} checks this reading against what each stack dispatches.
 % SOURCE: the mechanism table, attribution order, granularities, UNATTRIBUTED, and issue edges (vault lab-cosched-passes (30), item 2); the library AIECoschedDeps (mlir-aie f1725dae1f1, pinned); segments as in txn.segments (amd-npu a0ee2ed prefill-overlap/txn.py) and the formulation's operators (Section~\ref{subsec:formulation}); one edge per (wait, gated op) pair (lab-cosched-passes (30), item 3).
 
 % VALUE: each direct edge is classed by the pairs of operations it alone orders: true if one is read after write, name if one is write after read or write, order otherwise, after Bernstein's conditions and compilers' anti and output dependences; renaming removes a name dependence, reordering an order dependence, a true one stays; loop-carried edges are classed alike (redundant and control counts in appendix-body.tex, cut 2026-10-24); a class assumes every other edge in place, which is why a rewrite is judged as a whole
@@ -59,9 +57,8 @@ Because each class is computed with every other edge in place, it says what remo
 
 % VALUE: each of the two classes of false dependence (§3) occurs at two granularities (the CP's stream, an engine's loop), so every blocking edge that is not true falls in one cell of Table grid; a DMA chain counts as a loop; the table places every known instance in the designs our passes rewrite
 % DECISION: false dependences and the name class are textbook and cited; the paper claims their analysis on this platform, never the classes.
-Each of the two classes of false dependence (Section~\ref{sec:motivation}) occurs both in the CP's instruction stream and inside an engine's loop, so every blocking edge that is not a true dependence falls into one cell of Table~\ref{tab:grid}.
-A BD chain with locks counts as a loop on its DMA engine.
-The table places each instance we know of in the MLIR-AIR designs, which are the designs our passes rewrite.
+Each of the two classes of false dependence (Section~\ref{sec:motivation}) occurs both in the CP's instruction stream and inside an engine's loop, where a BD chain with locks counts as a loop on its DMA engine, so every blocking edge that is not a true dependence falls into one cell of Table~\ref{tab:grid}.
+The table places each instance we know of in the MLIR-AIR designs, which our passes rewrite.
 % SOURCE: the grid and its instances (vault paper-cosched-direction-converged, Clarification (xiii), ruled on lab-cosched-passes (30)); the DMA row folded into the loop row (lab-cosched-passes (30), item 6).
 
 \begin{table}[t]
@@ -106,8 +103,7 @@ Operators on the same group are composed in sequence instead, so their writes to
 % VALUE: a rename is legal only for a location whose every conflict across uses is WAR or WAW, so carried state stays, and only with a free added instance: no slot reused before its previous reader completes; in a loop, one lock pair whose protocol the added slot extends, within the tile's BDs and local memory; a condition the streams cannot decide refuses the rewrite with that condition; the conditions hold under the execution semantics and are not claimed sufficient for every design, and every rewrite run is also bit-identical
 % DECISION: the conditions are stated as what the streams and their configuration can check, never as sufficient for every design (introduction).
 A rename is legal only for a location whose conflicts across its uses are all write-after-read or write-after-write, so state carried from one iteration or chunk to the next stays in place.
-Its added instance must also be free, with no slot reused before its previous reader has completed.
-In a loop, the buffer must in addition be guarded by one pair of locks, whose protocol the added slot extends, and that slot must fit in the tile's BDs and local memory.
+Its added instance must also be free, with no slot reused before its previous reader has completed, and in a loop the buffer must be guarded by one pair of locks, whose protocol the added slot extends, with the slot fitting in the tile's BDs and local memory.
 Where the streams cannot decide a condition, such as a buffer range they do not fix, the rewrite is refused with that condition as its reason.
 Because the conditions hold only if the locations cover all the state an operation touches, we do not claim that they suffice for every design, and every rewrite we run also leaves the outputs bit-identical (Section~\ref{subsec:setup}).
 % SOURCE: the loop conditions: the class rule renames only buffers whose every cross-iteration conflict is WAR / WAW and leaves RAW-carried state untouched; one free / full lock pair, the BD and local-memory budgets (16 BDs, 64 KiB), checked on the input and re-derived on the output (lab-cosched-passes (33), (57)); the ring condition: no slot reused before its previous reader has completed (merged.colour and assert_no_hazard, amd-npu a0ee2ed; the hazard check turns red on an overlapping slot, lab-prefill-overlap (9)).

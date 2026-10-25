@@ -1,26 +1,24 @@
 \section{Evaluation}
 \label{sec:eval}
 
-% VALUE: what the evaluation establishes, then the order: OPCORD shortens prefill and decode on five LLMs against the existing program on its own best shipped split; its choice of order and split stays near the best measured option; the gain follows the condition's shape; the event model, legality, and the census close the section
+% VALUE: what the evaluation establishes: OPCORD shortens prefill and decode on five LLMs against the existing program on its own best shipped split; its choice of order and split stays near the best measured option; the gain follows the condition's shape
 % DECISION: no question list at the head of the evaluation; subsections have noun titles and each opens with its finding.
 % COMMENT: every \E value comes from the amendment-1 batch, the decode development batch, the synthetic sweep, the legality control, the FastFlowLM replay, and finally the final sweep; prose stays as written while numbers move (STYLE.md, Results vary between runs).
 In this section, we show that OPCORD shortens prefill and decode on five LLMs against the existing program on the shipped split that minimizes its TTFT, that its choice of order and split stays close to the measured minimum, and that its gains follow the shape that the condition of Section~\ref{sec:condition} predicts.
-After the setup, we report end-to-end latency, the quality of the choices, the shape of the gain, the sources of the gains, the event model's accuracy, legality, the census of the stacks we read, and the overheads.
 
 \subsection{Experimental Setup}
 \label{subsec:setup}
 
 % VALUE: the platform and its power state, the software, the designs, and the five LLMs (one per class of edge LLM)
-We measure on a GMKtec NucBox EVO-X2, whose AMD Ryzen\texttrademark{} AI Max+ 395 processor carries an XDNA~2 NPU of 8 columns of 4 compute tiles and 64\,GB of shared memory, under Linux~7.0 with the amdxdna driver, XRT~2.25.0~\citep{xdna-driver,xrt-repo}, and NPU firmware 1.1.2.65 in performance mode.
+We measure on a GMKtec NucBox EVO-X2, whose AMD Ryzen\texttrademark{} AI Max+ 395 carries an XDNA~2 NPU of 8 columns of 4 compute tiles and 64\,GB of shared memory, under Linux~7.0 with the amdxdna driver, XRT~2.25.0~\citep{xdna-driver,xrt-repo}, and NPU firmware 1.1.2.65 in performance mode.
 We rewrite MLIR-AIR's fused prefill and fused decode~\citep{wang2026mlirair}, compiled with MLIR-AIE~\citep{mlir-aie-repo}, for five LLMs with 4-bit weights, one per class of edge LLM: the dense Llama-3.2-1B~\citep{meta2024llama32}, Qwen3-4B~\citep{yang2025qwen3}, and Llama-3.1-8B, together with Gemma3-4B, which uses sliding-window attention, and LFM2-1.2B, which has convolution layers.
 % SOURCE: machine files read 2026-10-14/15: uname -r 7.0.0-34-generic; amdxdna 2.25.0_20260922 (DKMS, 31c01f2019e7); XRT 2.25.0 (3923b2b5be55); NPU firmware 1.1.2.65 (sysfs fw_version); BIOS EVO-X2 1.12; NPU power mode performance, CPU EPP and governor performance (lab-prefill-overlap (11), lab-split-sweep (9)).
 % SOURCE: mlir-air a3e26261 (llms/shared/fused_prefill, fused_decode; the runs use npu-gap's 44e8d8f7); mlir_aie wheel 1.4.5.dev22+g35fa6b1; weights FastFlowLM/Qwen3-4B-NPU2 rev 07651f11cac7, the Llama-3.2-1B q4nx bundle, FastFlowLM/Llama-3.1-8B-NPU2 rev 52700648, all sha256-verified (lab-prefill-overlap (23), lab-split-sweep (10)).
 % DECISION: the BIOS power mode cannot be read from the OS; add it once the author records it.
 
 % VALUE: the workloads: prompts from 128 to 32,768 tokens in powers of two plus lengths one token past a power of two, which fill no chunk; decode at contexts up to 32K; MLPerf Client's tasks marked on the sweep
-Prompts run from 128 to 32{,}768 tokens in powers of two, together with lengths one token past a power of two, whose last chunk holds a single token.
-Decode runs at cached contexts of 2{,}048 to 30{,}720 tokens.
-The sweep spans the prompts of MLPerf Client's scored tasks, from about 80 to about 3{,}500 tokens, its summarization at about 7{,}600, and the 12K and 15K contexts of its agentic tests~\E{cite: MLPerf Client v2.0}.
+Prompts run from 128 to 32{,}768 tokens in powers of two and one token past each, whose last chunk holds a single token, and decode runs at cached contexts of 2{,}048 to 30{,}720 tokens.
+The sweep spans the prompts of MLPerf Client's scored tasks, from about 80 to 3{,}500 tokens and 7{,}600 for summarization, and the 12K and 15K contexts of its agentic tests~\E{cite: MLPerf Client v2.0}.
 % SOURCE: MLPerf Client v2.0 task parameters (vault decisions log, "MLPerf Client's current task parameters"); its harness is not run.
 
 % VALUE: one baseline: the existing program on the shipped split that minimizes its TTFT, with every split predicted within 5% of it measured, run on the faster of its own host code and our runner, so OPCORD differs from it by the reorder alone; the remedies are their own rows; FastFlowLM appears only as an observation for the condition
@@ -33,8 +31,8 @@ For decode, the baseline is the unmodified decode design.
 % VALUE: correctness gates, metrics, and the run protocol; defaults stated once
 Every run's logits and KV records are bit-identical to the existing program's, and the kernel log stays free of driver and IOMMU messages.
 TTFT is the wall time of the prefill call, and the time per token is the inverse of the decode rate over 256 greedy tokens.
-All versions of a cell run on one engine in one process, interleaved, with one busy host core that keeps the CPU out of deep idle, and we report medians of at least five timed runs after a warm run, with 95\% bootstrap intervals.
-Because the DRAM read cap varies by up to 12\% between batches, every ratio compares runs from one batch, or chains two paired ratios through a version that both batches share.
+All versions of a cell run interleaved on one engine in one process, with one busy host core that keeps the CPU out of deep idle, and we report medians of at least five timed runs after a warm run, with 95\% bootstrap intervals.
+Because the DRAM read cap varies by up to 12\% between batches, every ratio pairs runs from one batch or chains two such ratios through a version both batches share.
 % SOURCE: protocol (amd-npu ab/FINAL-SWEEP.md: spinner, shared engine, gates; kept iterations max(5, the full spec); decode 5 ABBA repetitions of 256 tokens); 8x2 cap 49.9-55.7 GB/s over the batches (lab-prefill-device (1), lab-split-sweep (4)-(5)).
 
 \subsection{End-to-End Latency}
@@ -58,7 +56,7 @@ At prompts of one or two chunks, OPCORD keeps the existing order, whose TTFT it 
 \label{subsec:decode-eval}
 Because our loop pass lets each block's transfer overlap the compute on the previous block, the decode gain grows with the context, as attention's share of each token does (Figure~\ref{fig:decode}).
 At 16{,}384 tokens, the renamed design lowers the time per token against the unmodified decode design by \E{X--Y}$\times$ across the five LLMs, and by up to \E{Z}$\times$ at 30{,}720 tokens.
-The gain is smaller where an LLM's serialized compute per position is a smaller share of its transfer, as on Qwen3-4B, whose ratio is 0.34 against Llama-3.2-1B's 0.71.
+The gain is smaller where an LLM's serialized compute per position is a smaller share of its transfer, 0.34 on Qwen3-4B against 0.71 on Llama-3.2-1B.
 % SOURCE: development pairs, pre-final, not under the current protocol (vault decisions log, "Decode status", 2026-10-24): Llama-3.2-1B 1.27x at 16,384 and 1.39x at 32,512 (rename gate R, medians); Qwen3-4B 1.16x / 1.21x at 16,384 / 28,800; Llama-3.1-8B 1.079 [1.074, 1.084] at 16,384 and 1.140 [1.136, 1.151] at 30,720 (hand rename, 5 ABBA reps); serialized compute over transfer per position 0.34 (Qwen3-4B) and 0.71 (1B) (lab-decode-long-context (14)).
 
 \begin{figure}[t]
@@ -75,10 +73,10 @@ The gain is smaller where an LLM's serialized compute per position is a smaller 
 
 % VALUE: the composer's choice of order and split stays within a small margin of the best measured option on every configuration, whereas each fixed rule loses badly somewhere: never reordering gives up the long-prompt gains, always reordering loses at one or two chunks, a fixed split loses where the balance moves, and even the rule that reorders from four chunks at the existing program's best split loses where the composed order's best split differs; the event model's unaided choice is reported beside the measured tie-break
 % COMMENT: the outcome stated in this paragraph is the hypothesis the table tests; reword to what the table shows (if a fixed rule ties the price, state the regret bound instead).
-To measure how well the composer chooses, we compare its choice on every configuration against the minimum measured there over every shipped split and both orders, and against fixed rules (Table~\ref{tab:decision}).
+To measure how well the composer chooses, we compare its choice on every configuration against the minimum measured over every shipped split and both orders, and against fixed rules (Table~\ref{tab:decision}).
 The composer's choice stays within \E{X}\% of the measured minimum on every configuration, and its unaided choice, before any tie is settled by measurement, within \E{Y}\%.
-Each fixed rule loses badly somewhere, since never reordering gives up the long prompts' gains, always reordering loses at prompts of one or two chunks, and a fixed split loses where the balance between the groups moves.
-Even the rule that reorders from four chunks on the split that minimizes the existing program's TTFT loses \E{Z}\% where the composed order runs faster on another split.
+Each fixed rule loses badly somewhere, since never reordering gives up the long prompts' gains, always reordering loses at one or two chunks, and a fixed split loses where the balance between the groups moves.
+Even reordering from four chunks on the existing program's best split loses \E{Z}\% where the composed order runs faster on another split.
 % SOURCE: per configuration, the measured best = the minimum over every shipped split of the composed and existing orders (final sweep: comp and orig at every shipped split); development data so far: Qwen3-4B 8,192 regret 2.6% (paired, 0.9739 [0.9729, 0.9743]); Qwen3-4B 512 3.1%, Gemma3-4B 512 4.0%, Llama-3.2-1B 512 3.3% (unaided, before measure-when-close and the model rebuild) (vault decisions log, issue check 8d2eac19; tmp/issue-check/rules.py).
 
 \begin{table}[t]
@@ -104,16 +102,14 @@ Even the rule that reorders from four chunks on the split that minimizes the exi
 \subsection{Shape of the Gain}
 \label{subsec:shape-eval}
 
-% VALUE: at one split, the reorder's gain follows the shape the condition predicts on every LLM: a tie at one chunk, a loss at two, a gain from four chunks that rises to about twice at 8-16K and falls at 32K; with many chunks an estimate from the two groups' busy times and the hidden host time tracks the measured gain, while at few chunks only the event model prices the per-command costs
-At one split, the reorder's gain follows the shape that Section~\ref{subsec:exposure} predicts on every LLM.
-It ties at one chunk, loses $0.945$--$0.972\times$ at two, gains from four chunks, and rises to about $2\times$ at 8--16K tokens before it falls at 32K.
-At prompts of 1{,}024 to 4{,}096 tokens, the estimate from the two groups' busy times and the host time the overlap hides lies within 5\% of the measured gain on 23 of 24 configurations.
-It overstates the gain at few chunks, where the per-command costs and the pipeline's fill and drain outweigh the overlap, and at long prompts where the groups balance, since two groups that overlap inside one command still fall short of hiding the shorter one entirely, which only the event model's composition of each command captures.
-% SOURCE: same-split ratios on the development grids, pre-final: one chunk 0.976-1.006, two chunks 0.945-0.972, four chunks 1.040-1.076 on all five LLMs, 1.13-1.18x at 1,024, 1.82-2.17x at 8-16K (vault decisions log, the grids of 2026-10-23/24). The estimate F1 = (A + G + H_orig) / (max(A, G) + H_comp) over 70 measured cells (aie-cosched results/2026-10-24-group-terms, rows e5798e4, fit 6c5b666): within 5% on 23 of 24 cells at 1k-4k (geomean 0.996), 3 of 20 at N <= 512 (1.079), 12 of 26 at >= 8k (1.021; Gemma3-4B 16-32K 1.16-1.41, A and G about 21 s each at 32,768 against a composed device busy of 33.5 s); the event model 51 of 70 within 5%. Pre-final.
+% VALUE: at one split, the reorder's gain follows the shape the condition predicts on every LLM: a loss at two chunks, a gain from four that rises to about twice at 8-16K and falls at 32K; in the middle range an estimate from the two groups' busy times and the hidden host time tracks the gain, while only the event model prices the per-command costs at few chunks and the incomplete overlap at long balanced prompts
+On every LLM, the reorder's gain at one split loses at two chunks and gains from four, rising to about $2\times$ at 8--16K tokens before it falls at 32K, as Section~\ref{subsec:exposure} predicts.
+An estimate from the groups' busy times and the hidden host time tracks the gain within 5\% from 1K to 4K tokens, but only the event model, which composes each command, prices the dispatch costs at few chunks and the incomplete overlap at long balanced prompts.
+% SOURCE: same-split ratios on the development grids, pre-final: one chunk 0.976-1.006 (a tie), two chunks 0.945-0.972, four chunks 1.040-1.076 on all five LLMs, 1.13-1.18x at 1,024, 1.82-2.17x at 8-16K (vault decisions log, the grids of 2026-10-23/24). The estimate F1 = (A + G + H_orig) / (max(A, G) + H_comp) over 70 measured cells (aie-cosched results/2026-10-24-group-terms, rows e5798e4, fit 6c5b666): within 5% on 23 of 24 cells at 1k-4k (geomean 0.996), over-predicting below and above that range (per-command costs and the pipeline's fill and drain at few chunks; incomplete overlap inside one command at long balanced prompts), 3 of 20 at N <= 512 (1.079), 12 of 26 at >= 8k (1.021; Gemma3-4B 16-32K 1.16-1.41, A and G about 21 s each at 32,768 against a composed device busy of 33.5 s); the event model 51 of 70 within 5%. Pre-final.
 
 % VALUE: a synthetic LLM on the same engine varies the balance and the number of chunks directly, with OPCORD unmodified: the gain peaks where the groups balance and the dip at few chunks appears at every balance, so the shape is a property of the exposed work, not of the five LLMs
-To vary the balance directly, we run a synthetic two-layer LLM on the same engine, whose GEMM work we change at a fixed attention, through OPCORD unmodified.
-Across balances from one eighth to eight and from 1 to 32 chunks, the gain peaks where the groups' work balances and dips below one at two to four chunks at every balance, so the shape is a property of the exposed work rather than of the five LLMs (Figure~\ref{fig:synthetic}).
+To vary the balance directly, we run a synthetic two-layer LLM through OPCORD unmodified on the same engine, changing its GEMM work at a fixed attention.
+Across balances from one eighth to eight and 1 to 32 chunks, the gain peaks where the groups' work balances and dips below one at two to four chunks at every balance, so the shape belongs to the exposed work rather than to the five LLMs (Figure~\ref{fig:synthetic}).
 % SOURCE: Route E builds (mlir-air synthetic-route-e 8ce52a3c; four builds, (d, inter) = (256, 768), (1024, 768), (2048, 2304), (2048, 12288), the 1B's attention, 2 layers); predictions abaa3d9 (registered 2984f01), re-predicted at the rebuilt event model before the runs; measurements \E{pending}.
 \begin{figure}[t]
     \centering
@@ -125,20 +121,17 @@ Across balances from one eighth to eight and from 1 to 32 chunks, the gain peaks
 
 % VALUE: three small designs of our own put the two grid cells that hold no costly instance on the critical path: a removal off the binding cycle is worth nothing, the set that cuts it pays, and a class pays only where it binds
 \label{subsec:synthetic}
-Three small designs of our own put the two remaining cells of Table~\ref{tab:grid} on the critical path.
+Three small designs of our own put the two remaining cells of Table~\ref{tab:grid} on the critical path, and in each the outcome follows from whether the removal cuts the binding cycle.
 Where two name dependences close one cycle through a core, removing either alone gains nothing measurable, whereas removing both gains up to $1.60\times$.
 An order dependence inside a loop gains $2.00\times$ where it closes the producer--consumer cycle, and nothing where each core's own loop binds instead.
-Each outcome follows from whether the removal cuts the binding cycle.
 % SOURCE: re-derived from the committed scores (amd-npu 2ea67242 and c4f9a19d, runs-2026-10-22/{aon,ns,ol}/score.json; designs c423a98b, 9c94988a, ea3316e4; all three holds rc 0, no faults, every per-tile output check true). s1 by level, g(2,1) / g(1,2) / g(2,2): m256p1 1.0096 / 1.0031 / 1.5970; s3: stream-s2 3.610, pair-s2 7.235, stream-s4 11.653, pair-s4 11.643 ms, g 2.0044 and 0.9991 (vault lab-synthetic-classes (4)-(6)). The 1.60x rests on a depth-one baseline whose repetitions span 193% of their median (appendix-body.tex, app:synthetic (cut 2026-10-24)).
 
 \subsection{Sources of the Gains}
 \label{subsec:ablation}
 
 % VALUE: at OPCORD's choices, nearly all of the prefill gain is the composer's reorder across column groups: the stream pass changes nothing at four columns and finds no move at one, and at the default two-column split it contributes a within-operator share that grows with the prompt; packing alone contributes nothing; decode's gain needs the whole cycle renamed
-At the splits OPCORD chooses, nearly all of the prefill gain comes from the composer's reorder across column groups.
-The stream pass changes nothing on the four-column split, whose attention stream already issues each column's work before it waits, and finds no move on the one-column split.
-On the default two-column split, the stream pass alone gains \E{1.21--1.60}$\times$ at 16K tokens over the existing program, and the composer adds the reorder across groups on top.
-None of the gain comes from packing alone (Section~\ref{subsec:semantics}).
+At the splits OPCORD chooses, nearly all of the prefill gain comes from the composer's reorder across column groups, because the stream pass changes nothing on the four-column split, whose attention stream already issues each column's work before it waits, and finds no move on the one-column split.
+On the default two-column split, the stream pass alone gains \E{1.21--1.60}$\times$ at 16K tokens over the existing program and the composer adds the reorder across groups on top, whereas packing alone gains nothing (Section~\ref{subsec:semantics}).
 % SOURCE: at the picks the stream arm measures 1.000 at S4 and the pass makes no move at S1 (amd-npu s4-cells, s1-cells NOTES; vault decisions log, issue check); stream-pass-only at S2 1.21-1.60x at 16K on three LLMs, a same-split figure, pre-final (development grids).
 
 % VALUE: decode's gain needs the whole cycle renamed: keys and values alone gain nothing while the score buffer closes the cycle
@@ -176,8 +169,7 @@ The two clauses of the condition also hold under direct test: forcing the reorde
 \label{subsec:census}
 
 % VALUE: the method reads exactly what each stack dispatches: streams of three toolchains re-emit byte for byte, nearly every wait is attributed to a mechanism, and every loop of the MLIR-AIR designs is judged
-Because the method starts from artifacts a stack has already emitted, it must read them exactly, and it does so on all three stacks.
-Re-emitting 625 streams byte for byte shows that the analysis starts from exactly what each stack dispatches, namely 375 streams built by MLIR-AIR and 218 recorded from FastFlowLM, both through the lifter of Section~\ref{subsec:closed}, and 32 built by IRON through IRON's own translator.
+Because the method starts from artifacts a stack has already emitted, it must read them exactly, and 625 streams that re-emit byte for byte show that it does on all three stacks, namely 375 built by MLIR-AIR and 218 recorded from FastFlowLM, both through the lifter of Section~\ref{subsec:closed}, and 32 built by IRON through its own translator.
 Over 792 streams, the analysis attributes 73{,}994 of 74{,}010 waits to one of its ordering mechanisms, and at loop granularity it judges all 3{,}719 loops of the MLIR-AIR prefill and decode designs.
 % SOURCE: round trips (vault lab-cosched-passes (3), (9), (14)); attribution aie-cosched results/2026-10-23-s35-data (registered c57b708, result ef6733a); loops 3dbc1ee (MLIR-AIR prefill 3,488 / 3,488, the nine fused decodes 231 / 231).
 
@@ -189,16 +181,16 @@ Its decode bounds at $1.000$--$1.009\times$, and every one of IRON's 35 streams 
 % SOURCE: FastFlowLM terms4 (registered 67d54fe, rows 3c70af2): in-command 1.000 on every row; measured-only joint below 1.05 on every scored request; legal-space joint 1.034-1.049 at 512 and 1,024, 1.075-1.093 at 128 through the merge bracket at F = 195.0 us (terms5, e8232aa); exposure M 0.82-0.87 (a3ef131); decode 1.000-1.009 (e679463); merge replay stage 1 (e2b-p128 and e4b-p128 merges, registered 3ae0370), \E{pending}; IRON in-command pricing: 35 streams, every x_J 1.000, bound 1.000 (aie-cosched 1a87bc6, partb/iron-partb.json); composition predicted 1.000 (a73ba38).
 
 % VALUE: our passes judge MLIR-AIR designs of LLMs never examined, with no gain claimed; the stream pass's proposals on the other stacks and the checkers' verdicts
-Our passes also judge the MLIR-AIR designs of five LLMs we never ran or examined, Llama-3.2-3B, Phi-4-mini, Qwen2.5-3B and~7B, and Qwen3-8B, renaming attention's keys, values, and scores on their decodes as on the evaluated LLMs, but we claim no gain on any of them.
+Our passes also judge the MLIR-AIR designs of five LLMs we never ran or examined, renaming attention's keys, values, and scores on their decodes as on the evaluated LLMs, but we claim no gain on any of them.
 Beyond the instances of Table~\ref{tab:grid}, the stream pass proposes moves on \E{X} of 277 streams of the three stacks, and its checker and an independent second implementation agree on every verdict (Section~\ref{subsec:checkers}).
-% SOURCE: P8 (a), the unexamined MLIR-AIR models (aie-cosched e5ad472; 0 accel opens; kernels byte-identical); population 277 = 27 MLIR-AIR + 32 IRON + 218 FastFlowLM (vault lab-cosched-passes (41)).
+% SOURCE: P8 (a), the unexamined MLIR-AIR models Llama-3.2-3B, Phi-4-mini, Qwen2.5-3B and 7B, and Qwen3-8B (aie-cosched e5ad472; 0 accel opens; kernels byte-identical); population 277 = 27 MLIR-AIR + 32 IRON + 218 FastFlowLM (vault lab-cosched-passes (41)).
 % COMMENT: re-derive the proposal and verdict counts after the checker fix for moved pushes (relative queue rule; registered d04fdf7, fix 3470a9d, re-check 78c8445: 16 QUEUE-OVERFLOW-only proposals accepted, 16 refused RESOURCE-UNPROVEN).
 
 \subsection{Overheads}
 \label{subsec:overheads}
 
 % VALUE: OPCORD's costs are paid once per prompt length, LLM, and split, outside the measured call except a small binding step every TTFT includes; probing is once per LLM and split; the tie-break measurement is once per prompt length
-OPCORD's costs are paid once per prompt length, LLM, and split, and later prompts of that length reuse its work.
-Composing a length's commands takes \E{56--368}\,ms and planning it \E{0.06--1.1}\,s, and settling near-ties by measurement takes \E{X}\,s per length, about 19 minutes over the whole sweep.
-Every TTFT includes the 7--50\,ms that binding attention's positions takes inside the call, and probing each operator alone costs 9--39\,s once per LLM and split.
+OPCORD pays its costs once per prompt length, LLM, and split, and later prompts of that length reuse its work.
+Composing a length's commands takes \E{56--368}\,ms, planning it \E{0.06--1.1}\,s, and settling near-ties by measurement \E{X}\,s, about 19 minutes over the whole sweep.
+Probing each operator alone costs 9--39\,s once per LLM and split, and every TTFT includes the 7--50\,ms that binding attention's positions takes inside the call.
 % SOURCE: composition host-only (amd-npu 82c5b5b0, compose-gate-2026-10-22): S2 1B 56-148 ms, Qwen3-4B 143-368 ms; planning 63-206 ms (1B) and 0.3-1.1 s (Qwen3-4B); bind step 7-50 ms; probes 9-39 s per model and split (vault lab-split-sweep (29)-(30)); measure-when-close 1-275 s per shape, 1,144 s over the grid (npu-gap tmp/amend1/close-cost.txt).
