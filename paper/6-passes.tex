@@ -1,13 +1,13 @@
 \section{OPCORD}
 \label{sec:method}
 
-% VALUE: design opener: OPCORD removes the false dependences of §3.3 in steps, each answering a property of the platform: a blocking in-order CP (reorder issue, by the composer across operators and the stream pass within one), one buffer per role in decode's loop (the loop pass's rings), a faster split that changes with the regime, from scratch or append (split chosen per regime by the event model), designs it did not compile (checkers that refuse with a reason)
+% VALUE: design opener: OPCORD removes the false dependences of §3.3 in steps, each answering a property of the platform: a blocking in-order CP (reorder issue, by the composer across operators and the stream pass within one), one buffer per role in decode's loop (the loop pass's rings), an order and a split that pay differently with the prompt length (both chosen per length by the event model), designs it did not compile (checkers that refuse with a reason)
 % DECISION: the opener follows the FPGA'27 design opener, each property of the platform followed by the mechanism that answers it, with one subsection per property (STYLE.md, Paper structure, Design; contract §6).
 % DECISION: the legality conditions themselves live in Section~\ref{sec:order}; this section states only how OPCORD acts on them, namely checkers that accept a rewrite or refuse it with a reason (contract §6).
 OPCORD removes the false dependences of Section~\ref{subsec:losses} in steps, each in response to a property of the platform.
 A synchronization blocks the in-order CP and every issue behind it, so our composer issues every column group's work before the CP waits on any group, and our stream pass does the same within one operator (Section~\ref{subsec:order}).
 Because decode attention's loop keeps one buffer per role, each block's transfer waits for the previous block's compute, which our loop pass removes by renaming those buffers into rings (Section~\ref{subsec:rings}).
-The faster split of the columns changes between the two \emph{regimes} of prefill, namely prompts computed from scratch and appends to a cached context, so the composer chooses the split per regime with the event model (Section~\ref{subsec:split}).
+The order that pays and the split that minimizes TTFT change with the prompt length (Section~\ref{subsec:exposure}), so the composer chooses both per prompt length with the event model (Section~\ref{subsec:split}).
 Since OPCORD rewrites designs it did not compile, a checker tests each rewrite against the legality conditions of Section~\ref{sec:order} and refuses, with a reason, any rewrite it cannot show legal (Section~\ref{subsec:checkers}).
 
 \subsection{Reordering Issue}
@@ -15,16 +15,15 @@ Since OPCORD rewrites designs it did not compile, a checker tests each rewrite a
 
 
 
-% VALUE: the composer reorders issue across operators: it list-schedules the host program's dependency graph chunk by chunk rather than stage by stage, pairing each attention operator with ready GEMMs of matching work; a composed command keeps each operator's segments in order and every instruction once, so only when work is issued and awaited changes; an append plans only its new chunks
+% VALUE: the composer reorders issue across operators: it list-schedules the host program's dependency graph chunk by chunk rather than stage by stage, pairing each attention operator with ready GEMMs of matching work; a composed command keeps each operator's segments in order and every instruction once, so only when work is issued and awaited changes
 \label{subsec:compose}
 % DECISION: subsec:compose names the composer's part of the reorder and resolves to this subsection; the conditions the former composing subsection stated are in Section~\ref{sec:order}.
 The existing host program runs a layer stage by stage, so no GEMM is ready to run beside attention.
 Our \emph{composer} instead list-schedules the host program's dependency graph chunk by chunk, from the design's per-operator streams and probes, and emits commands that we call the \emph{composed schedule}.
-Each command pairs the ready attention operator of the lowest layer and chunk with ready GEMMs whose estimated work matches it, and an append to a cached context plans only its new chunks.
+Each command pairs the ready attention operator of the lowest layer and chunk with ready GEMMs whose estimated work matches it.
 A command concatenates its operators' segments under the conditions of Section~\ref{subsec:legality}, so composing changes when work is issued and awaited, never what the work is.
 % SOURCE: merged.plan (amd-npu a0ee2ed prefill-overlap/merged.py, now opcord/compose/merged.py at aie-cosched opcord-runtime 446fa1c): qkv(L, c) after down(L-1, c); attn(L, c) after qkv(L, 0..c); o after attn; gate and up after o; down after gate and up; GEMMs added in the same order until their estimated work reaches the attention operator's; an optional cap on the GEMMs per attention command.
 % SOURCE: txn.segments and txn.compose (a0ee2ed prefill-overlap/txn.py, now opcord/compose/txn.py); compose asserts each stream's segment order, every op kept once, and equal headers.
-% SOURCE: append = Merged.prefill(ids, start=L) on the same plan rules; attention estimates linear in the absolute chunk index (vault lab-agent-step (1)).
 
 % VALUE: within a command, the composer opens every group's work and then places each synchronization at its predicted completion, followed by the issue it gates, so no synchronization holds back another group's work; attention's two columns count as two groups; the order is fixed at build time and runs without the host; its price is the shared DRAM read rate, priced in Section 5
 Because packing the operators into one command in turn would still leave the GEMM group idle while the CP walks attention's synchronizations (Figure~\ref{fig:order}b), the composer issues the opening segments of every group first.
@@ -59,29 +58,24 @@ The prefill needs no renaming, because the existing host program already gives e
 % SOURCE: shipped naming is one slot per role per chunk; R-ship (the composed schedule at shipped's per-chunk naming) equals the composer with rings within 0.1% (0.99996-1.00074, amd-npu 71081d1) and holds 4-7x the rings' buffer bytes (vault lab-prefill-overlap (29), third revision); merged.colour and Layout (a0ee2ed, now opcord/compose/merged.py).
 % DECISION: the prefill rings remove nothing and are never listed as a removal (decisions log D19, 2026-10-22).
 
-\subsection{Partitioning per Regime}
+\subsection{Choosing the Order and the Split}
 \label{subsec:split}
 
-% VALUE: the split is a hand-fixed build parameter of the existing design; the legal splits S1, S2 (default), S4 follow from the KV heads; each split is its own configuration built from the unchanged source, with outputs bit-identical to the default split, so the existing program and the composer each run on any of them
-The existing design fixes its split by hand, as a parameter of its build.
+% VALUE: the split is a build parameter of the existing design; the legal splits S1, S2 (default), S4 follow from the KV heads; each split is its own configuration built from the unchanged source, with outputs bit-identical to the default split, so the existing program and the composer each run on any of them
+The existing design fixes its split as a parameter of its build.
 Since each attention group serves an equal share of the KV heads, an LLM with 8 KV heads admits attention on 1, 2, or 4 columns, which we call the splits $S_1$, $S_2$, and $S_4$, with $S_2$ the default.
 We build each split as its own configuration from the unchanged source, with outputs bit-identical to those of the default split, so the existing program and the composed schedule can each run on any of them.
 % SOURCE: mlir-air a3e26261 fused_prefill/device.py: Attn(col=...) per group in Config.attn, GCOL0, GNC = 1, 6 as module constants; spec() splits kv_heads evenly, so 1, 2, or 4 attention columns with 8 KV heads (vault lab-split-sweep (1)).
 % SOURCE: out-of-tree split modules; logits bit-identical to the default split in every configuration on both models (vault lab-split-sweep (2), (4), (5)).
 
-% VALUE: the composer prices every candidate (split, existing or composed order, host policy) with the event model and runs the cheapest; more attention columns shorten attention and lengthen the GEMMs, and the group that binds decides the direction (GEMMs from scratch, attention on long appends); because the existing order is a candidate, it runs where composing is priced higher
-Before a prompt runs, the composer prices every candidate with the event model (Section~\ref{subsec:pricing}), namely each split, the existing order and the composed one, and each host policy (Appendix~\ref{app:host}), and it runs the cheapest.
-More attention columns shorten attention, whose time grows with the context, but lengthen every GEMM.
-The GEMMs therefore bind for prompts computed from scratch, which favours fewer attention columns, whereas attention binds on appends to a long cached context, which favours more (Section~\ref{subsec:bound-eval}).
-Because the existing order is among the candidates, the composer keeps it wherever composing is priced higher.
-% SOURCE: opcord/plan/planner.py choose(model, L, N) at aie-cosched opcord-runtime 446fa1c: candidates every split with a committed probe (S1, S2, S4), arms ship / shipar / comp, composer policies depth {1, 2, 4, 8} x GEMM cap {none, 4} x packing {1, 4}, each priced by event_model.predict, cheapest returned with the whole table (vault lab-split-sweep, N6 and N7; decisions log D24 N3).
+% VALUE: before a prompt length runs, the composer prices every candidate (split, existing or composed order, host policy) with the event model and runs the cheapest, settling near-ties by a short measurement; more attention columns shorten attention and lengthen the GEMMs, so the split that pays moves with the balance of the two groups; because the existing order is a candidate, the composer keeps it where composing is priced higher, as at prompts of one or two chunks
+Before a prompt length runs, the composer prices every candidate with the event model (Section~\ref{subsec:pricing}), namely each split, the existing order and the composed one, and each host policy (Appendix~\ref{app:host}), and it runs the cheapest, settling a near-tie by a short measurement.
+More attention columns shorten attention, whose time grows with the prompt, but lengthen every GEMM, so the split that pays moves with the balance between the two groups (Section~\ref{subsec:exposure}).
+Because the existing order is among the candidates, the composer keeps it wherever composing is priced higher, as at prompts of one or two chunks.
+The plan for a prompt length is computed once and reused by every later prompt of that length.
+% SOURCE: opcord/plan/planner.py choose(model, L, N): candidates every split with a committed probe (S1, S2, S4), arms ship / shipar / comp, composer policies depth {1, 2, 4, 8} x GEMM cap {none, 4} x packing {1, 4}, each priced by event_model.predict, cheapest returned with the whole table; measure-when-close (planner.decide) as in Section~\ref{subsec:pricing}.
 % SOURCE: the four-column split's GEMMs are 27% (1B) and 35% (Qwen3-4B) slower than on six columns, and its attention slope per chunk 3.0-3.1x lower than the default split's existing stream (vault lab-split-sweep (4)-(5)).
-% DECISION: this states the current planner (N3); the evaluation's present cells used the measured-arm policy of the earlier composer, and the final sweep runs through choose() (vault decisions log D24; eval re-run planned).
-
-% VALUE: chosen splits stay resident and a conversation switches at a turn boundary, moving its cached context to the new split's attention groups; the price of a per-regime split is memory or a switch with a relayout, priced in the appendix; neither applies within one regime
-Each chosen split stays resident in its own hardware context, and a conversation switches split at a turn boundary, moving its cached context to the new split's attention groups at a cost that Appendix~\ref{app:relayout} prices.
-% SOURCE: one copy of the weights per resident split (vault lab-metric-fields (1)); warm switch by suspend and resume (lab-split-sweep (5)); relayout measured (lab-split-sweep (38)); the numbers are in Appendix~\ref{app:relayout}.
-% DECISION: the tradeoffs are stated beside the decision that incurs them rather than collected in a section (author, 2026-10-21).
+% DECISION: resident splits, switching at a turn boundary, and relayout belong to agent workloads, an extension under spine v18; their text is archived in the vault.
 
 \subsection{Legality Checkers}
 \label{subsec:checkers}

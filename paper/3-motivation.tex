@@ -39,7 +39,7 @@ Nor does a second hardware context, because the driver gives every context all e
 
 % VALUE: one command that issues all of one group's work before any synchronization runs the pair at the longer one's time; the cost appears near the DRAM read cap; because the CP is in order, the order inside a command is itself a scheduling decision, so serial execution is a property of composition, not of the array
 In contrast, one command that issues all of the GEMM's work, then the attention operator's stream, and only then the GEMM's synchronizations runs the pair within 6\% of the longer operator's time alone (Figure~\ref{fig:order}c).
-The small excess appears where the pair's DRAM reads approach the \emph{read cap}, which is the highest DRAM read rate that the column groups together sustain (Section~\ref{subsec:removal}).
+The small excess appears where the pair's DRAM reads approach the \emph{read cap}, which is the maximum DRAM read rate that the column groups together sustain (Section~\ref{subsec:removal}).
 Because a synchronization on one group delays every later issue to the other (Section~\ref{subsec:platform}), the order of instructions within a command, and not only which operators share it, is a scheduling decision.
 The serial execution of the existing prefill is therefore a property of how its commands are composed, not of the array.
 % SOURCE: interleaved / max(A, G) = 0.998-1.058 over 10 pair runs = 9 pairs (c8 + lm measured twice, 1.054 and 1.058; the figure keeps each pair's first measurement); GEMM shapes up, LM head chunk, down; attention chunks 0, 4, 8, 12, 15 (lab-prefill-overlap (3)).
@@ -104,8 +104,9 @@ MLIR-AIR's double-buffering transformation declines the loop because its running
 \subsection{Challenges}
 \label{subsec:challenges}
 
-% VALUE: removing these waits from compiled designs poses three challenges, one per section: recover the order from binaries without source (Section 4), price a schedule without running it (Section 5), rewrite legally without the compiler that built the design (Section 6)
-Removing these waits from already compiled designs poses three challenges.
-First, the order must be recovered from binaries without their source, although even an open design spreads it over the CP's stream, DMA chains, and core loops (Section~\ref{sec:order}).
-Second, a schedule must be priced without running it, because the program fixes the order of the work but not its durations, and the candidates multiply with chunks, column divisions, and removals (Section~\ref{sec:pricing}).
-Third, a reorder or a rename must be shown legal without the compiler that built the design, from what the instructions alone establish about buffers, locks, and routes (Section~\ref{sec:method}).
+% VALUE: removing these waits from compiled designs poses four challenges, one per section: decide which false orders can pay at all (Section 4), recover the order from binaries without source (Section 5), price an order without running it (Section 6), rewrite legally without the compiler that built the design (Section 7)
+Removing these waits from already compiled designs poses four challenges.
+First, a design holds many false orders, most of which cost nothing, so we need a condition that says which can pay before any is removed (Section~\ref{sec:condition}).
+Second, the order must be recovered from binaries without their source, although even an open design spreads it over the CP's stream, DMA chains, and core loops (Section~\ref{sec:order}).
+Third, an order must be priced without running it, because the artifact fixes the order of the work but not its durations, and the candidates multiply with chunks, column splits, and removals (Section~\ref{sec:pricing}).
+Fourth, a reorder or a rename must be shown legal without the compiler that built the design, from what the instructions alone establish about buffers, locks, and routes (Section~\ref{sec:method}).

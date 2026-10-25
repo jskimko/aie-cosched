@@ -230,9 +230,9 @@ Although we evaluate one NPU, our findings rest on properties that other spatial
 Where an in-order issuer mediates the concurrency of an array, its instruction order may act as the schedule, so packing work into fewer dispatches may yield little concurrency, and a second queue or a completion signal per group of columns could remove the rationing in hardware (Sections~\ref{subsec:semantics} and~\ref{subsec:ablation}).
 Where operators are partitioned spatially, the faster partition may change between computing a prompt from scratch and appending to a cached context, so an evaluation of prompts computed from scratch alone could choose the partition that is slower for agents (Section~\ref{subsec:ablation}).
 Where issue returns at once and waits block, probes of each operator alone may rank configurations reliably even where they misprice them, so a configuration can be chosen before it runs (Section~\ref{subsec:accuracy}).
-Once the issue order is right, the binding term may move from the issuer to the groups' own busy time, so further gains could come from kernels and from the balance of work between groups rather than from scheduling (Section~\ref{subsec:bound-eval}).
+Once the issue order is right, the binding term may move from the issuer to the groups' own busy time, so further gains could come from kernels and from the balance of work between groups rather than from scheduling (Section~\ref{subsec:accuracy}).
 Where an operator reuses one buffer across the iterations of a loop, reordering issue across operators cannot reach the resulting wait, whereas renaming the buffer inside the operator could (Section~\ref{subsec:decode-eval}).
-Finally, where agents append to long contexts, prefill becomes bound by attention and decode by the KV cache, so gains measured on prompts computed from scratch may misstate what an agent's turn gains (Section~\ref{subsec:turns}).
+Finally, where agents append to long contexts, prefill becomes bound by attention and decode by the KV cache, so gains measured on prompts computed from scratch may misstate what an agent's turn gains (Section~\ref{subsec:e2e}).
 % DECISION: each sentence is re-checked against its section's result at the results freeze; a sentence whose result does not hold is dropped (vault paper-cosched-plan, section 6).
 
 % The former limits paragraph is distributed to the points it qualifies: the passes' scope to the passes, the
@@ -632,7 +632,7 @@ When issue costs are negligible, the estimates are exact, and the host work is h
 % VALUE: the price of running the two groups at once: the columns share the DRAM read cap, so a group whose partner is bandwidth-bound loses a measured share of its partner's time, and the ceiling on a pair is below the ideal; where a group is already near the cap there is nothing to win
 Running the two groups at once is not free, because the columns share one DRAM read rate.
 A group on the critical path loses 8.5\% of its partner's duration when it is bandwidth-bound and almost nothing when it is not, so two operators of equal duration overlap to within $1.84\times$ of the longer rather than the ideal $2.00\times$ (Section~\ref{subsec:removal}).
-Where a design already reads near the cap the reorder therefore has little to recover, which Section~\ref{subsec:bound-eval} reports for the largest model we evaluate.
+Where a design already reads near the cap the reorder therefore has little to recover, which Section~\ref{subsec:accuracy} reports for the largest model we evaluate.
 % SOURCE: the penalty by regime and the 1.84x ceiling are Section 5's measurement; per command on Llama-3.2-1B at 4,096 tokens, commands carrying GEMMs read 90-93% of the cap and commands carrying attention about 15% (vault decisions log, "Regime analysis" steps 1 and 3); the 8B composed prefill averages 93-96% of the cap (lab-metric-fields (1)).
 
 \subsection{Host Boundaries}
@@ -889,7 +889,7 @@ The gain is smaller on Qwen3-4B because its serialized compute per position is 0
 % SOURCE: the value path alone (lab-cosched-passes (61) registration, (64) result; amd-npu 89c4345a outputs committed before reading, fit 27c3d60f): P3, K and V in both columns, 0.6245 us per block [0.6225, 0.6259], below the value kernel's 0.6487 (coupled-pair arm (ii), lab-cosched-passes (59), census placement) by more than its CI, so by the registered rule kv's loop binds R; R measures 0.683 per position (lab-decode-long-context (22)), its 0.034 above kv not attributed. Corrected 2026-10-23: the earlier sentence said the renamed loop runs at the rate of its own transfer.
 
 \textbf{The Faster Split and a Regime Rule.}
-A reader may object that the split follows a one-line rule, since Section~\ref{subsec:bound-eval} explains the faster split by which group binds.
+A reader may object that the split follows a one-line rule, since Section~\ref{subsec:accuracy} explains the faster split by which group binds.
 Every cell scored here is an append to a cached context, so that rule reduces to answering with the four-column split everywhere, which is the better of the two constant rules and scores 27.
 The measured faster split is not constant across these cells, and what varies is the model rather than the regime: Llama-3.2-1B and Qwen3-4B want four attention columns in every scored cell and Llama-3.1-8B in seven of its nine, whereas Gemma3-4B wants two in seven of its nine.
 A rule keyed on the regime cannot see that; pricing each configuration can.

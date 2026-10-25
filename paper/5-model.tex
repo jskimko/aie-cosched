@@ -28,10 +28,10 @@ The buffer assignment maps each use of a buffer to a slot in memory, since two u
 The number $D$ of commands in flight and the packing of commands manage only the boundary with the host and would disappear if the host's work moved onto the array, so we report their effect apart.
 
 \textbf{Timing.}
-% VALUE: the command semantics as rules: commands in sequence after a boundary cost or the dispatch floor; within a command, a segment's work starts once issued and its predecessor has finished; co-running operators pay an overlap cost
-A command starts once its predecessor completes, after a \emph{boundary cost} $\epsilon$ if it was already queued, or after the dispatch floor $F$ if it reaches an idle device.
+% VALUE: the command semantics as rules: commands in sequence after a setup or the dispatch floor; within a command, a segment's work starts once issued and its predecessor has finished; co-running operators share the DRAM read rate
+A command starts once its predecessor completes, after the \emph{setup} of its first operator if it was already queued, or after the dispatch floor $F$ if it reaches an idle device.
 Within a command, the CP walks $\sigma_k$ in order, and the work of segment $s_{o,j}$ starts once it is issued and $s_{o,j-1}$'s work has finished, and a synchronization completes once it is reached and the work it names has finished.
-Operators running at once on different groups each pay an overlap cost (Section~\ref{subsec:removal}).
+Operators running at once on different groups share the DRAM read rate (Section~\ref{subsec:removal}).
 
 \textbf{Objective.}
 % VALUE: minimize the makespan, which for prefill is TTFT less the head and tail (the work before the first decoder layer and after the last)
@@ -68,42 +68,52 @@ We use it as a test on the recovered graph with measured costs, which discards e
 % DECISION: the condition is stated as necessary only: a longest-path or cycle criterion is valid on an uncapacitated graph, and this machine has a shared DRAM cap, a shared command processor and a per-command boundary cost; the capacity half is the measured regime of this section, and the 8B at cap and the loss at 512-token appends are the two negative instances inside the paper.
 % DECISION: the bound's sentences follow outline v9 section 3's rows (P4 withdraws them, P4u marks them untested); the critical-cycle sentences follow the W1-W5 table.
 
-% VALUE: the read cap makes the allowed overlap depend on which operator holds the critical path (two cases): a bandwidth-bound GEMM pays a fixed share of its partner's time, attention almost nothing, so two equal operators run together at most 1.81-1.84x faster than in sequence rather than 2.00x; in a prefill the GEMMs are the ones near the cap; the same cap bounds reordering decode's stream
-Because the groups share the read cap, overlap costs almost nothing where attention holds the critical path, but costs a GEMM that reads near the cap about a tenth of its partner's time, and in a whole prefill the GEMMs are the operators near the cap (Appendix~\ref{app:dram-regimes}).
-% SOURCE: computed in aie-cosched-paper-0 tmp/regime/{pairs,model,final}.py from lab-prefill-overlap (3)'s pre-registered pair table (10 pair-runs on Llama-3.2-1B, 5 attention chunk indices x 3 GEMM shapes, medians of 20, DRAM measured during each concurrent run, cap 53.9-55.3 GB/s): with the GEMM on the critical path the penalty is 3 us + 0.085 x the co-runner's duration (R2 = 0.993, 5 runs, ratio 0.084-0.105); with attention on it the penalty is 21 us - 0.015 x the co-runner (R2 = 0.896, 5 runs, ratio -0.002 to 0.029), at most 15 us on the five pairs; penalty against the pair's total DRAM rate correlates at only r = 0.54, so the regime of the critical-path operator is the predictor and total bandwidth is not (vault decisions log, "Regime analysis, step 1"). Ceiling for two equal durations: 2 / (1 + r) = 1.84-1.81 for r = 0.084-0.105 (derivation in the appendix).
-% SOURCE: GEMM-only commands read 90-93% of the cap and attention-only about 15% during Llama-3.2-1B's 4,096-token prefill (amd-npu 71901c50 metrics/retro-2026-10-21/dram-retro.txt; vault lab-metric-fields (1) and its amendment 1); per-command detail in the appendix.
+% VALUE: because the groups share the DRAM read rate, two overlapped groups take at least their total bytes over the read cap, so overlap costs little where attention holds the critical path and costs the GEMMs, which read near the cap, a share of their partner's time; in a prefill the GEMMs are the operators near the cap
+Because the column groups share the DRAM read rate, two groups that overlap take at least their total bytes divided by the read cap (Section~\ref{subsec:semantics}).
+Overlap therefore costs almost nothing where attention, which reads little, holds the critical path, but it costs a GEMM that reads near the cap a share of its partner's time, and in a whole prefill the GEMMs are the operators near the cap (Appendix~\ref{app:dram-regimes}).
+% SOURCE: GEMM-only commands read 90-93% of the cap and attention-only about 15% during Llama-3.2-1B's 4,096-token prefill (amd-npu 71901c50 metrics/retro-2026-10-21/dram-retro.txt; vault lab-metric-fields (1) and its amendment 1); the read cap from the 8x2 bracket, 53.93 GB/s at the calibration hold (amd-npu d94266bf prefill-overlap/calib/run-2026-10-22/batch.log), re-read at every batch.
 
-% VALUE: the bound is prescriptive (build a removal only where its bound exceeds its cost); since it never falls below one it cannot predict a loss, which the event model prices instead (the 512-token appends, in the evaluation)
+% VALUE: the bound is prescriptive (build a removal only where its bound exceeds its cost); since it never falls below one it cannot predict a loss, which the event model prices instead (the short prompts, in the evaluation)
 A removal is therefore worth building only where its bound exceeds its cost, which for a rename is the local memory, BDs, locks, and channels it takes, and for a reorder the synchronization and planning it adds.
-The bound cannot predict a loss, such as the per-command costs that make reordering lose on short appends, so the event model prices those (Section~\ref{subsec:ablation}).
-% SOURCE: the bound and its typed resources (outline v9 section 2, C1; vault lab-bound-validation (1)); the 512-token loss and its SOURCE are in 7-eval Sources of the Gains.
+The bound cannot predict a loss, such as the per-command costs that make reordering lose on prompts of two chunks, so the event model prices those (Section~\ref{subsec:shape-eval}).
+% SOURCE: the bound and its typed resources (outline v9 section 2, C1; vault lab-bound-validation (1)).
 
 \subsection{Event Model}
 \label{subsec:pricing}
 
-% VALUE: to choose among schedules without running each, an event simulation of the device, the CP, and the host prices a schedule from measured terms only (eq:cmd; per-command busy with the two overlap cases; the host program, for the existing program as for ours), and reports device time, host exposure, and the head and tail apart; Table params lists the measured constants of one configuration
-To choose among schedules without running each, we price a schedule with an event simulation of the device, the CP, and the host, whose every term is measured (Appendix~\ref{app:pricing-details} lists them).
+% VALUE: to choose among orders and splits without running each, an event simulation of the device, the CP, and the host prices a schedule; its form follows the platform (one in-order queue of commands, a host timeline with waits, column groups that overlap within a command) and its parameters are the operators' own timings plus a few machine constants measured once by microbenchmarks; the existing program runs through the same simulation, so both sides are priced alike; device time, host exposure, and head and tail reported apart
+% COMMENT: this subsection describes the event model's rebuilt form (setup by column group, overlap bounded by bytes over the read cap, the head as a probed operator), which npu-gap is implementing in development; confirm every term against the implementation before the freeze.
+To choose among orders and splits without running each, we price a schedule with an event simulation of the device, the CP, and the host, whose form follows the platform and whose parameters are measured.
 Queued commands run one at a time (Section~\ref{subsec:semantics}), so command $k$ ends at
 \begin{equation}
 \label{eq:cmd}
-e_k = \max\bigl(e_{k-1} + \epsilon_k,\; q_k + F\bigr) + b_k,
+e_k = \max\bigl(e_{k-1} + s_k,\; q_k + F\bigr) + b_k,
 \end{equation}
-where $q_k$ is the time the host queues it and the boundary cost $\epsilon_k$ depends on whether commands $k-1$ and $k$ carry attention.
-The busy time $b_k$ sums the command's GEMMs with a gap $\gamma$ per additional GEMM.
-With attention work $a$ beside GEMM work $g$, it becomes $\max(a, g) + \alpha_r + \beta_r \min(a, g)$, with one line for each case $r$ of Section~\ref{subsec:removal}, namely whether the GEMMs or attention hold the critical path, chosen by the longer of the two.
+where $q_k$ is the time the host queues it and $s_k$ is the setup of its first operator, which depends only on whether that operator runs on the same column group as the operator before it, since setup on another group can proceed while the previous command finishes.
+Within a command, each column group's time is the sum of its operators' timings alone, with the same-group setup between consecutive operators, and two groups that overlap take
+\begin{equation}
+\label{eq:overlap}
+b_k = \max\Bigl(\max_{g} t_{k,g},\; \frac{\sum_g \beta_{k,g}}{R}\Bigr),
+\end{equation}
+where $t_{k,g}$ and $\beta_{k,g}$ are group $g$'s time and DRAM bytes in command $k$ and $R$ is the read cap.
 On the host side, each command costs an issue and each operator a post-processing step, and the host waits on the oldest command once $D$ are in flight.
 The existing program runs through the same simulation as its own host program, so both sides of every comparison are priced alike.
-Finally, the event model adds the head and tail to the makespan and reports the device time, the host's exposed time, and the head and tail separately, so an error in one term cannot hide behind another.
-% SOURCE: opcord/model/event_model.py at aie-cosched opcord-runtime 446fa1c (simulate: end_k = max(end_{k-1} + eps_{prev->kind}, t_issue_k + F) + busy_k; composed: max(a, g) + a_r + b_r x min(a, g), r = G if g >= a else A; GEMMs: sum + gamma x (n - 1); composer_program and shipped_program through one simulate()); N2 closed 2026-10-23 (vault lab-split-sweep (48); paper-cosched-decisions-log N2).
-% DECISION: this subsection describes the event model at opcord-runtime 446fa1c (one machinery for every arm, per-transition boundary costs, two overlap regimes, constants from microbenchmarks only); the accuracy that Section 7 reports is re-derived on this form at the final sweep.
+Finally, the event model adds the work before the first decoder layer and after the last, which it prices as ordinary operators, and reports the device time, the host's exposed time, and that work separately, so an error in one term cannot hide behind another.
+% SOURCE: opcord/model/event_model.py simulate() (one in-order queue; host program with waits); the rebuilt form, constants schema version 2 (npu-gap, opcord dev checkout; vault decisions log "The model rebuilt from a logical base", 2026-10-24); bytes per operator instance from the instruction streams' buffer descriptors (pass-0 tools/bprime_check byte model).
 
-% VALUE: only the per-operator busy times depend on the LLM and the split, measured once per configuration by probing each operator alone; the structural and host terms are measured once by microbenchmarks; no constant is fitted to an LLM's end-to-end runs
-Only the operators' busy times depend on the LLM and the split, so they are the terms we measure once per configuration, by dispatching each GEMM alone and each attention chunk alone at several cached-context lengths.
-Between probed points the event model interpolates, and beyond them it refuses to price.
-The structural terms, namely $F$, the boundary costs, $\gamma$, and the overlap lines, are measured once on the platform by microbenchmarks on dummy data, and the host's costs and the head and tail by microbenchmarks at each LLM's dimensions.
-No constant is therefore fitted to an LLM's end-to-end runs, and every LLM of Section~\ref{subsec:accuracy} tests the event model rather than supplying its constants.
-% SOURCE: attn_probe_busy (opcord-runtime 446fa1c): exact at a probed point, linear between probed chunks and between the two probed contexts around L, ValueError beyond them; probes per (model, split) on the 20k builds at contexts 0, 2k, 4k, 8k, 12k, 16k and on the 1B's and Qwen3-4B's 32k builds at 0, 16k, 28k (vault lab-split-sweep (48), calibration hold 2026-10-22, outputs d94266bf).
-% SOURCE: constants from microbenchmark sources only (calib_read.py refuses any other kind): F from the bypass floor; eps per transition from 6 fitted back-to-back sequences, within 3% on 3 never fitted; gamma from 1-6 GEMMs in one command; the two overlap lines from a 30-cell co-run grid on the 1B S2 build's kernels with dummy data, within 3% on the half not fitted; host issue and post costs from host_bench.py (the composer's host code at each model's dimensions) and the head (fixed + per token) from the head operators' own probes, per model (vault lab-split-sweep (45), (48); paper-cosched-decisions-log D22).
+% VALUE: the operators' timings and bytes depend on the LLM and the split and are measured once per configuration by running each operator alone or read from its streams; the few machine constants (dispatch floor, setup within and across groups, host issue and post, read cap) are measured once by microbenchmarks, all non-negative, none fitted to an LLM's end-to-end runs; precedent: analytical models whose parameters are machine constants measured by microbenchmarks
+Only the operators' timings and bytes depend on the LLM and the split, so we measure the timings once per configuration by dispatching each GEMM alone and each attention chunk alone at several cached-context lengths, and read the bytes from the operators' streams.
+Between measured points the event model interpolates, and beyond them it refuses to price.
+The machine constants, namely $F$, the setup within and across groups, the host's issue and post-processing costs, and $R$, are measured once by microbenchmarks on dummy data, as analytical models of communication and of memory-bound kernels measure theirs~\E{cite: Hockney; LogP; roofline}.
+No constant is fitted to an LLM's end-to-end runs, so every configuration of Section~\ref{subsec:accuracy} tests the event model rather than supplying its constants.
+% SOURCE: microbenchmarks (npu-gap prefill-overlap/microbench.py): dispatch floor from empty commands; setup from back-to-back sequences mixing same-group and cross-group pairs, non-negative least squares on one set and checked on another; read cap from co-runs on both sides of the crossover between the longest group and bytes over the cap; per split build (S1, S2, S4 of Llama-3.2-1B) with a Qwen3-4B transfer check; values \E{pending}.
+% COMMENT: bib entries needed (read each source first): Hockney's model, LogP / LogGP, the roofline model.
+
+% VALUE: the event model's error is stated on the difference between candidates, so its choice is right whenever two candidates differ by more than about twice that error and costs at most about that much otherwise; where the top candidates fall inside a frozen band, a short measurement at plan time settles the tie, and the unaided choice is always reported
+Because a choice compares candidates, we state the event model's error on the difference between two candidates' times rather than on each time alone.
+Its choice is then right whenever two candidates differ by more than about twice that error, and otherwise costs at most about that much.
+Where the top candidates fall inside a band of 5\% for orders of one kind or 15\% between a composed and a shipped order, the composer runs each candidate briefly when it plans the shape and keeps the faster, and we always report the event model's unaided choice beside it (Section~\ref{subsec:decision}).
+% SOURCE: measure-when-close, implemented test-first in opcord (planner.CLOSE_BAND, close_candidates, decide; test_measure_close 10/10); bands same 5%, cross 15%, tie 0.5%, one warm and three kept runs per candidate; about 19 min of device time over the whole grid, once per shape (vault decisions log, "Spine v18 drafted; amendment-1 batch and measure-when-close approved").
 
 % VALUE: decode is priced by a two-term time per token whose per-position cost is the KV transfer and compute in series when the loop is single-buffered and the larger of the two when double-buffered
 For decode, we price the time per token with two terms instead, as $T_0 + c\,L$ over $L$ cached positions, whose per-position cost $c$ is the KV transfer plus the compute when the loop is single-buffered and the larger of the two when it is double-buffered (Appendix~\ref{app:pricing-derivations}).

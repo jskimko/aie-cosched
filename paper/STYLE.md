@@ -428,6 +428,19 @@ Copied from the portable guide (vault `0-notes/ai-instructions/paper-writing-sty
 FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`, the IEEE template) and FPGA'27
 (`~/docs/FPGA27__Control_Packet_Reconfiguration.pdf`, FCPR). Entries marked *proposal* wait for the author.
 
+- **Stage, structure, framing and baseline (2026-10-24; supersede the entries below where they differ):** the spine
+  is the vault's `paper-cosched-spine-v18` (the author chose the lead on 2026-10-24: the system leads, and a condition
+  is the finding). Structure: 1 Introduction; 2 Background; 3 Motivation; 4 When a False Order Costs Time (the
+  condition; exposure, the cut and the shape; where the stacks meet it); 5 Scheduling a Compiled Design (analysis and
+  legality, closed binaries read and bounded); 6 Pricing Schedules (formulation, bound, the event model in its rebuilt
+  form, the guarantee on the difference between candidates, the tie-break measurement); 7 OPCORD (composer, stream
+  pass, loop pass, choosing the order and the split per prompt length, checkers); 8 Evaluation; 9 Related Work;
+  10 Conclusion. Contributions: four items (the analysis method, the condition, the event model and bound, OPCORD).
+  The baseline is the existing program on the shipped split that minimizes its TTFT, run on the faster of its own
+  host code and our runner; the hand-alternated baseline is retired. FastFlowLM, taken as released, is an
+  observation for the condition only, never a speedup reference and never "hand-tuned" or "expert". Appends and agent
+  turns are an extension and stay out of the body. The text before this rewrite is archived verbatim in the vault
+  (`archive-tex-2026-10-24`).
 - **Venue** (author, 2026-10-15): **MLSys'27** research track; FCCM'27 is the fallback only if the audit kills a
   headline. Call (mlsys.org/Conferences/2027/CallForResearchPapers, read 2026-10-15): OpenReview, submissions open Oct
   19, deadline **Oct 30, 2026, 19:00 UTC** (12:00 PM PDT on the home page; the call says 20:00 UTC; plan for the
