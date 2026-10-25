@@ -49,8 +49,8 @@ Its choice of order and split stays within \E{X}\% of the measured minimum on ev
 % DECISION: four noun-phrase items, per spine v18 (author's framing decision, 2026-10-24): the condition joins the method, the event model and OPCORD; no evaluation item.
 In summary, the primary contributions of this work are as follows:
 \begin{itemize}
-    \item A method for analysing compiled NPU programs, closed ones included, as dependence graphs over every agent that touches state, namely the CP with its transfers, the cores, and the host, which decides from the artifacts alone whether a reorder or a rename is legal.
+    \item A method for analysing compiled NPU programs, closed ones included, as dependence graphs over every agent that touches state, which decides from the artifacts alone whether a reorder or a rename is legal.
     \item A condition for when a false order costs time on a spatial NPU, tested on a census of 112 designs from three stacks and by varying a synthetic design.
-    \item An event model and bound, analytical in form with constants from microbenchmarks and timings of each operator run alone, that price an order and a split per prompt length before they run and limit what removing each false order can gain.
-    \item The design and implementation of OPCORD, a composer that reorders issue across commands and two MLIR-AIE passes that reorder within an operator's stream and rename decode attention's buffers into rings, each behind a checker that refuses any rewrite it cannot show legal, with the kernels, driver, and firmware unchanged.
+    \item An event model and bound, analytical in form with constants from microbenchmarks, that price an order and a split per prompt length before they run.
+    \item The design and implementation of OPCORD, a composer and two MLIR-AIE passes that remove the false orders their price clears from compiled designs behind legality checkers, with the kernels, driver, and firmware unchanged.
 \end{itemize}

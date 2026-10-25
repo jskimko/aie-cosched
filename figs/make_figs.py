@@ -249,7 +249,7 @@ def fig_bound():
 
 
 def fig_order():
-    """Schematic: the same operators under three issue orders, with what the CP is doing beneath each.
+    """Schematic: the same operators under two issue orders within one command, with what the CP is doing beneath each.
 
     Durations are illustrative, not measured; the figure shows the mechanism, and the measured version of the
     same effect is Figure~\\ref{fig:outstanding}. An issue returns at once, so it is drawn narrow; a
@@ -265,12 +265,11 @@ def fig_order():
     ours_cp = [(i * ISS, ISS, 0) for i in range(4)]
     ours_cp += [(4 * ISS, max(A, 3 * G) - 4 * ISS, 1)]
     panels = [
-        ("(a) One operator per command", serial_attn, serial_gemm, serial_cp, A + 3 * G),
-        ("(b) One command, operators in turn", serial_attn, serial_gemm, serial_cp, A + 3 * G),
-        ("(c) One command, every group's work issued before any wait",
+        ("(a) One command, operators in turn", serial_attn, serial_gemm, serial_cp, A + 3 * G),
+        ("(b) One command, every group's work issued before any wait",
          serial_attn, [(i * G, G) for i in range(3)], ours_cp, max(A, 3 * G)),
     ]
-    fig, axes = plt.subplots(3, 1, figsize=(COLUMN, 2.6))
+    fig, axes = plt.subplots(2, 1, figsize=(COLUMN, 1.85))
     span = max(p[4] for p in panels)
     for ax, (title, attn, gemm, cp, end) in zip(axes, panels):
         for color, bars, y in ((MAGENTA, attn, 1.0), (BLUE, gemm, 0.0)):
@@ -367,7 +366,7 @@ def fig_decode():
     what the renaming removes is the part of each position's cost that waited on the previous block."""
     panels = [("Llama-3.2-1B", "decode-1b.json", MAGENTA, "o"),
               ("Qwen3-4B", "decode-qwen.json", BLUE, "s")]
-    fig, axes = plt.subplots(2, 1, figsize=(COLUMN, 2.9), sharex=True)
+    fig, axes = plt.subplots(1, 2, figsize=(COLUMN, 1.6), sharex=True)
     for ax, (model, name, color, marker) in zip(axes, panels):
         d = json.loads((DATA / name).read_text())
         pts = sorted((int(p), v) for p, v in d["points"].items())
@@ -384,18 +383,18 @@ def fig_decode():
         ax.plot(x, [v["R_ms_tok"] for _, v in keep], color=color, marker=marker, label="Renamed")
         for p, v in keep[-1:]:
             ax.annotate(f"${v['census_ms_tok'] / v['R_ms_tok']:.2f}\\times$",
-                        (p, v["R_ms_tok"]), textcoords="offset points", xytext=(-2, -9),
+                        (p, v["R_ms_tok"]), textcoords="offset points", xytext=(1, -13),
                         ha="right", fontsize=7, color=color)
         slope = d["R_fit"]["slope_us_per_pos"]
         base = d["census_fit"]["slope_us_per_pos"]
-        ax.text(0.03, 0.9, f"{model}: {base:.2f} to {slope:.2f}\\,$\\mu$s per position",
-                transform=ax.transAxes, fontsize=7, va="top")
-        ax.set_ylabel("ms per token")
+        ax.set_title(model, fontsize=7, pad=2, loc="left")
+        ax.text(0.03, 0.97, f"{base:.2f} to {slope:.2f}\\,$\\mu$s/pos.",
+                transform=ax.transAxes, fontsize=6.5, va="top")
+        ax.set_xlabel("Cached context, tokens")
         ax.set_ylim(0, None)
-    axes[0].legend(ncol=2, loc="lower right", handlelength=1.8)
-    axes[-1].set_xlabel("Cached context, tokens")
-    axes[-1].set_xticks([0, 8192, 16384, 24576, 32768], ["0", "8k", "16k", "24k", "32k"])
-    fig.align_ylabels(axes)
+        ax.set_xticks([0, 16384, 32768], ["0", "16k", "32k"])
+    axes[0].set_ylabel("ms per token")
+    axes[1].legend(ncol=1, loc="lower right", handlelength=1.8)
     fig.savefig(OUT / "decode.pdf")
     plt.close(fig)
 

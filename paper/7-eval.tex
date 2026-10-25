@@ -4,13 +4,12 @@
 % VALUE: what the evaluation establishes: OPCORD shortens prefill and decode on five LLMs against the existing program on its own best shipped split; its choice of order and split stays near the best measured option; the gain follows the condition's shape
 % DECISION: no question list at the head of the evaluation; subsections have noun titles and each opens with its finding.
 % COMMENT: every \E value comes from the amendment-1 batch, the decode development batch, the synthetic sweep, the legality control, the FastFlowLM replay, and finally the final sweep; prose stays as written while numbers move (STYLE.md, Results vary between runs).
-In this section, we show that OPCORD shortens prefill and decode on five LLMs against the existing program on the shipped split that minimizes its TTFT, that its choice of order and split stays close to the measured minimum, and that its gains follow the shape that the condition of Section~\ref{sec:condition} predicts.
 
 \subsection{Experimental Setup}
 \label{subsec:setup}
 
 % VALUE: the platform and its power state, the software, the designs, and the five LLMs (one per class of edge LLM)
-We measure on a GMKtec NucBox EVO-X2, whose AMD Ryzen\texttrademark{} AI Max+ 395 carries an XDNA~2 NPU of 8 columns of 4 compute tiles and 64\,GB of shared memory, under Linux~7.0 with the amdxdna driver, XRT~2.25.0~\citep{xdna-driver,xrt-repo}, and NPU firmware 1.1.2.65 in performance mode.
+We measure on a GMKtec NucBox EVO-X2 with an AMD Ryzen\texttrademark{} AI Max+ 395 and 64\,GB of shared memory, under Linux~7.0 with the amdxdna driver, XRT~2.25.0~\citep{xdna-driver,xrt-repo}, and NPU firmware 1.1.2.65 in performance mode.
 We rewrite MLIR-AIR's fused prefill and fused decode~\citep{wang2026mlirair}, compiled with MLIR-AIE~\citep{mlir-aie-repo}, for five LLMs with 4-bit weights, one per class of edge LLM: the dense Llama-3.2-1B~\citep{meta2024llama32}, Qwen3-4B~\citep{yang2025qwen3}, and Llama-3.1-8B, together with Gemma3-4B, which uses sliding-window attention, and LFM2-1.2B, which has convolution layers.
 % SOURCE: machine files read 2026-10-14/15: uname -r 7.0.0-34-generic; amdxdna 2.25.0_20260922 (DKMS, 31c01f2019e7); XRT 2.25.0 (3923b2b5be55); NPU firmware 1.1.2.65 (sysfs fw_version); BIOS EVO-X2 1.12; NPU power mode performance, CPU EPP and governor performance (lab-prefill-overlap (11), lab-split-sweep (9)).
 % SOURCE: mlir-air a3e26261 (llms/shared/fused_prefill, fused_decode; the runs use npu-gap's 44e8d8f7); mlir_aie wheel 1.4.5.dev22+g35fa6b1; weights FastFlowLM/Qwen3-4B-NPU2 rev 07651f11cac7, the Llama-3.2-1B q4nx bundle, FastFlowLM/Llama-3.1-8B-NPU2 rev 52700648, all sha256-verified (lab-prefill-overlap (23), lab-split-sweep (10)).
@@ -83,9 +82,9 @@ Even reordering from four chunks on the existing program's best split loses \E{Z
     \caption{Loss against the Measured Minimum}
     \label{tab:decision}
     % VALUE: the composer's choice, unaided and with the tie-break, against fixed rules, over every configuration of the sweep
-    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lrr}
+    \begin{tabular*}{\linewidth}{@{}l@{\extracolsep{\fill}}rr@{}}
         \toprule
-        Choice & Median (\%) & Maximum (\%) \\
+        Choice & Median (\%) & Max.\ (\%) \\
         \midrule
         OPCORD & \E{} & \E{} \\
         OPCORD, unaided & \E{} & \E{} \\
@@ -97,6 +96,13 @@ Even reordering from four chunks on the existing program's best split loses \E{Z
         \bottomrule
     \end{tabular*}
 \end{table}
+
+\label{subsec:accuracy}
+
+% VALUE: the event model orders the candidates correctly wherever they differ by more than its error, and its error on the difference between candidates stays small against the gains; its choice is the measured best wherever candidates differ by more than about twice that error
+The event model orders every pair of candidates whose measured times differ by more than \E{X}\%, and its error on the difference between two candidates has a median of \E{Y}\% and a maximum of \E{Z}\% across the sweep.
+Its time for the chosen schedule lies within a median \E{A}\% of the measurement, against gains of up to about $2\times$.
+% SOURCE: final sweep, scored against the event model's frozen pin (rebuilt form), tolerance per design on the difference between candidates registered before the sweep; \E{pending}.
 
 \subsection{Shape of the Gain}
 \label{subsec:shape-eval}
@@ -130,14 +136,6 @@ On the default two-column split, the stream pass alone gains \E{1.21--1.60}$\tim
 In decode, renaming the keys and values alone, as a production mapping of another LLM does by hand~\citep{du2026gemma3}, is worth 0.3\%, because the shared score buffer still closes the loop's critical cycle, as the condition of Section~\ref{subsec:removal} requires.
 % SOURCE: keys and values renamed with the existing score buffer kept: 1.002x (16,384) and 1.003x (32,512), tokens and logits bit-identical (vault lab-decode-long-context (28); amd-npu d8f0bd4c, score 5e1017a5); all three renamed (the loop pass): 1.269x / 1.391x (lab-decode-long-context (22)).
 
-\subsection{Model Accuracy}
-\label{subsec:accuracy}
-
-% VALUE: the event model orders the candidates correctly wherever they differ by more than its error, and its error on the difference between candidates stays small against the gains; its choice is the measured best wherever candidates differ by more than about twice that error
-The event model orders every pair of candidates whose measured times differ by more than \E{X}\%, and its error on the difference between two candidates has a median of \E{Y}\% and a maximum of \E{Z}\% across the sweep.
-Its time for the chosen schedule lies within a median \E{A}\% of the measurement, against gains of up to about $2\times$.
-% SOURCE: final sweep, scored against the event model's frozen pin (rebuilt form), tolerance per design on the difference between candidates registered before the sweep; \E{pending}.
-
 \subsection{Legality}
 \label{subsec:legality-eval}
 
@@ -159,8 +157,3 @@ Over 792 streams, the analysis attributes 73{,}994 of 74{,}010 waits to one of i
 Across the census, the exposure and the bounds of Section~\ref{subsec:observed} explain where the gains are small, and the one rewrite that FastFlowLM's bound leaves worth measuring, which merges two of its commands at prompts of up to 128 tokens to save their dispatch, saves \E{X}\% when replayed on the device.
 Every one of IRON's 35 streams prices at $1.000\times$, since its streams issue their transfers ahead of their waits.
 % SOURCE: FastFlowLM terms4 (registered 67d54fe, rows 3c70af2): in-command 1.000 on every row; measured-only joint below 1.05 on every scored request; legal-space joint 1.034-1.049 at 512 and 1,024, 1.075-1.093 at 128 through the merge bracket at F = 195.0 us (terms5, e8232aa); exposure M 0.82-0.87 (a3ef131); decode 1.000-1.009 (e679463); merge replay stage 1 (e2b-p128 and e4b-p128 merges, registered 3ae0370), \E{pending}; IRON in-command pricing: 35 streams, every x_J 1.000, bound 1.000 (aie-cosched 1a87bc6, partb/iron-partb.json); composition predicted 1.000 (a73ba38).
-
-% VALUE: the stream pass's proposals on the three stacks and the checkers' agreement
-Beyond the instances of Section~\ref{subsec:reading}, the stream pass proposes moves on \E{X} of 277 streams of the three stacks, and its checker and an independent second implementation agree on every verdict (Section~\ref{subsec:checkers}).
-% SOURCE: population 277 = 27 MLIR-AIR + 32 IRON + 218 FastFlowLM (vault lab-cosched-passes (41)).
-% COMMENT: re-derive the proposal and verdict counts after the checker fix for moved pushes (relative queue rule; registered d04fdf7, fix 3470a9d, re-check 78c8445: 16 QUEUE-OVERFLOW-only proposals accepted, 16 refused RESOURCE-UNPROVEN).

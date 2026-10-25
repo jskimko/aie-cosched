@@ -1,9 +1,6 @@
 \section{Background}
 \label{sec:background}
 
-% VALUE: the array computes in parallel once configured, but the host reaches it only through instruction streams that one in-order CP executes
-Once configured, the AI Engine array of an XDNA~2 NPU computes on all of its columns at once, yet the host reaches it only through instruction streams that one in-order command processor executes.
-
 \subsection{AMD XDNA~2 NPU}
 \label{subsec:platform}
 
@@ -40,7 +37,7 @@ Queuing further commands before waiting on the first hides part of $F$ behind th
 % DECISION: no claim about how any stack chose its order ("hand-tuned", "expert"); FastFlowLM is described by what it ships.
 Three stacks produce LLM designs for XDNA~2.
 MLIR-AIR maps loop nests onto the array as fused multi-operator designs~\citep{wang2026mlirair}, IRON offers a close-to-metal Python interface to MLIR-AIE~\citep{hunhoff2025iron}, and FastFlowLM ships its designs and the engines that issue them as binaries~\citep{fastflowlm-repo}.
-All three reach the array through the same commands and instruction streams, so one analysis can read the designs of each, closed ones included (Section~\ref{subsec:closed}).
+All three reach the array through the same commands and instruction streams (Section~\ref{subsec:closed}).
 % SOURCE: FastFlowLM's engines reach the runtime through libhrx and ship as compiled libraries and xclbins (FastFlowLM 44d01787, lib/hrx/libgemma4e_flash.so; vault lab-cosched-passes (14)).
 
 \subsection{LLM Inference on the NPU}

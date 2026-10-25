@@ -23,7 +23,7 @@ A command concatenates its operators' segments under the conditions of Section~\
 % SOURCE: txn.segments and txn.compose (a0ee2ed prefill-overlap/txn.py, now opcord/compose/txn.py); compose asserts each stream's segment order, every op kept once, and equal headers.
 
 % VALUE: within a command, the composer opens every group's work and then places each synchronization at its predicted completion, followed by the issue it gates, so no synchronization holds back another group's work; attention's two columns count as two groups; the order is fixed at build time and runs without the host; its price is the shared DRAM read rate, priced in Section 5
-Packing the operators into one command in turn would still leave the GEMM group idle while the CP walks attention's synchronizations (Figure~\ref{fig:order}b), so the composer issues the opening segments of every group first.
+Packing the operators into one command in turn would still leave the GEMM group idle while the CP walks attention's synchronizations (Figure~\ref{fig:order}a), so the composer issues the opening segments of every group first.
 It then places each synchronization in order of its \emph{predicted completion}, estimated from the probes, followed by the issue it gates.
 Attention's two columns count as two groups, so their segments alternate as well.
 The estimates fix this order when the command is built, and the CP executes it without the host.
@@ -33,7 +33,6 @@ Running both groups at once costs the GEMMs a share of attention's time under th
 
 % VALUE: within one operator's stream, the stream pass (an MLIR-AIE pass on the runtime sequence, compiled or lifted) applies the same reorder: monotone mode only hoists issues; full mode interleaves the columns' segments round-robin by index, the rule that produced the hand-alternated streams, so it emits that alternation byte for byte rather than discovering it
 Our \emph{stream pass} applies the same reorder within one operator's stream, as an MLIR-AIE pass on its runtime sequence, compiled or lifted from a recording, and interleaves the columns' segments so that each column's work is issued before the CP waits on another.
-This is the rule by which we alternated attention's streams by hand, and the pass emits that alternation byte for byte on all 42 such streams.
 % SOURCE: aie-cosched-schedule (mlir-aie 573e0140174, identical in f1725dae1f1; in place on cosched-flag), proposal format /2 at aie-cosched 8dee63f; 42 / 42 decoded order and bytes equal to the hand versions (vault lab-cosched-passes (35), (40)); in place and byte-identical to the Python-applied moves and to the hand template on 42 / 42 (decisions log D24, P4); monotone and full mode as built (lab-cosched-passes, "Scan and monotone" and "Full mode").
 % DECISION: the pass emits the alternation and the checker accepts it; it is never said to discover it, and full mode is never called a predicted-completion rule (Ruling D3, vault decisions log).
 
@@ -44,7 +43,7 @@ This is the rule by which we alternated attention's streams by hand, and the pas
 Of the buffers in decode attention's loop (Section~\ref{subsec:losses}), only the running maximum and the accumulator carry data across blocks, so our \emph{loop pass} renames each of the others, namely the keys, the values, and the scores passed between the two cores, into a \emph{ring} of two slots.
 Each core acquires and releases a slot once per block, so the first core computes block $b+1$ while the second folds block $b$.
 Whereas MLIR-AIR's double-buffering transformation declines the whole loop for its carried state, our pass classes every buffer of the lowered loop by its conflicts across iterations and leaves the carried state in place.
-The kernels and the order of their arithmetic are unchanged, so the decoded tokens and every step's logits stay bit-identical.
+The kernels and the order of their arithmetic are unchanged, so the decoded tokens and every step's logits stay bit-identical, and the time per position falls from the KV transfer plus the compute to the larger of the two.
 % SOURCE: aie-cosched-rename (mlir-aie 41b4947f09e; on cosched-flag through the aiecc flag), classes and rings in vault lab-cosched-passes (33): 12 buffers renamed on the 1B census build (K, V, score per attention pair); the class rule renames only buffers whose every cross-iteration conflict is WAR or WAW (lab-cosched-passes (57), P6 plan); tokens and every step's logits bit-identical across the existing design, the hand edit, and the pass, 1B P = 0 to 32,517 and Qwen3-4B P = 2,048 to 28,800 (vault lab-decode-long-context (22), amd-npu a6bc94b and 455740b).
 % SOURCE: single buffering, the build's own comment ("air-label-scf-for-to-ping-pong declines it, because the running max and accumulator are live across blocks") (vault lab-decode-long-context (5)).
 % DECISION: the rename is our loop pass's output on the lowered design, not a hand edit; the hand edit appears only as the reference the pass reproduces (appendix-body.tex, app:loop-pass (cut 2026-10-24)).
