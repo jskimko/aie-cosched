@@ -18,8 +18,8 @@ Because OPCORD rewrites designs it did not compile, checkers refuse, with a reas
 % VALUE: the composer reorders issue across operators: it list-schedules the host program's dependency graph chunk by chunk rather than stage by stage, pairing each attention operator with ready GEMMs of matching work; a composed command keeps each operator's segments in order and every instruction once, so only when work is issued and awaited changes
 \label{subsec:compose}
 % DECISION: subsec:compose names the composer's part of the reorder and resolves to this subsection; the conditions the former composing subsection stated are in Section~\ref{sec:order}.
-The existing host program runs a layer stage by stage, so no GEMM is ready to run beside attention.
-Our \emph{composer} instead list-schedules the host program's dependency graph chunk by chunk, from the design's per-operator streams and probes, and emits commands that we call the \emph{composed schedule}.
+Our \emph{composer} list-schedules the host program's dependency graph chunk by chunk, from the design's per-operator streams and probes, and emits commands that we call the \emph{composed schedule}.
+The existing host program runs a layer stage by stage instead, so no GEMM is ready to run beside attention.
 Each command pairs the ready attention operator of the lowest layer and chunk with ready GEMMs whose estimated work matches it.
 A command concatenates its operators' segments under the conditions of Section~\ref{subsec:legality}, so composing changes when work is issued and awaited, never what the work is.
 % SOURCE: merged.plan (amd-npu a0ee2ed prefill-overlap/merged.py, now opcord/compose/merged.py at aie-cosched opcord-runtime 446fa1c): qkv(L, c) after down(L-1, c); attn(L, c) after qkv(L, 0..c); o after attn; gate and up after o; down after gate and up; GEMMs added in the same order until their estimated work reaches the attention operator's; an optional cap on the GEMMs per attention command.
@@ -61,7 +61,7 @@ The prefill needs no renaming, because the existing host program already gives e
 \label{subsec:split}
 
 % VALUE: the split is a build parameter of the existing design; the legal splits S1, S2 (default), S4 follow from the KV heads; each split is its own configuration built from the unchanged source, with outputs bit-identical to the default split, so the existing program and the composer each run on any of them
-The existing design fixes its split as a build parameter, and since each attention group serves an equal share of the KV heads, an LLM with 8 KV heads admits attention on 1, 2, or 4 columns, which we call the \emph{shipped splits} $S_1$, $S_2$, and $S_4$, with $S_2$ the default.
+The existing design fixes its split as a build parameter, and since each attention group serves an equal share of the KV heads, an LLM with 8 KV heads admits attention on 1, 2, or 4 columns, which are the shipped splits $S_1$, $S_2$, and $S_4$, with $S_2$ the default.
 We build each split as its own configuration from the unchanged source, with outputs bit-identical to those of the default split, so the existing program and the composed schedule can each run on any of them.
 % SOURCE: mlir-air a3e26261 fused_prefill/device.py: Attn(col=...) per group in Config.attn, GCOL0, GNC = 1, 6 as module constants; spec() splits kv_heads evenly, so 1, 2, or 4 attention columns with 8 KV heads (vault lab-split-sweep (1)).
 % SOURCE: out-of-tree split modules; logits bit-identical to the default split in every configuration on both models (vault lab-split-sweep (2), (4), (5)).

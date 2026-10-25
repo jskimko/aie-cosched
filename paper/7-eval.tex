@@ -3,6 +3,7 @@
 
 % VALUE: what the evaluation establishes, in order: OPCORD shortens prefill and decode on five LLMs against the existing program on its own best shipped split, and where the gain comes from; its choice of order and split stays near the best measured option; its rewrites are legal and its analysis reads every stream exactly; and what rescheduling recovers follows the cut and the prompt length, as Section 3.3 states
 % DECISION: no question list at the head of the evaluation; subsections have noun titles and each opens with its finding.
+Sections~\ref{subsec:e2e}--\ref{subsec:decision} evaluate OPCORD, Sections~\ref{subsec:legality-eval} and~\ref{subsec:census} its analysis, and Section~\ref{subsec:pays} the condition that says where rescheduling pays.
 % COMMENT: every \E value comes from the amendment-1 batch, the decode development batch, the synthetic sweep, the legality control, the FastFlowLM replay, and finally the final sweep; prose stays as written while numbers move (STYLE.md, Results vary between runs).
 
 \subsection{Experimental Setup}
@@ -38,7 +39,7 @@ Because the DRAM read cap varies by up to 12\% between batches, every ratio pair
 
 % VALUE: OPCORD shortens TTFT on every LLM wherever the condition holds, against the baseline, with bit-identical outputs; the gain rises with the prompt length, peaks in the middle of the sweep and falls at 32K, as the shape of the exposed work predicts, and at prompts of one or two chunks OPCORD keeps the existing order
 OPCORD shortens TTFT on all five LLMs, with outputs bit-identical to the existing program's, by \E{X--Y}$\times$ at prompts of 1{,}024 tokens and more (Figure~\ref{fig:headline}).
-The gain rises with the prompt length, peaks at \E{8--16K} tokens, and falls at 32K, as the balance of the exposed work predicts (Section~\ref{subsec:exposure}).
+The gain rises with the prompt length, peaks at \E{8--16K} tokens, and falls at 32K, as the balance of the work the two groups can overlap predicts (Section~\ref{subsec:shape-eval}).
 At prompts of one or two chunks, OPCORD keeps the existing order, whose TTFT it then equals.
 % SOURCE: valid end-to-end cells so far, pre-final (vault decisions log, issue check 8d2eac19): Qwen3-4B 1.33-1.57x (8-32K); LFM2-1.2B 1.10-1.24x (1-2K) and 1.45x (32K); Gemma3-4B 1.20x (1K), 1.22-1.30x (2-8K), 1.18x (32K); Llama-3.1-8B 1.04-1.25x (512-2K); the rest from the amendment-1 batch.
 \begin{figure*}[t]
@@ -120,7 +121,7 @@ Its time for the chosen schedule lies within a median \E{A}\% of the measurement
 \label{subsec:legality-eval}
 
 % VALUE: the checkers refuse every injected illegal rewrite; a rewrite refused on a single data hazard, forced onto the device, corrupts output while its accepted twin stays bit-identical, so a refusal marks a real hazard rather than caution
-The checkers refuse every illegal rewrite we inject, and a refusal marks a real hazard rather than caution.
+The checkers refuse every illegal rewrite we inject, and a refusal marks a real hazard rather than caution, while Section~\ref{subsec:checkers} reports the checkers' own cross-checks.
 In a small design of our own, a rewrite that the checkers refuse on a single data hazard, a read of a 64\,KB buffer moved above the wait that guards its write, returns stale data in \E{X} of 10 runs, whereas its accepted twin stays bit-identical in every run.
 % SOURCE: legality control B-synthetic (registered fdd96b4; design, pair and gates 61fad00; census control/): twin ACCEPTED, hazard RANGE-OVERLAP only over 65,536 bytes; N = 10 each, X pre-filled with a sentinel; device run on its user's go, \E{pending}.
 
@@ -128,14 +129,14 @@ In a small design of our own, a rewrite that the checkers refuse on a single dat
 \label{subsec:census}
 
 % VALUE: the census defined (112 designs from three stacks); the analysis reads exactly what each stack dispatches: streams of three toolchains re-emit byte for byte, nearly every wait is attributed to a mechanism, and every loop of the MLIR-AIR designs is judged; the bound is checked against measurement in Sections 6.3 and 6.7
-We call the 112 designs that we read from MLIR-AIR, IRON, and FastFlowLM our \emph{census}.
+We call the 112 designs, LLM and non-LLM, that we read from MLIR-AIR, IRON, and FastFlowLM our \emph{census}.
 Because the analysis starts from artifacts a stack has already emitted, it must read them exactly, and it does on all three stacks, since all 793 streams of our population re-emit byte for byte, namely 543 built by MLIR-AIR and 218 recorded from FastFlowLM, both through the lifter of Section~\ref{subsec:closed}, and 32 built by IRON through its own translator.
 Over the 792 of them that fit within its graph's size limit, the analysis attributes 73{,}994 of 74{,}010 waits to one of its ordering mechanisms, and at loop granularity it judges all 3{,}719 loops of the MLIR-AIR prefill and decode designs.
 % SOURCE: population and round trips (aie-cosched adf0e2c, passes/population_roundtrip.py, results/2026-10-24-population/check.json: 793 = AIR 543 (539 dispatched prefill in gate (6), 4 fused decode in gate (3)) + FastFlowLM 218 (gate (14)) + IRON 32 (gate (9)), no_roundtrip empty; 792 analysed, 1 too-large, IRON decode-fused_op fc078b33 at 179,576 ops over the 60,000-node limit; matched by sha256[:16]); gates in vault lab-cosched-passes (3), (6), (9), (14); attribution aie-cosched results/2026-10-23-s35-data (registered c57b708, result ef6733a); loops 3dbc1ee (MLIR-AIR prefill 3,488 / 3,488, the nine fused decodes 231 / 231).
 
 % VALUE: our passes also judge MLIR-AIR designs of LLMs never run or examined, renaming their decodes as on the evaluated LLMs, with no gain claimed
 Our passes also judge the MLIR-AIR designs of five LLMs we never ran or examined, renaming attention's keys, values, and scores on their decodes as on the evaluated LLMs, but we claim no gain on any of them.
-The bound per false order is checked against measurement where a removal is run, in decode (Section~\ref{subsec:ablation}) and in FastFlowLM's merge replay (Section~\ref{subsec:observed}).
+The bound per false order stands beside a measured gain in FastFlowLM's merge replay (Section~\ref{subsec:observed}), and its critical-path test is checked in decode, where renaming only part of the critical cycle gains nothing (Section~\ref{subsec:ablation}).
 % COMMENT: verify how the 793-stream population relates to the 112 census designs (pass-0) before stating it.
 % SOURCE: P8 (a), the unexamined MLIR-AIR models Llama-3.2-3B, Phi-4-mini, Qwen2.5-3B and 7B, and Qwen3-8B (aie-cosched e5ad472; 0 accel opens; kernels byte-identical).
 
@@ -151,19 +152,20 @@ What rescheduling recovers is set by how a design cuts its work and by the promp
 How a design cuts its work into configurations, commands, and buffers sets how much of that work meets the condition.
 For the reorders available inside a design's existing commands, which is all that a closed stack lets us rewrite, we state per workload its \emph{exposure} $M$, the share of the wall time spent in commands whose configuration holds two or more operators, together with the bound $b$ on the gain inside those commands (Section~\ref{subsec:removal}).
 The two imply a ceiling on the end-to-end gain from inside commands of $1 / \bigl((1 - M) + M / b\bigr)$, which separates a design that exposes little work from one whose exposed work cannot overlap.
-On an open fused design that issues one operator per command, OPCORD's composer instead re-cuts the commands themselves, a rewrite that the bound of each false order across commands prices.
+On an open fused design, OPCORD's composer also re-cuts the commands themselves, so that operators issued one per command come to share commands, a rewrite that the bound of each false order across commands covers, and on MLIR-AIR's prefill this re-cut carries nearly all of the gain (Section~\ref{subsec:ablation}).
 % SOURCE: exposure metric and ceiling (aie-cosched registered 2a7990a; script 3d11670; rows a3ef131; partb/README).
 
 \label{subsec:observed}
 % VALUE: the census by design class, each placed by its two cuts, with what the condition predicts and what the bounds and measurements show: MLIR-AIR's prefill (fused configuration, one operator per command) gains, as Section 6.2 measures; FastFlowLM's flash prefill (fused, several operators per command) has M 0.82-0.87 but b 1.000 because its streams already keep every column busy, its waits between commands are mostly true, its one rewrite worth measuring (merging commands at the shortest prompts) is measured against its bound, and its decode pairs share an engine; IRON's modular operator sequences share no command and their streams price at one; the non-LLM designs overlap through dataflow; so every design the condition says can gain is one whose gain we measure
-Across the 112 designs of our census, the condition predicts gains only where a fused configuration's independent operators wait on one another in the CP's order, and the bounds and measurements bear each prediction out.
+Across the 112 designs of our census, the condition predicts gains only where independent work in a fused configuration waits on other work in the CP's order or through a buffer it need not share, and the bounds and measurements bear each prediction out.
 MLIR-AIR's chunked fused prefill holds every operator in one configuration but issues one command per operator and chunk, with attention and the GEMMs on disjoint column groups, so its column groups take turns on work that meets both clauses (Section~\ref{subsec:losses}), and the gains of Section~\ref{subsec:e2e} are measured there.
-FastFlowLM's flash prefill, taken as released, holds several operators per command and has an exposure $M$ of 0.82--0.87, yet the false orders inside its commands bound at $b = 1.000\times$, because its streams already keep every column busy at once, so deleting those orders lets no further work overlap.
-Between its commands, most waits are true, since the host reads each command's output before it issues the next, and the false ones bound below $1.05\times$ on measured terms on every request we price.
+MLIR-AIR's fused decode keeps one buffer per role in its attention loop, so each block's transfer waits on the previous block's compute, and the loop pass's gain of Section~\ref{subsec:e2e} is measured there, whereas renaming only the keys and values, which leaves the score buffer closing the cycle, gains nothing (Section~\ref{subsec:ablation}).
+FastFlowLM's prefill, taken as released, holds several operators per command and has an exposure $M$ of 0.82--0.87, yet the false orders inside its commands bound at $b = 1.000\times$, because its streams already keep every column busy at once, so deleting those orders lets no further work overlap.
+Between its commands, most waits are true, since the host reads each command's output before it issues the next, and the false ones bound below $1.05\times$ with measured durations on every prompt we bound.
 The one rewrite that its bound leaves worth measuring, which merges two of its commands at prompts of up to 128 tokens to save their dispatch, bounds at $1.075$--$1.093\times$ and saves \E{X}\% when replayed on the device.
 Its decode runs one command per step, whose false pairs all share a core tile or a DMA channel, and bounds at $1.000$--$1.009\times$.
-IRON's modular operator sequences give each operator its own configuration, so their operators share no command and pay reconfiguration between operators instead, and their 32 streams, which issue their transfers ahead of their waits, all price at $1.000\times$.
-Each of the non-LLM designs we read runs as one command whose stages already overlap through the array's own dataflow, and the 3 that IRON builds also price at $1.000\times$.
+IRON's modular operator sequences give each operator its own configuration, so their operators share no command and pay reconfiguration between operators instead, and their 32 streams, which issue their transfers ahead of their waits, all bound at $1.000\times$.
+Each of the non-LLM designs we read runs as one command whose stages already overlap through the array's own dataflow, and the 3 that IRON builds also bound at $1.000\times$.
 Every design in the census that the condition says can gain is therefore one whose gain we measure.
 % SOURCE: census Part A 112 designs (aie-cosched 7827f85); FastFlowLM exposure, scored request, M 0.82-0.87 (flash), b over the legal rewrite space 1.000 under the task form (terms4, registered 67d54fe, rows 3c70af2; exposure 2a7990a / a3ef131); 211 of 312 waits true at E2B 1,024 (census SUMMARY); measured-only joint below 1.05 on every scored request (terms3/terms4); decode boundary 1.000-1.009, inside a runlist 1.000 (decode2 rows e679463). IRON composition predicted 1.000 for every design (aie-cosched a73ba38 / dbdbda0); non-LLM designs: each one command (pass-0 task 6, 2026-10-24).
 % SOURCE: FastFlowLM's only crossing over its legal rewrite space is the dispatch a merge of two commands saves at the 128-token bucket, 1.075-1.093x as an upper bound at the measured floor F = 195.0 us (terms5, aie-cosched e8232aa); the merges are measured below.
@@ -174,7 +176,7 @@ Every design in the census that the condition says can gain is therefore one who
 
 \label{subsec:shape-eval}
 % VALUE: the prompt length sets the balance of the exposed work: attention per chunk grows with the chunk's position while the GEMMs' work per chunk is fixed; at one split on every LLM the reorder ties at one chunk and loses at two (per-command costs and the pipeline's fill and drain outweigh the overlap), gains from four and rises to about twice at 8-16K where the groups balance, and falls at 32K where attention outweighs the GEMMs; in the middle range an estimate from the groups' busy times and the hidden host time tracks the gain, while only the event model prices the few-chunk costs and the incomplete overlap at long balanced prompts; the split moves the balance, so the best split changes with the length
-The prompt length sets the balance of the exposed work, since in a prefill cut into chunks of 128 tokens attention's work per chunk grows with the chunk's position while the GEMMs' work per chunk stays fixed, so overlapping the two column groups across chunks hides the shorter group's time behind the longer one's.
+The prompt length sets the balance of the work the two groups can overlap, since in a prefill cut into chunks of 128 tokens attention's work per chunk grows with the chunk's position while the GEMMs' work per chunk stays fixed, so overlapping the two column groups across chunks hides the shorter group's time behind the longer one's.
 At one split on every LLM, the reorder ties at one chunk and loses at two, because the per-command costs and the time to fill and drain the pipeline of commands outweigh the overlap, and it gains from four chunks, rising to about $2\times$ at 8--16K tokens where the groups' work balances, before it falls at 32K, where attention outweighs the GEMMs.
 From 1K to 4K tokens, an estimate from the two groups' busy times and the host time the overlap hides tracks the gain within 5\%, but only the event model, which composes each command, prices the dispatch costs at few chunks and the incomplete overlap at long balanced prompts.
 The split moves this balance, so the split that minimizes TTFT also changes with the prompt length.
@@ -184,7 +186,7 @@ The split moves this balance, so the split that minimizes TTFT also changes with
 
 % VALUE: a synthetic LLM on the same engine varies the balance and the number of chunks directly, with OPCORD unmodified: the gain peaks where the groups balance and dips at few chunks at every balance, so the shape is a property of the exposed work, not of the five LLMs
 To vary the balance directly, we run a synthetic two-layer LLM through OPCORD unmodified on the same engine, changing its GEMM work at a fixed attention.
-Across balances from one eighth to eight and 1 to 32 chunks, the gain peaks where the groups' work balances and dips below one at few chunks at every balance, so the shape belongs to the exposed work rather than to the five LLMs (Figure~\ref{fig:synthetic}).
+Across balances from one eighth to eight and 1 to 32 chunks, the gain peaks where the groups' work balances and dips below one at few chunks at every balance, so the shape belongs to that balance rather than to the five LLMs (Figure~\ref{fig:synthetic}).
 % SOURCE: Route E builds (mlir-air synthetic-route-e 8ce52a3c; four builds, (d, inter) = (256, 768), (1024, 768), (2048, 2304), (2048, 12288), the 1B's attention, 2 layers); predictions abaa3d9 (registered 2984f01), re-predicted at the rebuilt event model before the runs; measurements \E{pending}.
 \begin{figure}[t]
     \centering
@@ -194,9 +196,9 @@ Across balances from one eighth to eight and 1 to 32 chunks, the gain peaks wher
     \label{fig:synthetic}
 \end{figure}
 
-% VALUE: the consequence: the order is fixed in the artifact while the exposed work changes with the prompt, so the order that pays changes with the prompt; choosing it needs durations no compile has, which is why OPCORD prices the order and the split per prompt length
-Because the order is fixed in the artifact while the work it exposes changes with the prompt, the order that pays changes with the prompt as well, and choosing it needs durations that no compile has, which is why OPCORD prices the order and the split per prompt length (Section~\ref{subsec:pricing}).
-
 % VALUE: one control per clause: forcing the reordered groups onto one DMA channel (a resource a rewrite cannot duplicate), or adding a host step that reads each output before the next command (a true dependence through the host), leaves the gain the condition predicts
-Each clause also holds under direct test, since forcing the reordered groups onto one DMA channel, which a rewrite cannot duplicate, leaves a gain of \E{Y}$\times$, and adding a host step that reads each output before the next command leaves \E{Z}$\times$.
+Each clause also holds under direct test, since forcing the reordered groups onto one DMA channel, which a rewrite cannot duplicate, leaves a gain of \E{Y}$\times$, and adding a host step that reads each output before the next command leaves \E{Z}$\times$, where the condition predicts no gain from either.
 % SOURCE: controls through the generic composer front end (vault decisions log, 2026-10-24), \E{pending}.
+
+% VALUE: the consequence: the order is fixed in the artifact while the work it lets overlap changes with the prompt, so the order that pays changes with the prompt; choosing it needs durations no compile has, which is why OPCORD prices the order and the split per prompt length
+Because the order is fixed in the artifact while the work it lets overlap changes with the prompt, the order that pays changes with the prompt as well, and choosing it needs durations that no compile has, which is why OPCORD prices the order and the split per prompt length (Section~\ref{subsec:pricing}).
