@@ -462,14 +462,15 @@ def _intersect(a, b):
 def fig_timeline():
     """Figure 1: when each column group had work outstanding over one prefill, and when both did, existing against OPCORD.
 
-    Llama-3.2-1B, a 4,096-token prompt, the median-TTFT run of each arm, from the CP's own record timers: the existing
-    program (attention's columns alternated) and the composed schedule. The exact intervals are drawn, unmerged, and the
-    third lane is their intersection, so the overlap the figure shows is the overlap the data holds."""
+    Llama-3.2-1B, a 4,096-token prompt on the two-column split, the median-TTFT run of each arm, from the CP's own record
+    timers: the unmodified existing program and the composed order. The exact intervals are drawn, unmerged, and the
+    third lane is their intersection, so the overlap the figure shows is the overlap the data holds; it is checked
+    against the reader's own both-outstanding total."""
     d = json.loads((DATA / "fig1-intervals-1b.json").read_text())["arms"]
-    arms = (("shipar", "Existing, attention's columns alternated"), ("comp", "OPCORD"))
+    arms = (("ship", "Existing"), ("comp", "OPCORD"))
     rows = (("A", "Attention", ORANGE), ("G", "GEMMs", BLUE))
     fig, axes = plt.subplots(2, 1, figsize=(COLUMN, 1.45), sharex=True)
-    base = d["shipar"]["ttft_ms"]
+    base = d["ship"]["ttft_ms"]
     for ax, (arm, name) in zip(axes, arms):
         a = d[arm]
         groups = {g: _merge(a["outstanding"][g]) for g, _, _ in rows}
@@ -478,9 +479,10 @@ def fig_timeline():
         both = _intersect(groups["A"], groups["G"])
         ax.broken_barh([(s, e - s) for s, e in both], (1 - 0.32, 0.64), facecolors=INK, edgecolor="none")
         overlap = sum(e - s for s, e in both)
+        assert abs(overlap - a["both_outstanding_ms"]) < 1e-3, (arm, overlap, a["both_outstanding_ms"])
         ttft = a["ttft_ms"]
         ax.axvline(ttft, color="black", linewidth=0.6, linestyle=(0, (4, 2)))
-        gain = "" if arm == "shipar" else rf", ${base / ttft:.2f}\times$"
+        gain = "" if arm == "ship" else rf", ${base / ttft:.2f}\times$"
         ax.text(ttft + 15, 2.5, rf"TTFT {ttft / 1000:.2f}\,s{gain}", ha="left", va="center", fontsize=6.5)
         ax.text(ttft + 15, 1, rf"{overlap:.0f}\,ms", ha="left", va="center", fontsize=6.5)
         ax.set_title(name, fontsize=7, pad=2, loc="left")
@@ -490,7 +492,7 @@ def fig_timeline():
         for side in ("top", "right", "left"):
             ax.spines[side].set_visible(False)
         ax.tick_params(axis="x", top=False)
-    axes[-1].set_xlim(0, 1700)
+    axes[-1].set_xlim(0, 2150)
     axes[-1].set_xlabel("Time into the prefill (ms)", labelpad=1)
     fig.tight_layout(pad=0.2, h_pad=0.3)
     fig.savefig(OUT / "timeline.pdf")
