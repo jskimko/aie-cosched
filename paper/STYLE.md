@@ -441,6 +441,15 @@ FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`, the IEEE templa
   observation for the condition only, never a speedup reference and never "hand-tuned" or "expert". Appends and agent
   turns are an extension and stay out of the body. The text before this rewrite is archived verbatim in the vault
   (`archive-tex-2026-10-24`).
+- **Contribution list** (author, 2026-10-24; supersedes the noun-phrase item form and the contribution items above
+  where they differ): three items, in MLSys form ("We + verb" clauses), with the characterization first. (1) We identify
+  that fused designs serialize independent work through their compiled command order, and characterize when removing
+  it pays (the cut, between modular and fused, and the prompt length; predicts where gains arise and where they cannot).
+  (2) We develop the analysis (dependence graphs over every agent, legality from the artifact, a bound per false
+  order). (3) We design and implement OPCORD (rewrites; order and split per prompt length with the event model).
+  Evaluation is never a contribution. The field's practice, counted on 18 MLSys papers from 2024-2026 (vault
+  assets/contrib-review/mlsys-tally.md): a characterization item in 7-8 of 18 papers, always first, "We identify ...";
+  lists of 3-4 items. The section plan is the vault's `paper-cosched-narrative-plan-v1`.
 - **Venue** (author, 2026-10-15): **MLSys'27** research track; FCCM'27 is the fallback only if the audit kills a
   headline. Call (mlsys.org/Conferences/2027/CallForResearchPapers, read 2026-10-15): OpenReview, submissions open Oct
   19, deadline **Oct 30, 2026, 19:00 UTC** (12:00 PM PDT on the home page; the call says 20:00 UTC; plan for the
