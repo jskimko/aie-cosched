@@ -44,7 +44,7 @@ How a design cuts its work into configurations, commands, and buffers, and the l
 Like the existing program, which issues one operator per command, the released designs of a closed production stack, FastFlowLM~\citep{fastflowlm-repo}, which MLIR-AIR's designs reimplement, issue each command to one column group.
 They run each layer's attention once over the whole prompt rather than in chunks, so every GEMM feeds or reads it and every turn between their groups is a true dependence.
 The existing prefill instead runs over fixed-size chunks, and attention's work per chunk grows with the chunk's position in the prompt while the GEMMs' work stays fixed, so the balance between the two groups shifts with the prompt length, and with it whether the overlap repays the per-command costs of a new order.
-The issue order that pays therefore changes with the prompt and must be priced per length rather than fixed.
+The issue order that pays therefore changes with the prompt and must be priced per length rather than fixed, and the split that pays moves with the same balance, because more attention columns shorten attention but lengthen every GEMM.
 
 % VALUE: (4) this work: OPCORD, one sentence per part with what it is and why: the analysis reads compiled artifacts across every agent and decides legality from them; the event model, analytical in form with microbenchmark constants, prices orders and splits per prompt length, and a bound limits what each false order can gain; the composer, the stream pass and the loop pass remove the false orders the price clears, under checkers; headline results against the existing program on its best shipped split, and the event model's choice quality
 In this work, we build OPCORD, which removes from compiled designs the false orders whose removal pays, choosing the prefill's order and split per prompt length with an event model.
@@ -54,7 +54,7 @@ Third, a composer reorders issue across commands, a stream pass within one opera
 Against the existing program on the shipped split that minimizes its TTFT, OPCORD shortens TTFT across five LLMs by \E{X--Y}$\times$ at prompts of 1K to 32K tokens, and its loop pass shortens decode by \E{X--Y}$\times$ at 16K-token contexts against the unmodified decode design, with bit-identical outputs.
 Its choice of order and split stays within \E{X}\% of the measured minimum on every LLM and prompt length we measure, where every fixed rule we test loses up to \E{Y}\% somewhere.
 Its analysis re-emits all 793 streams we read from three stacks byte for byte, and its checkers refuse every illegal rewrite we inject.
-Across 112 designs from three stacks, every overlap gain we measure falls where the condition says one can arise, and FastFlowLM's prefill leaves almost nothing to remove at every prompt length it accepts, as the condition predicts.
+Across 112 designs from three stacks, every overlap gain we measure falls where the condition says one can arise, and FastFlowLM's prefill leaves almost no overlap to recover at every prompt length it accepts, as the condition predicts.
 % COMMENT: this sentence states the decision-quality outcome; reword to what the table shows once the amendment-1 batch and the final sweep are in (if a fixed rule ties, state the regret bound instead).
 % COMMENT: add one sentence comparing OPCORD's absolute TTFT with what FastFlowLM's released engine reaches on the same LLM, worded as an observation and never as a baseline (contribution review, PC); needs a measured cell.
 
