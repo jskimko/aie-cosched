@@ -330,7 +330,7 @@ def fig_rewrites():
         then the columns' segments alternate so both run at once.
     (c) Loop pass: with one buffer per role, block i+1's transfer waits for block i's compute to release the buffer;
         with a two-slot ring it fills the other slot (compute is 0.71 of the transfer, as measured in decode)."""
-    fig, axes = plt.subplots(2, 3, figsize=(_m.WIDE, 1.38), sharex="col", gridspec_kw=dict(wspace=0.42, hspace=0.5))
+    fig, axes = plt.subplots(2, 3, figsize=(_m.WIDE, 1.08), sharex="col", gridspec_kw=dict(wspace=0.42, hspace=0.62))
 
     def lanes(ax, rows, labels, end, waits=()):
         for y, bars, color in rows:
@@ -338,8 +338,8 @@ def fig_rewrites():
                 ax.broken_barh([(t0, d)], (y - 0.32, 0.64), facecolors=color, edgecolor=INK, linewidth=0.4)
                 if text:
                     ax.text(t0 + d / 2, y, text, ha="center", va="center_baseline", fontsize=FS - 0.5)
-        for x, y0, y1 in waits:  # a dotted shaft with a solid head, from y0 to y1
-            ax.plot([x, x], [y0, y1], color=INK, linewidth=0.6, linestyle=(0, (1, 1.2)), zorder=10)
+        for x, y0, y1 in waits:  # a solid arrow from y0 to y1: a false dependence
+            ax.plot([x, x], [y0, y1], color=INK, linewidth=0.6, zorder=10)
             ax.add_patch(FancyArrowPatch((x, y1 + 0.05 * (y0 - y1)), (x, y1),
                                          arrowstyle="-|>,head_length=1.2,head_width=0.65", color=INK, linewidth=0.6,
                                          shrinkA=0, shrinkB=0, zorder=10))
@@ -371,8 +371,6 @@ def fig_rewrites():
     for j in range(3):
         for i, label in enumerate(("Before", "After")):
             axes[i, j].text(0.0, 1.03, label, transform=axes[i, j].transAxes, fontsize=FS, va="bottom")
-    handles = [plt.Line2D([], [], color=INK, linewidth=0.6, linestyle=(0, (1, 1.2)))]
-    fig.legend(handles, ["False dependence"], loc="lower right", bbox_to_anchor=(0.99, -0.07), handlelength=1.2)
     fig.supxlabel("Time (illustrative)", fontsize=7, y=-0.05)
     fig.savefig(OUT / "rewrites.pdf", metadata={"CreationDate": None})
     plt.close(fig)

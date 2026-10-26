@@ -534,7 +534,7 @@ def fig_decode():
     data/decode-cells.json (figs/paper_numbers.py): one development batch, 5 ABBA repetitions of 256 greedy tokens per
     point, logits bit-identical; the last context is 30,208 tokens (28,800 on Qwen3-4B, its design's window)."""
     cells = json.loads((DATA / "decode-cells.json").read_text())["cells"]
-    fig, ax = plt.subplots(figsize=(COLUMN + 0.37, 1.6))  # the tight crop trims about 0.37 in of margin
+    fig, ax = plt.subplots(figsize=(COLUMN + 0.37, 1.3))  # the tight crop trims about 0.37 in of margin
     order = ("Llama-3.2-1B", "LFM2-1.2B", "Qwen3-4B", "Llama-3.1-8B", "Gemma3-4B")
     for llm in order:
         pts = sorted((c["P"], c) for c in cells if c["llm"] == llm)
@@ -600,7 +600,7 @@ def fig_choice():
     data/accuracy-cells.json (the frozen form's 70 development cells) and data/choice.json (the 59 priced cells).
     "Never reorder" is left out of (b): its loss is the headline gain forgone, which Figure 6 shows."""
     rows = json.loads((DATA / "accuracy-cells.json").read_text())
-    fig, (a, b) = plt.subplots(1, 2, figsize=(WIDE, 1.55), gridspec_kw=dict(width_ratios=[1.0, 0.8], wspace=0.62))
+    fig, (a, b) = plt.subplots(2, 1, figsize=(COLUMN + 0.37, 2.55), gridspec_kw=dict(height_ratios=[1.15, 0.85], hspace=0.62))
     a.axhspan(-5, 5, color="#EDEDED", zorder=0, linewidth=0)
     for key, llm in KEY_LLM.items():
         rs = [r for r in rows if r["model"].startswith(key)]
@@ -640,7 +640,7 @@ def fig_vs_flm():
     """TTFT speedup over FLM's current release at 1K, 4K and 16K tokens: AIR's original program on its default
     configuration, and the same design under OPCORD. data/absolute.json (D1, one batch)."""
     rows = json.loads((DATA / "absolute.json").read_text())["rows"]
-    fig, ax = plt.subplots(figsize=(COLUMN + 0.37, 1.5))
+    fig, ax = plt.subplots(figsize=(COLUMN + 0.37, 1.25))
     x, ticks, labels = 0.0, [], []
     for llm in LLMS:
         rs = sorted((r for r in rows if r["llm"] == llm and r.get("N") in (1024, 4096, 16384)), key=lambda r: r["N"])
@@ -653,7 +653,7 @@ def fig_vs_flm():
             ticks.append(x)
             labels.append({1024: "1K", 4096: "4K", 16384: "16K"}[r["N"]])
             x += 1
-        ax.text((x0 + x - 1) / 2, 2.95, llm, ha="center", va="bottom", fontsize=5.5)
+        ax.text((x0 + x - 1) / 2, 2.6, llm, ha="center", va="bottom", fontsize=5.5)
         x += 0.8
     ax.axhline(1.0, color="black", linewidth=0.5)
     ax.set_yscale("log", base=2)
