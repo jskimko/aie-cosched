@@ -12,7 +12,7 @@ We call this design with its host program the \emph{original program}.
 The measure a developer can compute, which divides the operators' summed time by the wall time, still reads the device as busy for 92--97\% of the time to first token (TTFT).
 % SOURCE: busy 92-97% of TTFT at 512 / 2,048 / 4,096 tokens, each operator's isolated time less the dispatch floor, summed over the prefill (amd-npu e3acc8a prefill-e2/decomp.txt; Section 3.2).
 Issued in another order on the same columns, the same operators run together and reach the first token \FigOneGain$\times$ sooner (Figure~\ref{fig:timeline}, bottom).
-Compilers and mapping frameworks~\citep{hunhoff2025iron,symons2025stream} optimize what each operator computes and where it runs, but they take the order in which the CP issues that work from the program as written.
+Compilers and mapping frameworks~\citep{hunhoff2025iron,symons2025stream} optimize what each operator computes and where it runs, and the toolchains we study lower the host program's order of issue as it is written.
 The insight of this work is that the CP's instruction order is the array's schedule, fixed in the artifact that a toolchain emits.
 Every wait in a design can therefore be read from that artifact, together with the columns it holds idle and whether removing it could free overlap, so the waits that leave the array idle can be bounded and removed after compilation.
 
@@ -62,7 +62,7 @@ A team that holds a closed stack's source can recover that loss in its own desig
 First, because the order sits in binaries whose source may be closed, its analysis reads a design's artifacts as a dependence graph over every agent that touches state, accepts a reorder or a rename only where the artifacts and the host's accesses show it legal, and bounds what removing each false order can gain.
 On a closed stack's binaries, OPCORD stops at the analysis and replays only rewrites that leave the host program unchanged, to check a bound against measurement.
 Second, because the artifact fixes the order of the work but not its durations, an analytical event model, with constants measured once by microbenchmarks, prices each candidate order and split per prompt length from timings of each operator run alone.
-When two candidates are priced close, a measurement while OPCORD plans the prompt length settles the choice.
+When two candidates are priced close, OPCORD can settle the choice by a short measurement while it plans the prompt length.
 Third, a composer reorders issue across commands, a stream pass within one operator's stream, and a loop pass renames decode attention's buffers into rings.
 Because OPCORD rewrites designs it did not compile, each stands behind a checker that refuses any rewrite it cannot show legal, with kernels, driver, and firmware unchanged.
 
