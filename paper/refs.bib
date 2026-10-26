@@ -45,6 +45,8 @@
   title     = {Efficiency, Expressivity, and Extensibility in a Close-to-Metal {NPU} Programming Interface},
   booktitle = {2025 IEEE 33rd Annual International Symposium on Field-Programmable Custom Computing Machines (FCCM)},
   pages     = {85--94},
+  publisher = {IEEE},
+  address   = {Fayetteville, AR, USA},
   year      = {2025},
   doi       = {10.1109/FCCM62733.2025.00043}
 }
@@ -63,6 +65,7 @@
   title     = {From Loop Nests to Silicon: Mapping {AI} Workloads onto {AMD} {NPUs} with {MLIR-AIR}},
   journal   = {ACM Transactions on Reconfigurable Technology and Systems},
   volume    = {19},
+  number    = {2},
   year      = {2026},
   doi       = {10.1145/3785670}
 }
@@ -83,20 +86,21 @@
   year         = {2024}
 }
 
-% VERIFY: repository owner (vault src-fastflowlm lists ROCm/FastFlowLM after AMD took on the team in 2026-07), title, year.
+% Metadata confirmed 2026-10-26 against the publisher, repository or vendor page (tmp/draft1/bib/proposed.bib report). Earlier note: was VERIFY: repository owner (vault src-fastflowlm lists ROCm/FastFlowLM after AMD took on the team in 2026-07), title, year.
 @misc{fastflowlm-repo,
   author       = {{FastFlowLM}},
-  title        = {{FastFlowLM}: {LLM} Runtime for {AMD} {Ryzen} {AI} {NPUs}},
+  title        = {{FastFlowLM}: Run {LLMs} on {AMD} {Ryzen} {AI} {NPUs}},
   url          = {https://github.com/ROCm/FastFlowLM},
   year         = {2025}
 }
 
-% VERIFY: title and URL of the CUDA Graphs section.
+% Metadata confirmed 2026-10-26 against the publisher, repository or vendor page (tmp/draft1/bib/proposed.bib report). Earlier note: was VERIFY: title and URL of the CUDA Graphs section.
 @misc{nvidia-cudagraphs,
   author       = {{NVIDIA Corporation}},
-  title        = {{CUDA} {C++} Programming Guide: {CUDA} Graphs},
-  url          = {https://docs.nvidia.com/cuda/cuda-c-programming-guide/},
-  year         = {2025}
+  title        = {{CUDA} Programming Guide, Section 4.2: {CUDA} Graphs},
+  howpublished = {CUDA Toolkit Documentation, v13.4.2},
+  url          = {https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/cuda-graphs.html},
+  year         = {2026}
 }
 
 % ---- Command processor primitive (third person, double-blind) ----
@@ -111,21 +115,26 @@
 
 % ---- Related work ----
 
-% Vault 5-sources/aie/src-stream-dse (arXiv v2 HTML read 2026-10-14). VERIFY: pages.
+% Metadata confirmed 2026-10-26 against the publisher, repository or vendor page (tmp/draft1/bib/proposed.bib report). Earlier note: Vault 5-sources/aie/src-stream-dse (arXiv v2 HTML read 2026-10-14). was VERIFY: pages.
 @article{symons2025stream,
   author    = {Symons, Arne and Mei, Linyan and Colleman, Steven and Houshmand, Pouya and Karl, Sebastian and Verhelst, Marian},
   title     = {Stream: Design Space Exploration of Layer-Fused {DNNs} on Heterogeneous Dataflow Accelerators},
   journal   = {IEEE Transactions on Computers},
   volume    = {74},
   number    = {1},
-  year      = {2025}
+  pages     = {237--249},
+  year      = {2025},
+  doi       = {10.1109/TC.2024.3477938}
 }
 
-% Author list checked against arXiv 2408.12757 (2026-10-15). VERIFY: the OSDI version's pages; no vault source note yet.
+% Metadata confirmed 2026-10-26 against the publisher, repository or vendor page (tmp/draft1/bib/proposed.bib report). Earlier note: Author list checked against arXiv 2408.12757 (2026-10-15). was VERIFY: the OSDI version's pages; no vault source note yet.
 @inproceedings{zhu2025nanoflow,
   author    = {Zhu, Kan and Gao, Yufei and Zhao, Yilong and Zhao, Liangyu and Zuo, Gefei and Gu, Yile and Xie, Dedong and Tang, Tian and Xu, Qinyu and Ye, Zihao and Kamahori, Keisuke and Lin, Chien-Yu and Wang, Ziren and Wang, Stephanie and Krishnamurthy, Arvind and Kasikci, Baris},
   title     = {{NanoFlow}: Towards Optimal Large Language Model Serving Throughput},
   booktitle = {19th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
+  pages     = {749--765},
+  publisher = {USENIX Association},
+  address   = {Boston, MA, USA},
   year      = {2025}
 }
 
@@ -199,36 +208,50 @@
 
 % ---- GPU phase partitioning and classical overlap (added 2026-10-15) ----
 
-% VERIFY: authors and title from arXiv 2401.09670 (read 2026-10-15); venue from its comments field; PDF not read.
+% Metadata confirmed 2026-10-26 against the publisher, repository or vendor page (tmp/draft1/bib/proposed.bib report). Earlier note: was VERIFY: authors and title from arXiv 2401.09670 (read 2026-10-15); venue from its comments field; PDF not read.
 @inproceedings{zhong2024distserve,
   author    = {Zhong, Yinmin and Liu, Shengyu and Chen, Junda and Hu, Jianbo and Zhu, Yibo and Liu, Xuanzhe and Jin, Xin and Zhang, Hao},
   title     = {{DistServe}: Disaggregating Prefill and Decoding for Goodput-optimized Large Language Model Serving},
   booktitle = {18th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
+  pages     = {193--210},
+  publisher = {USENIX Association},
+  address   = {Santa Clara, CA, USA},
   year      = {2024}
 }
 
-% VERIFY: authors and title from arXiv 2311.18677 (read 2026-10-15); venue (ISCA 2024) from memory; PDF not read.
+% Metadata confirmed 2026-10-26 against the publisher, repository or vendor page (tmp/draft1/bib/proposed.bib report). Earlier note: was VERIFY: authors and title from arXiv 2311.18677 (read 2026-10-15); venue (ISCA 2024) from memory; PDF not read.
 @inproceedings{patel2024splitwise,
   author    = {Patel, Pratyush and Choukse, Esha and Zhang, Chaojie and Shah, Aashaka and Goiri, {\'I}{\~n}igo and Maleki, Saeed and Bianchini, Ricardo},
   title     = {Splitwise: Efficient Generative {LLM} Inference Using Phase Splitting},
   booktitle = {51st ACM/IEEE Annual International Symposium on Computer Architecture (ISCA)},
-  year      = {2024}
+  pages     = {118--132},
+  publisher = {IEEE},
+  address   = {Buenos Aires, Argentina},
+  year      = {2024},
+  doi       = {10.1109/ISCA59077.2024.00019}
 }
 
-% VERIFY: authors and title from arXiv 2403.02310 (read 2026-10-15); venue (OSDI 2024) from memory; PDF not read.
+% Metadata confirmed 2026-10-26 against the publisher, repository or vendor page (tmp/draft1/bib/proposed.bib report). Earlier note: was VERIFY: authors and title from arXiv 2403.02310 (read 2026-10-15); venue (OSDI 2024) from memory; PDF not read.
 @inproceedings{agrawal2024sarathi,
-  author    = {Agrawal, Amey and Kedia, Nitin and Panwar, Ashish and Mohan, Jayashree and Kwatra, Nipun and Gulavani, Bhargav S. and Tumanov, Alexey and Ramjee, Ramachandran},
+  author    = {Agrawal, Amey and Kedia, Nitin and Panwar, Ashish and Mohan, Jayashree and Kwatra, Nipun and Gulavani, Bhargav and Tumanov, Alexey and Ramjee, Ramachandran},
   title     = {Taming Throughput-Latency Tradeoff in {LLM} Inference with {Sarathi-Serve}},
   booktitle = {18th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
+  pages     = {117--134},
+  publisher = {USENIX Association},
+  address   = {Santa Clara, CA, USA},
   year      = {2024}
 }
 
-% VERIFY: authors, title, and venue from arXiv 2410.18038 (read 2026-10-15); PDF not read.
+% Metadata confirmed 2026-10-26 against the publisher, repository or vendor page (tmp/draft1/bib/proposed.bib report). Earlier note: was VERIFY: authors, title, and venue from arXiv 2410.18038 (read 2026-10-15); PDF not read.
 @inproceedings{kamath2025pod,
   author    = {Kamath, Aditya K. and Prabhu, Ramya and Mohan, Jayashree and Peter, Simon and Ramjee, Ramachandran and Panwar, Ashish},
   title     = {{POD-Attention}: Unlocking Full Prefill-Decode Overlap for Faster {LLM} Inference},
   booktitle = {30th ACM International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS), Volume 2},
-  year      = {2025}
+  pages     = {897--912},
+  publisher = {ACM},
+  address   = {Rotterdam, Netherlands},
+  year      = {2025},
+  doi       = {10.1145/3676641.3715996}
 }
 
 % Metadata checked against Crossref (DOI 10.1147/rd.111.0025), 2026-10-21. VERIFY: PDF not read (cited for renaming through tags).
@@ -303,7 +326,8 @@
   title         = {Programming {AMD} {XDNA} {NPUs} with Open-source Compiler Tools: A {FlashAttention} Case Study},
   year          = {2026},
   eprint        = {2609.21264},
-  archivePrefix = {arXiv}
+  archivePrefix = {arXiv},
+  howpublished = {arXiv:2609.21264}
 }
 
 % Metadata from arXiv 2602.06063v2, 2026-10-21; FlowKV checked in full text by review r14 (vault src-gemma3-edge).
@@ -312,7 +336,8 @@
   title         = {Mapping {Gemma3} onto an Edge Dataflow Architecture},
   year          = {2026},
   eprint        = {2602.06063},
-  archivePrefix = {arXiv}
+  archivePrefix = {arXiv},
+  howpublished = {arXiv:2602.06063}
 }
 
 % Metadata from arXiv 2606.11357v2, 2026-10-21; vault src-tilefuse.
@@ -349,25 +374,26 @@
   title         = {{LATTICE}: Constraint-Directed Scheduling, Memory Planning, and Pipeline Refinement for {NPUs}},
   year          = {2026},
   eprint        = {2607.17422},
-  archivePrefix = {arXiv}
+  archivePrefix = {arXiv},
+  howpublished = {arXiv:2607.17422}
 }
 
 % Metadata from arXiv 2607.12839v4 (accepted at MICRO 2026 per its comment), abstract read 2026-10-21; vault src-heteromosaic.
-@misc{jun2026heteromosaic,
-  author        = {Jun, Gregory Hyegang and Pang, Wesley and Richter, Eddie and Saeedi, Mehdi and Amarnath, Aporva and Ferrao, Pallavi and Chen, Deming},
-  title         = {{HeteroMosaic}: Exposing and Exploiting Heterogeneous Execution Opportunities for Energy-Efficient Edge {LLM} Inference},
-  year          = {2026},
-  eprint        = {2607.12839},
-  archivePrefix = {arXiv}
+@inproceedings{jun2026heteromosaic,
+  author    = {Jun, Gregory Hyegang and Pang, Wesley and Richter, Eddie and Saeedi, Mehdi and Amarnath, Aporva and Ferrao, Pallavi and Chen, Deming},
+  title     = {{HeteroMosaic}: Exposing and Exploiting Heterogeneous Execution Opportunities for Energy-Efficient Edge {LLM} Inference},
+  booktitle = {59th IEEE/ACM International Symposium on Microarchitecture (MICRO)},
+  address   = {Athens, Greece},
+  year      = {2026},
+  note      = {To appear}
 }
 
 % Metadata from arXiv 2506.24045v2, 2026-10-21; vault src-agent-xpu. VERIFY: PDF not read.
 @misc{wei2025agentxpu,
-  author        = {Wei, Xinming and Zhang, Jiahao and Li, Haoran and Chen, Jiayu and Guan, Haoning and Qu, Rui and Li, Maoliang and Chen, Xiang and Luo, Guojie},
-  title         = {{Agent.xpu}: Efficient Scheduling of Agentic {LLM} Workloads on Heterogeneous {SoC}},
-  year          = {2025},
-  eprint        = {2506.24045},
-  archivePrefix = {arXiv}
+  author       = {Wei, Xinming and Zhang, Jiahao and Li, Haoran and Chen, Jiayu and Guan, Haoning and Qu, Rui and Li, Maoliang and Chen, Xiang and Luo, Guojie},
+  title        = {{Agent.xpu}: Efficient Scheduling of Agentic {LLM} Workloads on Heterogeneous {SoC}},
+  howpublished = {arXiv:2506.24045},
+  year         = {2025}
 }
 
 % Venue confirmed (USENIX ATC '20, Microsoft Research listing); authors from arXiv 2006.03318; abstract read 2026-10-21; vault src-daydream.
@@ -375,6 +401,7 @@
   author    = {Zhu, Hongyu and Phanishayee, Amar and Pekhimenko, Gennady},
   title     = {Daydream: Accurately Estimating the Efficacy of Optimizations for {DNN} Training},
   booktitle = {USENIX Annual Technical Conference (USENIX ATC)},
+  pages     = {337--352},
   publisher = {USENIX Association},
   address   = {Virtual Event},
   year      = {2020}
@@ -500,6 +527,9 @@
   author    = {Kwon, Woosuk and Yu, Gyeong-In and Jeong, Eunji and Chun, Byung-Gon},
   title     = {Nimble: Lightweight and Parallel {GPU} Task Scheduling for Deep Learning},
   booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {33},
+  pages     = {8343--8354},
+  publisher = {Curran Associates, Inc.},
   address   = {Virtual Event},
   year      = {2020}
 }
@@ -557,7 +587,8 @@
   year          = {2025},
   eprint        = {2503.14781},
   archivePrefix = {arXiv},
-  primaryClass  = {cs.AR}
+  primaryClass  = {cs.AR},
+  howpublished = {arXiv:2503.14781}
 }
 
 @inproceedings{sarkar2023lightningsim,
@@ -598,7 +629,10 @@
   author    = {Fields, Brian A. and Bodik, Rastislav and Hill, Mark D. and Newburn, Chris J.},
   booktitle = {Proceedings of the 36th Annual IEEE/ACM International Symposium on Microarchitecture (MICRO)},
   pages     = {228--239},
-  year      = {2003}
+  publisher = {IEEE},
+  address   = {San Diego, CA, USA},
+  year      = {2003},
+  doi       = {10.1109/MICRO.2003.1253198}
 }
 
 @misc{copilotplus-reqs,
@@ -658,8 +692,9 @@
   title     = {The Configuration Wall: Characterization and Elimination of Accelerator Configuration Overhead},
   booktitle = {Proceedings of the 31st ACM International Conference on Architectural Support for Programming Languages and Operating Systems, Volume 1 (ASPLOS '26)},
   pages     = {265--280},
-  year      = {2026},
   publisher = {ACM},
+  address   = {Pittsburgh, PA, USA},
+  year      = {2026},
   doi       = {10.1145/3760250.3762225}
 }
 
@@ -667,8 +702,10 @@
   author    = {Zhuang, Jinming and Xiang, Shaojie and Chen, Hongzheng and Zhang, Niansong and Yang, Zhuoping and Mao, Tony and Zhang, Zhiru and Zhou, Peipei},
   title     = {{ARIES}: An Agile {MLIR}-Based Compilation Flow for Reconfigurable Devices with {AI} Engines},
   booktitle = {Proceedings of the 2025 ACM/SIGDA International Symposium on Field Programmable Gate Arrays (FPGA)},
-  year      = {2025},
+  pages     = {92--102},
   publisher = {ACM},
+  address   = {Monterey, CA, USA},
+  year      = {2025},
   doi       = {10.1145/3706628.3708870}
 }
 
@@ -689,16 +726,19 @@
   year          = {2025},
   eprint        = {2509.06794},
   archivePrefix = {arXiv},
-  primaryClass  = {cs.PL}
+  primaryClass  = {cs.PL},
+  howpublished = {arXiv:2509.06794}
 }
 
-@misc{danopoulos2025aie4ml,
-  author        = {Danopoulos, Dimitrios and Lupi, Enrico and Sun, Chang and Dittmeier, Sebastian and Kagan, Michael and Loncar, Vladimir and Pierini, Maurizio},
-  title         = {{AIE4ML}: An End-to-End Framework for Compiling Neural Networks for the Next Generation of {AMD} {AI} Engines},
-  year          = {2025},
-  eprint        = {2512.15946},
-  archivePrefix = {arXiv},
-  primaryClass  = {cs.LG}
+@inproceedings{danopoulos2025aie4ml,
+  author    = {Danopoulos, Dimitrios and Lupi, Enrico and Sun, Chang and Dittmeier, Sebastian and Kagan, Michael and Loncar, Vladimir and Pierini, Maurizio},
+  title     = {{AIE4ML}: An End-to-End Framework for Compiling Neural Networks for the Next Generation of {AMD} {AI} Engines},
+  booktitle = {IEEE 34th Annual International Symposium on Field-Programmable Custom Computing Machines (FCCM)},
+  pages     = {176--184},
+  publisher = {IEEE},
+  address   = {Atlanta, GA, USA},
+  year      = {2026},
+  doi       = {10.1109/FCCM68464.2026.00035}
 }
 
 % Read 2026-10-22 (PDF text extracted; sha256 c9570e2a044af725..., CreationDate 2012-01-24): "Fermi hardware has 3 queues: 1 Compute Engine queue, 2 Copy Engine queues"; "Stream dependencies between engine queues are maintained, but lost within an engine queue"; "a blocked operation blocks all other operations in the queue, even in other streams"; "issue order matters! Issue depth first / Issue breadth first".
@@ -811,7 +851,7 @@
 % ("the profile information is fed back into XLA compiler for a better scheduling decision"; section "Auto and manual PGLE"),
 % read 2026-10-25. The OpenXLA page "LHS Cost Model" (https://openxla.org/xla/lhs_cost_model) describes the scheduler itself
 % but does not mention PGLE.
-% VERIFY: author string; the page as fetched showed no copyright footer ("The JAX Authors" is the project's usual attribution).
+% Metadata confirmed 2026-10-26 against the publisher, repository or vendor page (tmp/draft1/bib/proposed.bib report). Earlier note: was VERIFY: author string; the page as fetched showed no copyright footer ("The JAX Authors" is the project's usual attribution).
 @misc{jax-pgle,
   author       = {{The JAX Authors}},
   title        = {{GPU} Performance Tips: Auto and Manual {PGLE}},
