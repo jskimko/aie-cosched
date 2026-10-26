@@ -21,7 +21,7 @@ A dispatch concatenates its operators' segments under the conditions of Section~
 \label{alg:compose}
 \small
 \begin{algorithmic}[1]
-\renewdispatch{\algorithmiccomment}[1]{\hfill$\triangleright$~#1}
+\renewcommand{\algorithmiccomment}[1]{\hfill$\triangleright$~#1}
 \REQUIRE operator graph $G$, segments, work $w(\cdot)$, packing $k$
 \ENSURE dispatches $C$ in the composed order, or a refusal
 \STATE $C \gets [\,]$; $R \gets \textsc{Sources}(G)$ \COMMENT{by layer, then chunk}
