@@ -78,9 +78,9 @@ AIR's double-buffering transformation declines the loop because its running maxi
 
 % VALUE: the question the rest of the paper answers: removing a false dependence pays only where the work it frees can overlap on resources a rewrite cannot duplicate, with no true dependence between (each clause from a platform fact); how much work qualifies is set by how the design cuts its work and by the prompt length, so the order that pays changes with length and must be priced; the full claim and its tests are in Section 4.7
 % DECISION: the critical-path condition is textbook and cited; the paper's claim is the condition's platform terms (non-duplicable resources, the host as an agent) and its dependence on the cut and the prompt length, never "false dependences cost time".
-Removing a false dependence frees overlap only where the work it frees runs on core tiles and DMA channels that the work it waited on does not use.
+Removing a false dependence frees overlap only where the work it frees runs on core tiles and DMA channels that the work it waited on does not use, which we call \emph{disjoint resources}.
 These are resources a rewrite cannot duplicate, because every engine runs its own work in order, and a buffer can be renamed into several slots whereas a core tile or a DMA channel cannot.
-It also frees overlap only where no true dependence, on the device or through a host step that reads one dispatch's output before it issues the next, separates the two pieces of work.
+It also frees overlap only where \emph{no true dependence}, on the device or through a host step that reads one dispatch's output before it issues the next, separates the two pieces of work.
 We call these two checkable clauses together the \emph{condition}.
 They refine the rule that removing a false dependence gains time only on the critical path~\citep{fields2003interaction}, since on this platform removing one shortens that path only when both hold.
 Both clauses name resources and dependences that the analysis reads from the artifacts and the host's accesses (Section~\ref{sec:order}).
@@ -91,5 +91,5 @@ The bound of Section~\ref{subsec:removal} and the event model of Section~\ref{su
 How much work meets both clauses is set by how the design cuts its work, into configurations, into dispatches, and into buffers, and by the prompt length, which sets the balance between attention and the GEMMs.
 The issue order that pays therefore changes with the prompt and must be priced per length rather than fixed.
 The configuration that pays moves with the same balance, because more attention columns shorten attention but lengthen every GEMM.
-We call the designs we read from three stacks our \emph{census}, and Section~\ref{subsec:pays} tests the condition across its design classes and across prompt lengths, and the first clause directly.
+We call the designs we read from three stacks our \emph{census}, and Section~\ref{subsec:pays} tests the condition across its design classes and across prompt lengths, and disjoint resources directly.
 % SOURCE: the condition and its resource wording (vault paper-cosched-decisions-log, "The lead", "The legality control is a designed single-hazard rewrite; the condition's resource wording", 2026-10-24); the census tags each instance by it, and the re-tag under the duplicable-resource wording changes no verdict on any stack (aie-cosched 460383a, rows e857444).
