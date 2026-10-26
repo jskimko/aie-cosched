@@ -31,7 +31,7 @@ The LLM designs we study map each group to whole columns, which the hardware doe
 
 \textbf{Command Processor.}
 % VALUE: the host reaches the array only through dispatches whose instruction streams one in-order CP executes; register write, address patch, issue (returns at once), synchronization (blocks), so the CP's order decides when each group receives work
-The host never drives the array directly but submits its work in \emph{dispatches}, each a command buffer whose \emph{instruction stream} the NPU's command processor (CP) executes in order~\citep{linux-amdnpu}.
+The host never drives the array directly but submits its work in \emph{dispatches}, where each dispatch is a command buffer whose \emph{instruction stream} the NPU's command processor (CP) executes in order~\citep{linux-amdnpu}.
 A \emph{register write} configures shim BDs, DMA queues, locks, or a core's runtime parameters, and an \emph{address patch} writes a host buffer's address into a shim BD.
 An \emph{issue} pushes a BD into a shim DMA queue and returns at once, whereas a \emph{synchronization} blocks the CP until a named transfer completes.
 The CP's instruction order therefore decides when each column receives work, and a synchronization on one column delays every later issue, whichever column it targets.
