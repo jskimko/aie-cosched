@@ -16,7 +16,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import make_figs as _m  # noqa: E402  (style, palette, OUT)
 from make_figs import ATTN, ATTN_FILL, COLUMN, GEMM, GEMM_FILL, GRAY, INK, OURS, OURS_TINT, OUT, plt  # noqa: E402
-from matplotlib.patches import FancyArrowPatch, Rectangle  # noqa: E402
+import numpy as np  # noqa: E402
+from matplotlib.patches import FancyArrowPatch, Polygon, Rectangle, Wedge  # noqa: E402
 
 MIST, STONE = "#E4E4E4", "#707070"
 # the fill steps of attention and the GEMMs, for the column groups of the default configuration
@@ -165,6 +166,30 @@ def _stage(ax, x, y, w, h, title, ours=True):
     ax.text(x + w / 2, y + h - 0.075, title, ha="center", va="center_baseline", fontsize=FS, zorder=6)
 
 
+def _doc(ax, x, y, w=0.12, h=0.16, z=5):
+    """A program: a page with a folded corner and three text lines; (x, y) is its lower left."""
+    f = 0.04
+    ax.add_patch(Polygon([(x, y), (x + w, y), (x + w, y + h - f), (x + w - f, y + h), (x, y + h)], closed=True,
+                         facecolor="white", edgecolor=INK, linewidth=0.45, joinstyle="miter", zorder=z))
+    ax.plot([x + w - f, x + w - f, x + w], [y + h, y + h - f, y + h - f], color=INK, lw=0.45, zorder=z + 1)
+    for k in range(3):
+        ly = y + h - 0.065 - k * 0.035
+        ax.plot([x + 0.025, x + w - (0.025 if k else 0.05)], [ly, ly], color=INK, lw=0.4, zorder=z + 1)
+
+
+def _gauge(ax, cx, cy, r=0.075, z=5):
+    """A measurement: a dial with ticks and a needle; (cx, cy) is the dial's center, on its flat edge."""
+    ax.add_patch(Wedge((cx, cy), r, 0, 180, facecolor="white", edgecolor=INK, linewidth=0.45, zorder=z))
+    for a in (30, 60, 90, 120, 150):
+        t = np.radians(a)
+        ax.plot([cx + 0.72 * r * np.cos(t), cx + 0.92 * r * np.cos(t)],
+                [cy + 0.72 * r * np.sin(t), cy + 0.92 * r * np.sin(t)], color=INK, lw=0.35, zorder=z + 1)
+    t = np.radians(55)
+    ax.plot([cx, cx + 0.70 * r * np.cos(t)], [cy, cy + 0.70 * r * np.sin(t)], color=INK, lw=0.6,
+            solid_capstyle="round", zorder=z + 2)
+    ax.add_patch(plt.Circle((cx, cy), 0.012, facecolor=INK, edgecolor="none", zorder=z + 3))
+
+
 def fig_framework():
     """OPCORD's components over a design its stack has already compiled, full width:
     the analysis reads the design and the host program into a dependence graph whose edges are true, name or order
@@ -172,27 +197,43 @@ def fig_framework():
     and the loop pass renames buffers into rings, each behind its checker; the event model prices each candidate order
     and split per prompt length from the probes, for prefill; the runtime package runs the result on the design's own
     hardware context, or the checkers refuse with a reason. On closed binaries OPCORD reads and bounds, and replays only
-    rewrites that leave the host program as it is."""
+    rewrites that leave the host program as it is.
+
+    Items inside a stage are told apart as the rewrites are: each item (or group) has a thin box, with its icon at
+    left."""
     W, H = _m.WIDE - 0.04, 1.48
     fig, ax = _canvas(W, H)
     fs = FS + 0.5
     top, bot = H - 0.02, 0.30  # the panels' common top and bottom; the probe rail runs beneath them
-    # ---- inputs
-    xi, wi = 0.02, 1.08
+
+    def item(x, y0, y1, w):  # one item's (or group's) frame
+        _box(ax, x, y0, w, y1 - y0, fc="white", lw=0.4, z=3)
+
+    # ---- inputs: the design and its host program, then the probes and the prompt length (the event model's inputs)
+    xi, wi = 0.02, 1.16
     _stage(ax, xi, bot, wi, top - bot, "Inputs", ours=False)
-    for k, kinds in enumerate(("iisiis", "isiiis", "iiisis")):
-        _strip(ax, xi + 0.08, 1.20 - k * 0.13, kinds, cw=0.048, h=0.09)
-    ax.text(xi + 0.08 + 6 * 0.048 + 0.04, 1.11, "Compiled design", ha="left", va="center", fontsize=fs,
-            linespacing=1.1)
-    rows_in = ((0.80, "Host program"), (0.60, "Operator probes"), (0.42, "Prompt length"))
-    for y, label in rows_in:
-        ax.text(xi + 0.08, y, label, ha="left", va="center_baseline", fontsize=fs)
+    bx, bw = xi + 0.07, wi - 0.14
+    ix, tx = bx + 0.05, bx + 0.31  # the icon column and the label column
+    item(bx, 1.02, 1.30, bw)
+    for k, kinds in enumerate(("iisiis", "isiiis")):
+        _strip(ax, ix, 1.175 - k * 0.11, kinds, cw=0.036, h=0.075)
+    ax.text(tx, 1.16, "Compiled design", ha="left", va="center_baseline", fontsize=fs, zorder=6)
+    item(bx, 0.78, 0.98, bw)
+    _doc(ax, ix + 0.04, 0.80)
+    ax.text(tx, 0.88, "Host program", ha="left", va="center_baseline", fontsize=fs, zorder=6)
+    gy0 = 0.38  # the probes group's bottom, where the rail to the event model starts
+    item(bx, gy0, 0.74, bw)
+    _gauge(ax, ix + 0.10, 0.525)
+    for y, label in ((0.635, "Operator probes"), (0.475, "Prompt length")):
+        ax.text(tx, y, label, ha="left", va="center_baseline", fontsize=fs, zorder=6)
     # ---- the analysis: dependence graph, legality, bound
-    xa, wa = 1.26, 1.52
+    xa, wa = 1.34, 1.44
     _stage(ax, xa, bot, wa, top - bot, "Analysis")
-    ox, oy = xa + 0.10, 0.92
-    nodes = {"a": (0.0, 0.30), "b": (0.0, 0.04), "c": (0.28, 0.28), "d": (0.28, 0.02), "e": (0.56, 0.30),
-             "f": (0.56, 0.04), "g": (0.74, 0.17)}
+    ax0, aw = xa + 0.07, wa - 0.14
+    item(ax0, 0.78, 1.30, aw)
+    ox, oy = ax0 + 0.08, 0.95
+    nodes = {"a": (0.0, 0.26), "b": (0.0, 0.03), "c": (0.26, 0.25), "d": (0.26, 0.02), "e": (0.52, 0.26),
+             "f": (0.52, 0.03), "g": (0.69, 0.145)}
     nodes = {k: (ox + x, oy + y) for k, (x, y) in nodes.items()}
     edges = (("a", "c", "true"), ("b", "d", "true"), ("c", "e", "true"), ("d", "f", "true"), ("e", "g", "true"),
              ("a", "d", "order"), ("c", "f", "order"), ("b", "c", "name"), ("f", "g", "name"))
@@ -200,16 +241,18 @@ def fig_framework():
              "order": dict(color=INK, ls=(0, (1, 1.2)))}  # magenta is reserved for ours
     for u, v, kind in edges:
         (x1, y1_), (x2, y2) = nodes[u], nodes[v]
-        ax.plot([x1, x2], [y1_, y2], lw=0.7, zorder=3, **style[kind])
+        ax.plot([x1, x2], [y1_, y2], lw=0.7, zorder=4, **style[kind])
     for x, y in nodes.values():
-        ax.add_patch(plt.Circle((x, y), 0.033, facecolor="white", edgecolor=INK, linewidth=0.5, zorder=4))
+        ax.add_patch(plt.Circle((x, y), 0.03, facecolor="white", edgecolor=INK, linewidth=0.5, zorder=5))
     for k, (kind, label) in enumerate((("true", "True"), ("name", "Name"), ("order", "Order"))):
-        lx, ly = ox + 0.92, 1.24 - k * 0.11
-        ax.plot([lx, lx + 0.09], [ly, ly], lw=0.7, zorder=3, **style[kind])
-        ax.text(lx + 0.12, ly, label, ha="left", va="center_baseline", fontsize=fs - 0.5)
-    for y, label in ((0.70, "Dependence graph"), (0.56, "Legality conditions"),
-                     (0.42, "Bound per false dependence")):
-        ax.text(xa + 0.10, y, label, ha="left", va="center_baseline", fontsize=fs)
+        lx, ly = ox + 0.86, 1.21 - k * 0.11
+        ax.plot([lx, lx + 0.09], [ly, ly], lw=0.7, zorder=4, **style[kind])
+        ax.text(lx + 0.12, ly, label, ha="left", va="center_baseline", fontsize=fs - 0.5, zorder=6)
+    ax.text(ox - 0.03, 0.85, "Dependence graph", ha="left", va="center_baseline", fontsize=fs, zorder=6)
+    rows_a = ((0.66, "Legality conditions"), (0.46, "Bound per false dependence"))
+    for y, label in rows_a:
+        item(ax0, y - 0.08, y + 0.08, aw)
+        ax.text(ox - 0.03, y, label, ha="left", va="center_baseline", fontsize=fs, zorder=6)
     # ---- the rewrites, each behind its checker
     xr, wr = 2.96, 1.80
     _stage(ax, xr, bot, wr, top - bot, "Checked rewrites")
@@ -242,10 +285,10 @@ def fig_framework():
     # decode: the loop pass's rings go straight to the output, passing under the probe rail with a break, so the
     # two do not read as joined
     _arrow(ax, (xr + wr - 0.08, rew[2][0]), (xo, rew[2][0]), z=3)
-    # the probes and the prompt length feed the event model along a rail beneath the panels
-    ry, rx = 0.15, xe + we / 2
+    # the probes and the prompt length feed the event model along a rail beneath the panels, from their own group
+    ry, rx, gx = 0.15, xe + we / 2, ix + 0.10
     ax.add_patch(Rectangle((rx - 0.04, rew[2][0] - 0.02), 0.08, 0.04, facecolor="white", edgecolor="none", zorder=4))
-    ax.plot([xi + wi / 2, xi + wi / 2, rx], [bot, ry, ry], color=INK, lw=0.6, solid_joinstyle="miter", zorder=2)
+    ax.plot([gx, gx, rx], [gy0, ry, ry], color=INK, lw=0.6, solid_joinstyle="miter", zorder=2)
     _arrow(ax, (rx, ry), (rx, be))
     fig.savefig(OUT / "framework.pdf", metadata={"CreationDate": None})
     plt.close(fig)
