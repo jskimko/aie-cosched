@@ -22,7 +22,7 @@ The AMD XDNA~2 neural processing unit (NPU) in Ryzen\texttrademark{} AI processo
 Each column holds a shim tile that moves data to and from DRAM, a memory tile, and 4 compute tiles with local memory.
 % SOURCE: tile anatomy (AM027): the shim tile is at the bottom of each column with the memory tile above it; the compute tiles are VLIW, SIMD vector cores; DMAs move data over a stream switch network.
 Direct memory access (DMA) engines move data by following buffer descriptors (BDs), which can chain, and locks hand each buffer from its producer to its consumer~\citep{amd_am027}.
-A configuration of the array is its core programs, stream routes, BDs, and locks, which a compiler such as MLIR-AIE~\citep{mlir-aie-repo} or MLIR-AIR emits, and a design is one or more configurations with the host program that issues their dispatches.
+A configuration of the array is its core programs, stream routes, BDs, and locks, which a compiler such as MLIR-AIE~\citep{mlir-aie-repo} or AIR emits, and a design is one or more configurations with the host program that issues their dispatches.
 The configured array runs data-driven, so a design maps each operator's flow onto a group of tiles that computes independently whenever its input locks are released.
 The LLM designs we study map each group to whole columns, which the hardware does not require, and we call the columns that one operator occupies its \emph{column group}.
 % SOURCE: the XDNA 2 topology is the kernel documentation's, which states 4 rows of compute tiles in 8 columns, 1 memory-tile row per column, and 4,096 KB of L2 (docs.kernel.org/accel/amdxdna/amdnpu.html, read 2026-10-21; the same citation FCPR Section 2.1 uses for the column count). Confirmed on the Ryzen AI Max+ 395 NPU of this paper's machine. NOTE: Rico et al. (IEEE Micro 2024) is the FIRST XDNA generation (5 columns, 10 TOPS) and must not be cited for an XDNA 2 figure.
@@ -61,10 +61,10 @@ A second cut splits a fused design's work into dispatches, each with one operato
 This cut decides which waits the CP's order places between operators.
 A third cut decides whether each role in a loop keeps one buffer or several, and so which waits the loop places between its blocks.
 IRON, a close-to-metal Python interface to MLIR-AIE~\citep{hunhoff2025iron} that can also express fused designs, composes an LLM's operators as an operator sequence that reconfigures the whole array for each one.
-In contrast, MLIR-AIR and Stream~\citep{symons2025stream} generate fused designs.
-FastFlowLM ships both fused flash designs and a modular per-operator engine as binaries, together with the runtime that issues them.
+In contrast, AIR and Stream~\citep{symons2025stream} generate fused designs.
+FLM ships both fused flash designs and a modular per-operator engine as binaries, together with the runtime that issues them.
 % SOURCE: how each tool builds its fused designs (Related Work names both as generating fused designs): MLIR-AIR maps loop nests onto fused multi-operator designs; Stream generates fused designs from its mapping search.
-MLIR-AIR, IRON, and FastFlowLM, the three stacks we read, reach the array through the same dispatches and instruction streams (Sections~\ref{subsec:closed} and~\ref{subsec:census}), and so do Stream's designs, which compile through MLIR-AIE.
+AIR, IRON, and FLM, the three stacks we read, reach the array through the same dispatches and instruction streams (Sections~\ref{subsec:closed} and~\ref{subsec:census}), and so do Stream's designs, which compile through MLIR-AIE.
 % SOURCE: IRON's OperatorSequence keeps each operator its own aie.device and emits configure/run per runlist entry in runlist order (amd-iron 1fd3dab, iron/common/sequence.py:89-96, 286; iron/common/compilation/sequence.py:243-324; pass-0 census check, decisions log 2026-10-24 late). Stream's fused design: iron/operators/swiglu_prefill_stream (PR #122, stream-dse 2.1.1 at d03bfd10) places gate, up, silu, mul and down on disjoint columns in one design. FastFlowLM's engines reach the runtime through libhrx and ship as compiled libraries and xclbins (FastFlowLM 44d01787, lib/hrx/libgemma4e_flash.so; vault lab-cosched-passes (14)); its flash prefill spends 82-87% of its time in commands whose configuration holds several operators (exposure a3ef131).
 % DECISION: FCPR is cited in the third person, for the command-processor primitive only, in this one background sentence; no text or figures are reused from it.
 
@@ -74,7 +74,7 @@ MLIR-AIR, IRON, and FastFlowLM, the three stacks we read, reach the array throug
 % VALUE: prefill and TTFT; the decoder layer's operators; the original fused prefill puts GEMMs and attention on disjoint column groups of one configuration (its default split, the number of columns attention takes), so its operators differ only in their streams; it runs a layer stage by stage over 128-token chunks with host work between dispatches
 \emph{Prefill} processes a prompt to produce the first output token, and its latency is the TTFT.
 Each decoder layer applies a QKV projection, attention, an output projection, and a gated feed-forward network of gate, up, and down projections.
-MLIR-AIR's open fused prefill places every operator of a decoder layer in one configuration, with the GEMMs on columns 1--6 and attention on columns 0 and 7.
+AIR's open fused prefill places every operator of a decoder layer in one configuration, with the GEMMs on columns 1--6 and attention on columns 0 and 7.
 This placement is its default configuration, which we name by its \emph{split}, namely the number of columns that attention takes.
 The split is a parameter of the design's build, and each admitted value gives a \emph{supported configuration}.
 Since each attention group serves an equal share of the KV heads, an LLM with 8 KV heads admits attention on 1, 2, or 4 columns.
@@ -87,5 +87,5 @@ Between dispatches, its CPU computes the normalizations, rotary embedding, and r
 % SOURCE: mlir-air a3e26261 programming_examples/llms/shared/fused_prefill/: device.py (column map cols(cfg); "one PDI serves every op and shape and the ops differ only in their insts"), engine.py (strip_columns), dense.py (_mix_all, stage-major order), hostops.py; README.md: "Some of the LLM implementations in this directory reimplement AMD NPU LLM designs originally developed by the FastFlowLM team".
 
 % VALUE: decode is a separate design that generates one token per step and whose attention reads the KV cache of the whole context
-\emph{Decode} generates one token per step with a separate design, namely MLIR-AIR's fused decode, in which every layer's attention reads the KV cache of the whole context.
+\emph{Decode} generates one token per step with a separate design, namely AIR's fused decode, in which every layer's attention reads the KV cache of the whole context.
 % DECISION: appends to a cached context and agent turns are an extension under spine v18 and are not described in the body; their text is archived in the vault (archive-tex-2026-10-24).
