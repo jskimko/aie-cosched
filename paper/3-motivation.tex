@@ -35,7 +35,6 @@ The serial execution of the original program is thus a property of how its comma
 % VALUE: in the fused LLM designs we study, the waits recur at three places, each a textbook false dependence (cited): an order dependence where the instruction order puts a wait data does not require, a name dependence where work shares storage it need not share
 At three places in the fused LLM designs we study, work waits on other work whose results it does not consume, which is a \emph{false dependence} in the textbook sense~\citep{bernstein1966analysis,kuck1981dependence}.
 It is an \emph{order} dependence where the instruction order alone places the wait, which reordering removes, or a \emph{name} dependence where two uses share storage they need not share, which renaming removes~\citep{tomasulo1967,lam1988software}.
-We call either kind a \emph{false order}.
 % DECISION: false dependences, the order and name causes, reordering, and renaming are textbook and cited; the paper claims their analysis on this platform, never the classes. Section 4 classes each wait formally.
 
 \textbf{Column Groups in Prefill.}
@@ -77,16 +76,16 @@ MLIR-AIR's double-buffering transformation declines the loop because its running
 \subsection{When Removing a Wait Frees Overlap}
 \label{subsec:question}
 
-% VALUE: the question the rest of the paper answers: removing a false order pays only where the work it frees can overlap on resources a rewrite cannot duplicate, with no true dependence between (each clause from a platform fact); how much work qualifies is set by how the design cuts its work and by the prompt length, so the order that pays changes with length and must be priced; the full claim and its tests are in Section 4.7
+% VALUE: the question the rest of the paper answers: removing a false dependence pays only where the work it frees can overlap on resources a rewrite cannot duplicate, with no true dependence between (each clause from a platform fact); how much work qualifies is set by how the design cuts its work and by the prompt length, so the order that pays changes with length and must be priced; the full claim and its tests are in Section 4.7
 % DECISION: the critical-path condition is textbook and cited; the paper's claim is the condition's platform terms (non-duplicable resources, the host as an agent) and its dependence on the cut and the prompt length, never "false dependences cost time".
-Removing a false order frees overlap only where the work it frees runs on core tiles and DMA channels that the work it waited on does not use.
+Removing a false dependence frees overlap only where the work it frees runs on core tiles and DMA channels that the work it waited on does not use.
 These are resources a rewrite cannot duplicate, because every engine runs its own work in order, and a buffer can be renamed into several slots whereas a core tile or a DMA channel cannot.
 It also frees overlap only where no true dependence, on the device or through a host step that reads one command's output before it issues the next, separates the two pieces of work.
 We call these two checkable clauses together the \emph{condition}.
-They refine the rule that removing a false dependence gains time only on the critical path~\citep{fields2003interaction}, since on this platform removing a false order shortens that path only when both hold.
+They refine the rule that removing a false dependence gains time only on the critical path~\citep{fields2003interaction}, since on this platform removing one shortens that path only when both hold.
 Both clauses name resources and dependences that the analysis reads from the artifacts and the host's accesses (Section~\ref{sec:order}).
-The condition therefore screens out the false orders that cannot free overlap before any duration is measured, whereas the critical-path rule needs durations to say which do.
-Durations decide the rest: how much each remaining false order frees, whether that exceeds its cost, and what a rewrite saves beyond overlap, such as a dispatch.
+The condition therefore screens out the false dependences that cannot free overlap before any duration is measured, whereas the critical-path rule needs durations to say which do.
+Durations decide the rest: how much each remaining false dependence frees, whether that exceeds its cost, and what a rewrite saves beyond overlap, such as a dispatch.
 The bound of Section~\ref{subsec:removal} and the event model of Section~\ref{subsec:pricing} supply them.
 
 How much work meets both clauses is set by how the design cuts its work, into configurations, into commands, and into buffers, and by the prompt length, which sets the balance between attention and the GEMMs.

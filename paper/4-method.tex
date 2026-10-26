@@ -6,19 +6,19 @@
 
 \begin{figure*}[t]
     \centering
-    % VALUE: OPCORD's components: inputs (compiled design, open or closed; host program; operator probes; prompt length), the analysis (dependence graph with true, name and order edges; legality conditions; a bound per false order), the composer, stream pass and loop pass each behind its checker, the event model choosing order and configuration per prompt length for prefill, the output (rewritten design on its own hardware context, or a refusal with its reason); on closed binaries, read and bound, replaying only rewrites that leave the host program as it is
+    % VALUE: OPCORD's components: inputs (compiled design, open or closed; host program; operator probes; prompt length), the analysis (dependence graph with true, name and order edges; legality conditions; a bound per false dependence), the composer, stream pass and loop pass each behind its checker, the event model choosing order and configuration per prompt length for prefill, the output (rewritten design on its own hardware context, or a refusal with its reason); on closed binaries, read and bound, replaying only rewrites that leave the host program as it is
     % DECISION: the overview figure (figs/diagrams.py fig_framework), full width as the comparable systems papers' overviews are (author, 2026-10-25); the loop pass's rings go straight to the output because the event model prices prefill only
     \includegraphics[width=\textwidth]{fig/framework.pdf}
     \caption{OPCORD's components over a design its stack has already compiled. The event model prices prefill only, so the loop pass's decode rings go straight to the output. On a closed stack's binaries, OPCORD stops at the analysis and replays only rewrites that leave the host program unchanged.}
     \label{fig:framework}
 \end{figure*}
 
-% VALUE: OPCORD's components (the figure), each with the property of the design or platform that requires it: the order is read from binaries, since even open designs spread it over the CP's stream, DMA chains, and core loops; most false orders cost nothing, so each is bounded and a rewrite is provided only where the bound leaves room; legality comes from the instructions alone, since OPCORD did not compile the design, and checkers refuse with a reason; the composer and stream pass answer the blocking in-order CP and the loop pass decode's one buffer per role; the order and split that pay change with the prompt length, so the event model prices both per length, since the artifact fixes the order but not the durations and the candidates multiply
+% VALUE: OPCORD's components (the figure), each with the property of the design or platform that requires it: the order is read from binaries, since even open designs spread it over the CP's stream, DMA chains, and core loops; most false dependences cost nothing, so each is bounded and a rewrite is provided only where the bound leaves room; legality comes from the instructions alone, since OPCORD did not compile the design, and checkers refuse with a reason; the composer and stream pass answer the blocking in-order CP and the loop pass decode's one buffer per role; the order and split that pay change with the prompt length, so the event model prices both per length, since the artifact fixes the order but not the durations and the candidates multiply
 % DECISION: the opener follows the FPGA'27 design opener, each property of the platform followed by the mechanism that answers it, with one subsection per property (STYLE.md, Paper structure, Design; contract §6).
 % DECISION: the legality conditions and the checkers live together in Section~\ref{subsec:legality}; this section states only how OPCORD acts on them, namely checkers that accept a rewrite or refuse it with a reason (contract §6).
 Figure~\ref{fig:framework} shows OPCORD's components over a design that its stack has already compiled.
 OPCORD's analysis recovers the order from the design's binaries, without their source where it is closed, because even an open design spreads that order over the CP's stream, DMA chains, and core loops (Section~\ref{sec:order}).
-A design holds many false orders, most of which cost nothing, so the analysis bounds each one, and OPCORD provides a rewrite only for the kinds of false order whose bound leaves room (Section~\ref{subsec:removal}).
+A design holds many false dependences, most of which cost nothing, so the analysis bounds each one, and OPCORD provides a rewrite only for the kinds of false dependence whose bound leaves room (Section~\ref{subsec:removal}).
 Because OPCORD rewrites designs it did not compile, it takes the legality conditions from what the instructions alone establish about buffers, locks, and routes (Section~\ref{subsec:legality}).
 Its checkers refuse, with a reason, any rewrite they cannot show legal (Section~\ref{subsec:checkers}).
 Each rewrite answers a property of the platform behind the waits of Section~\ref{subsec:losses}.
@@ -85,10 +85,10 @@ OPCORD instead rewrites the open designs in use (Sections~\ref{subsec:order} and
 \textbf{Bounding a Removal.}
 \label{subsec:removal}
 % VALUE: one removal is worth at most the overlap it blocks on typed resources, given every other edge; zero off the longest path; in a loop the maximum cycle mean governs; Amdahl's law for an ordering, from the order and measured durations, not a trace
-Removing a false order $d$ speeds a phase up by at most $T / (T - O(d))$, where $T$ is the phase's time and $O(d)$ is the time during which $d$ keeps work on disjoint resources from overlapping, given every other edge.
+Removing a false dependence $d$ speeds a phase up by at most $T / (T - O(d))$, where $T$ is the phase's time and $O(d)$ is the time during which $d$ keeps work on disjoint resources from overlapping, given every other edge.
 The resources are typed: the column groups, the CP with its cost at each command boundary, the DRAM read rate up to its cap, and the DMA channels that one group uses on another group's columns.
 Each resource runs its own work in turn, so the phase's time is the longest path through the graph with those resources' orders included, and $O(d)$ is zero when $d$ lies off that path.
-Because these resources include the core tiles and DMA channels that a rewrite cannot duplicate, and true dependences stay edges, a false order that fails either clause of the condition (Section~\ref{subsec:question}) frees no overlap and bounds at $1.000\times$.
+Because these resources include the core tiles and DMA channels that a rewrite cannot duplicate, and true dependences stay edges, a false dependence that fails either clause of the condition (Section~\ref{subsec:question}) frees no overlap and bounds at $1.000\times$.
 In a loop, the maximum cycle mean of the repeating graph determines the time per iteration instead~\citep{ghamarian2006throughput}.
 The bound is thus Amdahl's law applied to an ordering, computed from the program and the probes, without the timing trace that the tools of Section~\ref{sec:related} start from.
 
