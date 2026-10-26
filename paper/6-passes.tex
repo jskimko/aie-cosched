@@ -110,7 +110,7 @@ Each configuration comes from the design's own build, changing only the split pa
 
 % VALUE: to choose among orders and splits without running each, an event simulation of the device, the CP, and the host prices a schedule; its form follows the platform (one in-order queue of dispatches, a host timeline with waits, column groups that overlap within a dispatch) and its parameters are the operators' own timings plus a few machine constants measured once by microbenchmarks; the original program runs through the same simulation, so both sides are priced alike; device time, host exposure, and head and tail reported apart
 % DECISION: this subsection states the frozen form (dev form, frozen 2026-10-25; amd-npu 12250226, FORM-A2.md; opcord-runtime 3bead38, opcord/model/event_model.py, constants opcord/model/constants/frozen.json), term by term as npu-gap checked it against the code; the rebuilt form (per-split setups and windows, overlap bounded by bytes over the read cap) scored worse and did not freeze (vault decisions log, event-model form, 2026-10-25).
-To choose among orders and configurations without running each, we price a schedule from the probes of Section~\ref{subsec:removal} with an analytical event simulation of the device, the CP, and the host, which we call the \emph{event model} and whose form follows the platform's structure.
+To choose among orders and configurations without running each, we price a schedule from the probes of Section~\ref{subsec:overview} with an analytical event simulation of the device, the CP, and the host, which we call the \emph{event model} and whose form follows the platform's structure.
 Queued dispatches run one at a time (Section~\ref{subsec:semantics}), so dispatch $k$ ends at
 \begin{equation}
 \label{eq:cmd}
