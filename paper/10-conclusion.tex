@@ -10,7 +10,6 @@ OPCORD therefore reads compiled designs, bounds each false dependence, prices th
 Against the original program on its fastest supported configuration that we measure, OPCORD shortens the time to first token by \PrefillGainLo--\PrefillGainHi$\times$ on five LLMs at prompts of 1K to 32K tokens.
 Against the unmodified decode design, its loop pass, which renames decode attention's buffers into rings, shortens decode by \DecodeGainLo--\DecodeGainHi$\times$ at contexts of about 30K tokens, and both keep the outputs bit-identical.
 Across the designs we read from three stacks, every overlap gain we measure falls where the condition says one can arise, and a closed production stack leaves little overlap to recover in either of its prefill engines.
-One runs each layer's attention once over the whole prompt, so that every GEMM feeds or reads it, and the other runs each operator alone on the whole array.
 What the composed order still pays is the price of overlap under the shared DRAM read cap and the command processor's and the host's work that the schedule does not hide.
 Because the order stays the schedule however a design's kernels and cuts improve, the analysis and rewrites apply to each design a toolchain emits, and the result suggests that toolchains should emit the order of issue as a priced choice per input size rather than as a fixed artifact.
 % SOURCE: figs/paper_numbers.py macros (Section 6 SOURCE lines).
