@@ -54,6 +54,7 @@ COLUMN = 3.25  # MLSys column width, inches
 # IBM's color-blind-safe palette, softened; each series keeps its color and marker in every figure.
 BLUE, PURPLE, MAGENTA, ORANGE, GOLD = "#6E95F0", "#8770E0", "#D04A8A", "#EB7A3A", "#F0B840"
 GRAY = "#B0B0B0"
+MIST = "#E4E4E4"  # synchronizations, as in the architecture figure (diagrams.py)
 INK = "#262626"  # original schedules: near-black
 
 
@@ -276,10 +277,10 @@ def fig_order():
             ax.broken_barh([(t0, d) for t0, d in bars], (y - 0.32, 0.64),
                            facecolors=color, edgecolor=INK, linewidth=0.4)
         for t0, d, kind in cp:
-            ax.broken_barh([(t0, d)], (-1.32, 0.5), facecolors=INK if kind == 0 else GRAY,
+            ax.broken_barh([(t0, d)], (-1.32, 0.5), facecolors=INK if kind == 0 else MIST,
                            edgecolor=INK, linewidth=0.3)
         ax.axvline(end, color="black", linewidth=0.5, linestyle=(0, (4, 2)))
-        ax.set_yticks([1.0, 0.0, -1.07], ["Attn.", "GEMMs", "CP"])
+        ax.set_yticks([1.0, 0.0, -1.07], ["Attention", "GEMMs", "CP"])
         ax.set_ylim(-1.75, 1.6)
         ax.set_xlim(-0.1, span + 0.5)
         ax.set_title(title, fontsize=7, pad=2, loc="left")
@@ -288,9 +289,9 @@ def fig_order():
         for side in ("top", "right", "bottom"):
             ax.spines[side].set_visible(False)
     handles = [plt.Rectangle((0, 0), 1, 1, facecolor=INK, edgecolor=INK, linewidth=0.3),
-               plt.Rectangle((0, 0), 1, 1, facecolor=GRAY, edgecolor=INK, linewidth=0.3)]
+               plt.Rectangle((0, 0), 1, 1, facecolor=MIST, edgecolor=INK, linewidth=0.3)]
     axes[0].legend(handles, ["CP issuing", "CP blocked on a synchronization"], ncol=2,
-                   loc="lower center", bbox_to_anchor=(0.5, 1.28), handlelength=1.2, columnspacing=1.0)
+                   loc="lower center", bbox_to_anchor=(0.5, 1.12), handlelength=1.2, columnspacing=1.0)
     axes[-1].set_xlabel("Time (illustrative)", labelpad=1)
     fig.savefig(OUT / "order.pdf")
     plt.close(fig)
@@ -480,7 +481,6 @@ def fig_headline():
         for i, n in enumerate(lengths):
             c = at.get(n)
             if c is None or c.get("unpriced"):
-                ax.text(i, 1.0 + 0.02, "--", ha="center", va="bottom", fontsize=6)
                 continue
             ax.bar(i, c["gain"] - 1.0, bottom=1.0, width=0.72, color=SPLIT_COLOR[c["pick_split"]], edgecolor="none",
                    zorder=2)
@@ -494,7 +494,7 @@ def fig_headline():
                 ax.errorbar(i, c["gain"], yerr=[[c["gain"] - c["lo"]], [c["hi"] - c["gain"]]], fmt="none",
                             ecolor=INK, elinewidth=0.5, capsize=1.0, zorder=3)
         ax.axhline(1.0, color="black", linewidth=0.5, zorder=4)
-        ax.set_xticks(range(len(lengths)), labels, fontsize=5.5, rotation=90)
+        ax.set_xticks(range(len(lengths)), [lb if k % 2 == 0 else "" for k, lb in enumerate(labels)], fontsize=6)
         ax.set_xlim(-0.6, len(lengths) - 0.4)
         ax.tick_params(axis="x", length=0, pad=1.5)
         ax.set_title(llm, fontsize=7, pad=2)
@@ -510,9 +510,11 @@ def fig_headline():
     plt.close(fig)
 
 
-DECODE_STYLE = {"Llama-3.2-1B": (MAGENTA, "o", "full"), "LFM2-1.2B": (ORANGE, "s", "full"),
-                "Qwen3-4B": (BLUE, "^", "full"), "Llama-3.1-8B": (PURPLE, "D", "full"),
-                "Gemma3-4B": (INK, "v", "none")}
+# One neutral ink per LLM, told apart by marker and line style, since the palette's hues mean attention, GEMMs and
+# OPCORD in the other figures.
+DECODE_STYLE = {"Llama-3.2-1B": ("o", "full", (0, ())), "LFM2-1.2B": ("s", "none", (0, ())),
+                "Qwen3-4B": ("^", "full", (0, (4, 1.5))), "Llama-3.1-8B": ("D", "none", (0, (4, 1.5))),
+                "Gemma3-4B": ("v", "full", (0, (1, 1.2)))}
 
 
 def fig_decode():
@@ -521,17 +523,20 @@ def fig_decode():
     data/decode-cells.json (figs/paper_numbers.py): one development batch, 5 ABBA repetitions of 256 greedy tokens per
     point, logits bit-identical; the last context is 30,208 tokens (28,800 on Qwen3-4B, its design's window)."""
     cells = json.loads((DATA / "decode-cells.json").read_text())["cells"]
-    fig, ax = plt.subplots(figsize=(COLUMN, 1.55))
+    fig, ax = plt.subplots(figsize=(COLUMN + 0.37, 1.6))  # the tight crop trims about 0.37 in of margin
     order = ("Llama-3.2-1B", "LFM2-1.2B", "Qwen3-4B", "Llama-3.1-8B", "Gemma3-4B")
     for llm in order:
-        pts = sorted((c["P"], c["gain"]) for c in cells if c["llm"] == llm)
-        color, marker, fill = DECODE_STYLE[llm]
-        ax.plot([p / 1024 for p, _ in pts], [g for _, g in pts], color=color, marker=marker, markersize=3,
-                markerfacecolor=color if fill == "full" else "white", label=llm)
+        pts = sorted((c["P"], c) for c in cells if c["llm"] == llm)
+        marker, fill, dash = DECODE_STYLE[llm]
+        xs, ys = [p / 1024 for p, _ in pts], [c["gain"] for _, c in pts]
+        ax.errorbar(xs, ys, yerr=[[c["gain"] - c["lo"] for _, c in pts], [c["hi"] - c["gain"] for _, c in pts]],
+                    fmt="none", ecolor=INK, elinewidth=0.5, capsize=1.0)
+        ax.plot(xs, ys, color=INK, marker=marker, markersize=2.6, linestyle=dash, linewidth=0.7,
+                markerfacecolor=INK if fill == "full" else "white", markeredgewidth=0.6, label=llm)
     ax.axhline(1.0, color="black", linewidth=0.5)
     ax.set_xlabel("Cached context (K tokens)", labelpad=1)
     ax.set_ylabel("Decode speedup", labelpad=2)
-    ax.set_xticks([2, 8, 16, 24, 30])
+    ax.set_xticks([0, 8, 16, 24, 32])
     ax.set_xlim(0, 32)
     ax.set_ylim(0.95, 1.45)
     ax.legend(loc="upper left", fontsize=6, ncol=2, handlelength=1.6, columnspacing=0.8, labelspacing=0.2)

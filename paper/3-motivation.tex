@@ -15,8 +15,8 @@ Nor does a second hardware context, because the driver gives every context all e
 \begin{figure}[t]
     \centering
     % VALUE: the mechanism behind the paired measurements: packing in turn (a) leaves one group idle while the CP blocks on the other, as one command per operator does; issuing every group's work before any wait (b) runs the groups together
-    \includegraphics[width=\linewidth]{fig/order.pdf}
-    \caption{CP instruction order and the activity of the column groups for one attention operator and three GEMMs, with illustrative durations. Packing the operators into one command in turn (a) runs them exactly as one command each would, with the CP blocked on one group while the other is idle, whereas issuing every group's work before waiting on any (b) lets the groups run together.}
+    \includegraphics{fig/order.pdf}
+    \caption{CP instruction order and the activity of the column groups for one attention operator and three GEMMs, with illustrative durations. In (a), the CP blocks on one group while the other is idle, as with one command per operator, whereas in (b) the groups run together.}
     \label{fig:order}
 \end{figure}
 % DECISION: the schematic moves here from the introduction, whose Figure 1 is the measured timeline; it explains why packing creates no overlap, which the paired measurements show but do not explain, and Section 7 refers to it for the composer's order.

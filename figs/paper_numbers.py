@@ -246,8 +246,10 @@ def decode(ab):
                 continue
             pt = ab.json(p)["points"][str(P)]["ms_tok"]
             off, on = st.median(pt["baseline"]), st.median(pt["treatment"])
+            # the ABBA windows pair by index (each repetition times both arms back to back)
+            _, lo, hi = ratio_ci(pt["baseline"], pt["treatment"])
             out.append({"llm": NAME[t], "key": t, "P": P, "off_ms": off, "on_ms": on, "gain": off / on,
-                        "reps": len(pt["baseline"])})
+                        "lo": lo, "hi": hi, "reps": len(pt["baseline"])})
     return out
 
 

@@ -57,7 +57,7 @@ Running both groups at once makes a group that reads at the shared DRAM read cap
     \centering
     % VALUE: what the loop pass does, drawn in fig:order's vocabulary with illustrative durations: its two-slot ring lets block i+1's transfer overlap block i's compute, where one buffer per role makes it wait; the stream pass's reorder within one operator is fig:order's move, stated in the text
     \includegraphics[width=\linewidth]{fig/rewrites.pdf}
-    \caption{Decode attention's block loop with one buffer per role and after our loop pass renames its buffers into two-slot rings, with illustrative durations. The transfer brings a block's keys and values, and the compute is both cores' work on that block. Each dotted arrow ends at block $i{+}1$'s transfer, which waits on block $i$'s compute although it does not read its results.}
+    \caption{Decode attention's block loop with one buffer per role and after our loop pass renames its buffers into two-slot rings, with illustrative durations. The transfer brings a block's keys and values, and the compute is both cores' work on that block. Each dotted arrow ends at a block's transfer, which waits on the previous block's compute although it does not read its results.}
     \label{fig:rewrites}
 \end{figure}
 

@@ -8,8 +8,8 @@
     \centering
     % VALUE: the headline at a glance: OPCORD's TTFT gain over the baseline on every LLM across the prompt sweep, with the split it runs on
     % SOURCE: figs/make_figs.py fig_headline over figs/data/prefill-cells.json (figs/paper_numbers.py at amd-npu a6abaf19): the amendment-1 batch's registered analysis on its 38 cells (paired, or chained through orig-S2 where the baseline split differs from the pick's), the grid or split cells' paired ratio elsewhere, unpaired (no whisker) for LFM2-1.2B at 2K and Gemma3-4B at 1K; picks by choose() at opcord d6caf8b; Llama-3.2-1B at 32,768 unpriced (chunk 160 outside its probed chunks, n1 NOTES).
-    \includegraphics{fig/headline.pdf}
-    \caption{TTFT speedup of OPCORD over the original program on its fastest supported split that we measure, at each prompt length, for each LLM. Bars are ratios of medians with 95\% intervals, a dagger marks a ratio across batches with no interval, and the shade gives the split that OPCORD chooses. Llama-3.2-1B has no point at 32K tokens, where its attention operators were not probed.}
+    \includegraphics[width=\textwidth]{fig/headline.pdf}
+    \caption{TTFT speedup of OPCORD over the original program on its fastest supported split that we measure, at each power-of-two prompt length, for each LLM. Bars are ratios of medians with 95\% intervals, a dagger marks a ratio across batches with no interval, and the shade gives the split that OPCORD chooses. Llama-3.2-1B has no point at 32K tokens, where its attention operators were not probed.}
     \label{fig:headline}
 \end{figure*}
 
@@ -52,6 +52,8 @@ Because the DRAM read cap varies by up to 12\% between batches, a ratio pairs ru
 % VALUE: OPCORD shortens TTFT on every LLM from 1K tokens, against the baseline, with bit-identical outputs; the gain rises with the prompt length and peaks at 8-16K, as the shape of the exposed work predicts; at one to four chunks OPCORD mostly keeps the original order and stays near the baseline
 OPCORD shortens TTFT on all five LLMs, with outputs bit-identical to the original program's, by \PrefillGainLo--\PrefillGainHi$\times$ at prompts of 1{,}024 tokens and more (Figure~\ref{fig:headline}).
 The gain rises with the prompt length and peaks at 8K or 16K tokens, where the overlap between the groups and the alternation within attention together are largest (Section~\ref{subsec:shape-eval}).
+It dips where four attention columns already shorten attention, either in OPCORD's choice (Llama-3.2-1B and Qwen3-4B at 8K, Gemma3-4B at 32K) or in the baseline's (Llama-3.1-8B at 16K), which suggests that less of attention is left for the overlap to hide.
+The two wide intervals, Llama-3.2-1B at 16K and Llama-3.1-8B at 32K tokens, each come from one slow timed run.
 At prompts of one to four chunks, where the groups have little work to overlap, OPCORD composes commands at only one of the 20 cells, and its TTFT stays within \ShortGainLo--\ShortGainHi$\times$ of the baseline's.
 % SOURCE: figs/data/prefill-cells.json (figs/paper_numbers.py, amd-npu a6abaf19): 39 cells at 1,024-32,768 tokens, 1.097 (LFM2-1.2B 1,024, S1) to 1.625 [1.337, 1.632] (Llama-3.2-1B 16,384, S4); per LLM 1B 1.22-1.63, LFM2 1.10-1.49, Qwen 1.25-1.57, Gemma 1.18-1.30, 8B 1.11-1.56; peaks 1B 16K, LFM2 8K (16K 1.485), Qwen 16K, Gemma 8K, 8B 8K; prompts of 128-512 tokens 0.985-1.040 (LFM2-1.2B 256 0.985 [0.971, 0.999], Llama-3.1-8B 512 1.040). Pre-final: picks by choose() at opcord d6caf8b, the event model before its frozen form.
 
@@ -105,7 +107,7 @@ The loop pass brings Llama-3.2-1B and Llama-3.1-8B within \AbsDecodeClosePct\% o
     % VALUE: the decode result as a curve, because what the renaming removes grows with the context: the gain rises with the cached context on every LLM whose attention reads the whole context, and stays flat on Gemma3-4B, whose decode design reads a fixed window
     % SOURCE: figs/make_figs.py fig_decode over figs/data/decode-cells.json (figs/paper_numbers.py): the decode development batch (amd-npu decode-rename/decode-dev-2026-10-24, pin 572ec79c), 5 ABBA repetitions x 256 greedy tokens per point, medians of ms per token, logits bit-identical; contexts 2,048, 16,384 and 30,208 (Qwen3-4B 28,800).
     \includegraphics{fig/decode.pdf}
-    \caption{Decode speedup of our loop pass, which renames attention's keys, values, and scores into rings, over the unmodified decode design, in median time per token against the length of the cached context. Every step's logits are bit-identical between the two designs. The last context is 30{,}208 tokens, or 28{,}800 on Qwen3-4B.}
+    \caption{Speedup in median time per token of our loop pass, which renames attention's keys, values, and scores into rings, over the unmodified decode design. Every step's logits are bit-identical between the two designs, and the 95\% intervals lie within the markers. The last context is 30{,}208 tokens, or 28{,}800 on Qwen3-4B.}
     \label{fig:decode}
 \end{figure}
 

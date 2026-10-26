@@ -58,7 +58,7 @@ def fig_arch():
     # ---- the submission path along the top: host -> hardware context -> CP -> its instruction stream
     ty, th = 1.62, 0.2
     _box(ax, 0.02, ty, 0.38, th, "Host", fc=MIST)
-    _box(ax, 0.52, ty, 0.62, th, "HW context")
+    _box(ax, 0.52, ty, 0.62, th, "Hardware context", fs=FS - 0.5)
     _box(ax, 1.26, ty, 0.30, th, "CP")
     _arrow(ax, (0.40, ty + th / 2), (0.52, ty + th / 2))
     _arrow(ax, (1.14, ty + th / 2), (1.26, ty + th / 2))
@@ -176,8 +176,8 @@ def fig_framework():
     xi, wi = 0.02, 1.08
     _stage(ax, xi, bot, wi, top - bot, "Inputs", ours=False)
     for k, kinds in enumerate(("iisiis", "isiiis", "iiisis")):
-        _strip(ax, xi + 0.08, 1.20 - k * 0.13, kinds, cw=0.055, h=0.09)
-    ax.text(xi + 0.08 + 6 * 0.055 + 0.05, 1.11, "compiled design,\nopen or closed", ha="left", va="center", fontsize=fs,
+        _strip(ax, xi + 0.08, 1.20 - k * 0.13, kinds, cw=0.048, h=0.09)
+    ax.text(xi + 0.08 + 6 * 0.048 + 0.04, 1.11, "compiled design,\nopen or closed", ha="left", va="center", fontsize=fs,
             linespacing=1.1)
     rows_in = ((0.80, "host program"), (0.60, "operator probes"), (0.42, "prompt length"))
     for y, label in rows_in:
@@ -243,8 +243,6 @@ def fig_framework():
     ax.plot([xi + wi / 2, xi + wi / 2, rx], [bot, ry, ry], color=INK, lw=0.6, solid_joinstyle="miter", zorder=2)
     _arrow(ax, (rx, ry), (rx, be))
     ax.text(xa + 0.10, ry + 0.06, "probes, prompt length", ha="left", va="center_baseline", fontsize=fs - 0.5)
-    ax.text(xa + 0.10, 0.05, "closed binaries: read and bounded, replaying only rewrites that leave the host program as it is",
-            ha="left", va="center_baseline", fontsize=fs - 0.5, style="italic")
     fig.savefig(OUT / "framework.pdf", metadata={"CreationDate": None})
     plt.close(fig)
 
@@ -281,7 +279,7 @@ def fig_rewrites():
                 wait(ax, t0 + w, 0.32, 1.0 - 0.32)
         ax.set_yticks([1.0, 0.0], ("Transfer", "Compute"))
         ax.set_ylim(-0.6, 1.75)
-        ax.axvline(d["end"], color="black", linewidth=0.5, linestyle=(0, (4, 2)))
+        ax.axvline(d["end"] + 0.06, color="black", linewidth=0.5, linestyle=(0, (4, 2)))  # clear of the last box
         ax.set_xlim(-0.1, max(v["end"] for v in loop.values()) + 0.25)
         ax.set_title(title, fontsize=7, pad=2, loc="left")
         ax.tick_params(left=False, right=False, top=False, bottom=False, labelleft=col == 0)
