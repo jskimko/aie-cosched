@@ -595,7 +595,7 @@ CHOICE_RULES = (("opcord", "OPCORD"), ("always", "Always reorder"), ("fixed_s2",
 
 def fig_choice():
     """(a) The event model's error on each development cell's original-to-composed ratio against that ratio, and
-    (b) each choice rule's worst loss against the fastest measured choice, and the cells where it picks the fastest.
+    (b) each choice rule's worst loss against the fastest measured choice.
 
     data/accuracy-cells.json (the frozen form's 70 development cells) and data/choice.json (the 59 priced cells).
     "Never reorder" is left out of (b): its loss is the headline gain forgone, which Figure 6 shows."""
@@ -619,12 +619,12 @@ def fig_choice():
     a.set_title("(a) Event model", fontsize=7, pad=3)
     cells = json.loads((DATA / "choice.json").read_text())["cells"]
     labels = []
-    for i, (key, label) in enumerate(CHOICE_RULES):  # each rule's worst loss, and how often it picks the fastest
+    for i, (key, label) in enumerate(CHOICE_RULES):  # each rule's worst loss
         v = [c[key] for c in cells if c.get(key) is not None]
-        worst, exact = max(v), sum(1 for x in v if x == 0)
+        worst = max(v)
         b.barh(i, worst, height=0.6, color=OURS if key == "opcord" else GRAY, edgecolor="none")
         b.text(worst + 1.5, i, f"{worst:.1f}", ha="left", va="center", fontsize=6)
-        labels.append(f"{label} ({exact}/{len(v)})")
+        labels.append(label)
     b.set_xlim(0, 110)
     b.set_xticks([0, 25, 50, 75, 100])
     b.set_ylim(len(CHOICE_RULES) - 0.5, -0.5)
