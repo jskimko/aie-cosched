@@ -22,21 +22,22 @@ A command concatenates its operators' segments under the conditions of Section~\
 \small
 \begin{algorithmic}[1]
 \renewcommand{\algorithmiccomment}[1]{\hfill$\triangleright$~#1}
-\REQUIRE the operators' dependence graph; each operator's segments; estimated work $w(\cdot)$ from the probes
-\ENSURE commands in the composed order, or a refusal with its reason
-\STATE $R \gets$ the operators without producers, by layer and chunk
-\WHILE{an operator is in no command}
-\STATE $a \gets$ the first attention operator in $R$, if any
-\STATE $P \gets$ GEMMs from $R$, in order, until $\sum_{g \in P} w(g) \ge w(a)$, or as many as the packing allows if there is no $a$
-\STATE groups $\gets$ each column of $a$, and $P$ (its GEMMs in turn)
-\STATE $s \gets$ the opening segment of every group
-\FORALL{synchronizations $y$, by predicted completion}
-\STATE append $y$ to $s$, then the issue that $y$ gates
+\REQUIRE operator graph $G$, segments, work $w(\cdot)$, packing $k$
+\ENSURE commands $C$ in the composed order, or a refusal
+\STATE $C \gets [\,]$; $R \gets \textsc{Sources}(G)$ \COMMENT{by layer, then chunk}
+\WHILE{some operator is in no command}
+\STATE $a \gets \textsc{FirstAttention}(R)$ \COMMENT{may be none}
+\STATE $P \gets$ fewest next GEMMs with $w(P) \ge w(a)$ \COMMENT{else $k$}
+\STATE $\mathcal{G} \gets \textsc{Columns}(a) \cup \{P\}$ \COMMENT{$P$'s GEMMs in turn}
+\STATE $s \gets \textsc{Openings}(\mathcal{G})$
+\FORALL{$y \in \textsc{Syncs}(\mathcal{G})$, by predicted completion}
+\STATE $s \gets s \cdot y \cdot \textsc{Gated}(y)$
 \ENDFOR
-\STATE check $s$ (Section~\ref{subsec:legality}); \textbf{refuse} with any failed condition
-\STATE emit $s$ as one command; remove its operators from $R$
-\STATE add to $R$ each operator whose producers' commands, and the host work after them, have completed
+\STATE \textbf{if} $\neg\textsc{Legal}(s)$ \textbf{then refuse} with the failed condition
+\STATE $C \gets C \cdot s$; $R \gets R \setminus \textsc{Ops}(s)$
+\STATE $R \gets R \cup \textsc{Ready}(G, C)$ \COMMENT{producers, host steps done}
 \ENDWHILE
+\STATE \textbf{return} $C$
 \end{algorithmic}
 \end{algorithm}
 
