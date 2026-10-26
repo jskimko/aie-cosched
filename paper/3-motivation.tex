@@ -1,9 +1,9 @@
 \subsection{Command Semantics}
 \label{subsec:semantics}
 
-% VALUE: observation 1: concurrency comes from one command issuing two groups' work before it waits on either, not from queued commands (packing is neutral) or a second hardware context; measured on the existing prefill's own operators with bit-identical outputs
+% VALUE: observation 1: concurrency comes from one command issuing two groups' work before it waits on either, not from queued commands (packing is neutral) or a second hardware context; measured on the original prefill's own operators with bit-identical outputs
 Concurrency on the array comes from one command that issues two groups' work before it waits on either, not from queued commands or a second hardware context.
-We pair one attention operator of the existing program with one GEMM on disjoint column groups, with outputs bit-identical to those of the operators run alone.
+We pair one attention operator of the original program with one GEMM on disjoint column groups, with outputs bit-identical to those of the operators run alone.
 Two commands queued on one hardware context, like one command that holds both streams in sequence, take the sum of the two operators' times less at most one dispatch floor, within 3\% on each of seven pairs.
 Packing operators into one command, as MLIR-AIR's multi-launch programs~\citep{wang2026mlirair} also do, therefore creates no overlap on the NPU (Figure~\ref{fig:order}a).
 Nor does a second hardware context, because the driver gives every context all eight columns and shares them in time.
@@ -25,7 +25,7 @@ Nor does a second hardware context, because the driver gives every context all e
 In contrast, one command that issues all of the GEMM's work, then the attention operator's stream, and only then the GEMM's synchronizations runs the pair within 6\% of the longer operator's time alone on each of nine pairs (Figure~\ref{fig:order}b).
 The small excess appears where the pair's DRAM reads approach the \emph{read cap}, which is the maximum DRAM read rate that the column groups together sustain.
 Because a synchronization on one group delays every later issue to the other (Section~\ref{subsec:platform}), the order of instructions within a command, and not only which operators share it, is a scheduling decision.
-The serial execution of the existing program is thus a property of how its commands are composed, not of the array.
+The serial execution of the original program is thus a property of how its commands are composed, not of the array.
 % SOURCE: interleaved / max(A, G) = 0.998-1.058 over 10 pair runs = 9 pairs (c8 + lm measured twice, 1.054 and 1.058; the figure keeps each pair's first measurement); GEMM shapes up, LM head chunk, down; attention chunks 0, 4, 8, 12, 15 (lab-prefill-overlap (3)).
 % SOURCE: DRAM rate during the interleaved command 52.2 GB/s against a same-batch 8x2 cap of 53.9-55.3 GB/s for c8 + lm, the costliest overlap (1.054-1.058) (lab-prefill-overlap (3)); the cap is the 8x2 bracket's read of 256 MiB (7-eval Setup SOURCE).
 
@@ -40,7 +40,7 @@ We call either kind a \emph{false order}.
 
 \textbf{Column Groups in Prefill.}
 % VALUE: one operator per command and no overlap across commands make the prefill's column groups take turns, an order dependence in the CP's stream between operators; the array idles while the device reads busy: the computable occupancy reads 92-97% of TTFT and counts neither idle group; attention's share grows 12% -> 49%; the counters show the cores waiting
-The existing program issues one operator per command, about 1{,}500 commands for a 2{,}048-token prompt, so its column groups take turns (Figure~\ref{fig:timeline}), which is an order dependence in the CP's stream between operators.
+The original program issues one operator per command, about 1{,}500 commands for a 2{,}048-token prompt, so its column groups take turns (Figure~\ref{fig:timeline}), which is an order dependence in the CP's stream between operators.
 Attention on one chunk reads the QKV projections of that chunk and earlier ones, and only that chunk's output projection reads its result, so the GEMMs of the layer's later chunks could run beside it.
 The host, however, runs each layer stage by stage (Section~\ref{subsec:prefill}), so the CP issues no GEMM beside attention.
 The runtime reports nothing per column.
@@ -56,11 +56,11 @@ In the tiles' performance counters, attention's cores stall on a lock for 81--83
 
 \textbf{Columns of One Operator.}
 % VALUE: the same order dependence inside one operator: attention issues column 7 only after waiting on column 0, and alternating the columns lowers attention's device-busy time to 0.67x with equal work per column, so the CP's order is the cause
-The existing program's attention stream issues column~7's inputs only after two synchronizations on column~0's key and value transfers, which complete when column~0 is about half done.
+The original program's attention stream issues column~7's inputs only after two synchronizations on column~0's key and value transfers, which complete when column~0 is about half done.
 Alternating the two columns' work so that both start before the CP waits on either reduces attention's device-busy time to $0.67\times$ at each of seven chunks of a 2{,}048-token prompt, with the same instructions and bit-identical outputs.
 Each column's half alone takes the same time, so the loss comes from the CP's order rather than an imbalance of work.
 % SOURCE: decoded from the shipped a_32_4_0_0 stream, mid-stream synchronizations at ops 70, 75 (column 0) and 92, 97 (column 7); column 7's issue (ops 81-91) follows column 0's two mid-stream synchronizations (vault lab-prefill-overlap (4)).
-% SOURCE: (alternated - F) / (existing - F) = 0.666-0.668 on 7 pairs, chunks 2-14 at 2,048 tokens; column 7 alone / column 0 alone = 0.994-1.010 (amd-npu 17f7ec3 ovl4/, vault lab-prefill-overlap (5)c); at absolute chunks 16-255: Qwen3-4B 0.66-0.68; Llama-3.2-1B 0.66 / 0.57 / 0.41 / 0.43 / 0.68 / 0.67 / 0.66, lower at its mid-range chunks (vault lab-agent-step (4)).
+% SOURCE: (alternated - F) / (original - F) = 0.666-0.668 on 7 pairs, chunks 2-14 at 2,048 tokens; column 7 alone / column 0 alone = 0.994-1.010 (amd-npu 17f7ec3 ovl4/, vault lab-prefill-overlap (5)c); at absolute chunks 16-255: Qwen3-4B 0.66-0.68; Llama-3.2-1B 0.66 / 0.57 / 0.41 / 0.43 / 0.68 / 0.67 / 0.66, lower at its mid-range chunks (vault lab-agent-step (4)).
 
 \textbf{Transfers in Decode.}
 % VALUE: a name dependence inside decode attention's loop: attention grows to most of the time per token and reads KV at half the cap; neither the transfer alone nor the CP's order limits it (the measurement chain: appendix-body.tex, app:decode-chain (cut 2026-10-24)); the loop's keys, values, and scores sit in one buffer each, so each block's transfer waits for the previous block's compute (+41% per position), and MLIR-AIR's double-buffering pass declines the loop because the running max and accumulator live across blocks

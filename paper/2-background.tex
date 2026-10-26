@@ -1,12 +1,12 @@
 \section{Background and Motivation}
 \label{sec:background}
 
-% VALUE: the array computes in parallel once configured, but the host reaches it only through instruction streams that one in-order CP executes; the figure shows both sides, with the column groups of the existing prefill's default split
+% VALUE: the array computes in parallel once configured, but the host reaches it only through instruction streams that one in-order CP executes; the figure shows both sides, with the column groups of the original prefill's default split
 Once configured, the AI Engine array of an XDNA~2 NPU computes on all of its tiles at once, yet the host reaches it only through instruction streams that one in-order command processor executes (Figure~\ref{fig:arch}).
 
 \begin{figure}[t]
     \centering
-    % VALUE: the host reaches the array through a hardware context and one in-order CP; an issue pushes a BD into a shim DMA queue and returns, a synchronization blocks; the array runs data-driven on BDs and locks; the compute tiles are tinted by the existing prefill's column groups
+    % VALUE: the host reaches the array through a hardware context and one in-order CP; an issue pushes a BD into a shim DMA queue and returns, a synchronization blocks; the array runs data-driven on BDs and locks; the compute tiles are tinted by the original prefill's column groups
     \includegraphics[width=\linewidth]{fig/arch.pdf}
     \caption{The XDNA~2 NPU as the host reaches it. The command processor executes each command's instruction stream in order. The tiles then run data-driven on chains of buffer descriptors and on locks. The tint marks the column groups of an LLM prefill's default split.}
     \label{fig:arch}
@@ -36,7 +36,7 @@ A \emph{register write} configures shim BDs, DMA queues, locks, or a core's runt
 An \emph{issue} pushes a BD into a shim DMA queue and returns at once, whereas a \emph{synchronization} blocks the CP until a named transfer completes.
 The CP's instruction order therefore decides when each column receives work, and a synchronization on one column delays every later issue, whichever column it targets.
 % SOURCE: instruction encoding, mlir-air a3e26261 programming_examples/llms/shared/fused_prefill/insts.py: TXN v1.0 stream; address patch = opcode 0x81 (argument index at word 8, byte offset at word 10); synchronization = opcode 0x80.
-% SOURCE: the existing prefill's operators write only shim BDs and queues (row 0, 0x1D000/0x1D200), their own cores' lock registers (0x1F000), and runtime-parameter words in their cores' memory (0x3C00 GEMM, 0x2000 attention); no program loads, core resets, or memory-tile writes (decoded from the shipped streams, lab-prefill-overlap (3)).
+% SOURCE: the original prefill's operators write only shim BDs and queues (row 0, 0x1D000/0x1D200), their own cores' lock registers (0x1F000), and runtime-parameter words in their cores' memory (0x3C00 GEMM, 0x2000 attention); no program loads, core resets, or memory-tile writes (decoded from the shipped streams, lab-prefill-overlap (3)).
 
 \textbf{Host Runtime.}
 % VALUE: commands go to a hardware context that holds one configuration and runs them in submission order; argument slots bind buffers for address patches; each command costs a fixed dispatch floor F that queuing partly hides
@@ -69,7 +69,7 @@ MLIR-AIR, IRON, and FastFlowLM, the three stacks we read, reach the array throug
 \subsection{LLM Inference on the NPU}
 \label{subsec:prefill}
 
-% VALUE: prefill and TTFT; the decoder layer's operators; the existing fused prefill puts GEMMs and attention on disjoint column groups of one configuration (its default split, the number of columns attention takes), so its operators differ only in their streams; it runs a layer stage by stage over 128-token chunks with host work between commands
+% VALUE: prefill and TTFT; the decoder layer's operators; the original fused prefill puts GEMMs and attention on disjoint column groups of one configuration (its default split, the number of columns attention takes), so its operators differ only in their streams; it runs a layer stage by stage over 128-token chunks with host work between commands
 \emph{Prefill} processes a prompt to produce the first output token, and its latency is the TTFT.
 Each decoder layer applies a QKV projection, attention, an output projection, and a gated feed-forward network of gate, up, and down projections.
 MLIR-AIR's open fused prefill~\citep{wang2026mlirair} places every operator of a decoder layer in one configuration, with the GEMMs on columns 1--6 and attention on columns 0 and 7.

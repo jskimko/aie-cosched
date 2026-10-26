@@ -1,7 +1,7 @@
 \section{Evaluation}
 \label{sec:eval}
 
-% VALUE: what the evaluation establishes, in order: OPCORD shortens prefill and decode on five LLMs against the existing program on its own best supported split, and where the gain comes from; its choice of order and split stays near the best measured option; its rewrites are legal and its analysis reads every stream exactly; and what rescheduling recovers follows the cut and the prompt length, as Section 3.3 states
+% VALUE: what the evaluation establishes, in order: OPCORD shortens prefill and decode on five LLMs against the original program on its own best supported split, and where the gain comes from; its choice of order and split stays near the best measured option; its rewrites are legal and its analysis reads every stream exactly; and what rescheduling recovers follows the cut and the prompt length, as Section 3.3 states
 % DECISION: no question list at the head of the evaluation; subsections have question titles and each answers its question in its first sentence (core-rule restructure, 2026-10-25).
 % COMMENT: every \E value comes from the amendment-1 batch, the decode development batch, the synthetic sweep, the legality control, the FastFlowLM replay, and finally the final sweep; prose stays as written while numbers move (STYLE.md, Results vary between runs).
 
@@ -10,7 +10,7 @@
     % VALUE: the headline at a glance: OPCORD's TTFT gain over the baseline on every LLM across the prompt sweep, with the split it runs on
     % COMMENT: regenerate from the final sweep against the baseline of this section; the current figure plots the retired hand-alternated baseline.
     \includegraphics{fig/headline.pdf}
-    \caption{TTFT speedup of OPCORD over the existing program on the supported split that minimizes its TTFT, across prompt lengths, for each LLM. Points are ratios of medians with 95\% intervals, and the marker gives the split OPCORD runs on.}
+    \caption{TTFT speedup of OPCORD over the original program on the supported split that minimizes its TTFT, across prompt lengths, for each LLM. Points are ratios of medians with 95\% intervals, and the marker gives the split OPCORD runs on.}
     \label{fig:headline}
 \end{figure*}
 
@@ -29,16 +29,16 @@ Prompts run from 128 to 32{,}768 tokens in powers of two and one token past each
 The sweep thus spans the prompts of every MLPerf Client task and the contexts of all but its experimental agent~\citep{mlcommons2026mlperfclient}.
 % SOURCE: MLPerf Client v2.0 tasks (mlcommons.org/benchmarks/client, read 2026-10-25; release 2026-08-18): input tokens 128 (content generation), 512 (creative writing), 830 (structured text), 1,856 (code analysis), 3,906 (summarization ~4K), 7,631 (summarization ~8K, extended, unscored); SWE agent ~27K in / ~1K out; data-analyst agent (experimental) ~29K in / ~2K out, reaching ~31K, past the 30,208 decode context; its harness is not run.
 
-% VALUE: one baseline: the existing program on the supported split that minimizes its TTFT, with every split predicted within 5% of it measured, run on the faster of its own host code and our runner, so it differs from OPCORD only in the order and the split OPCORD chooses; the remedies are their own rows; FastFlowLM appears only as an observation for the condition
-Every end-to-end result compares against one baseline, namely the existing program on the supported split that minimizes its measured TTFT at each prompt length, measured on every supported split (Section~\ref{subsec:decision}).
-The baseline runs on the faster of its own host code and our runtime package (Section~\ref{subsec:impl}) issuing the existing order, so it differs from OPCORD only in what OPCORD chooses, namely the order and the split for that order.
+% VALUE: one baseline: the original program on the supported split that minimizes its TTFT, with every split predicted within 5% of it measured, run on the faster of its own host code and our runner, so it differs from OPCORD only in the order and the split OPCORD chooses; the remedies are their own rows; FastFlowLM appears only as an observation for the condition
+Every end-to-end result compares against one baseline, namely the original program on the supported split that minimizes its measured TTFT at each prompt length, measured on every supported split (Section~\ref{subsec:decision}).
+The baseline runs on the faster of its own host code and our runtime package (Section~\ref{subsec:impl}) issuing the original order, so it differs from OPCORD only in what OPCORD chooses, namely the order and the split for that order.
 For decode, the baseline is the unmodified decode design.
-Where a result isolates the order, it compares the composed and existing orders on one split.
-% SOURCE: the baseline rule (vault decisions log, the per-split cells' ruling and amendment 1, 2026-10-24; the final sweep measures the existing order at every supported split, ruling 2026-10-25, which supersedes the 5% screen); OPCORD's ratio = baseline / composed, at the event model's choice.
+Where a result isolates the order, it compares the composed and original orders on one split.
+% SOURCE: the baseline rule (vault decisions log, the per-split cells' ruling and amendment 1, 2026-10-24; the final sweep measures the original order at every supported split, ruling 2026-10-25, which supersedes the 5% screen); OPCORD's ratio = baseline / composed, at the event model's choice.
 % DECISION: the old hand-alternated baseline is retired; FastFlowLM, taken as released, is an observation for the condition (Section~\ref{subsec:pays}), never a speedup reference.
 
 % VALUE: correctness gates, metrics, and the run protocol; defaults stated once
-Every run's logits and KV records are bit-identical to the existing program's, and the kernel log stays free of driver and IOMMU messages.
+Every run's logits and KV records are bit-identical to the original program's, and the kernel log stays free of driver and IOMMU messages.
 TTFT is the wall time of the prefill call, and the time per token is the inverse of the decode rate over 256 greedy tokens.
 A \emph{cell} is one LLM at one prompt length.
 All versions of a cell run interleaved in one runtime process, with one busy host core that keeps the CPU out of deep idle.
@@ -49,32 +49,32 @@ Because the DRAM read cap varies by up to 12\% between batches, every ratio pair
 \subsection{How Much Does OPCORD Gain?}
 \label{subsec:e2e}
 
-% VALUE: OPCORD shortens TTFT on every LLM wherever the condition holds, against the baseline, with bit-identical outputs; the gain rises with the prompt length, peaks in the middle of the sweep and falls at 32K, as the shape of the exposed work predicts, and at prompts of one or two chunks OPCORD keeps the existing order
-OPCORD shortens TTFT on all five LLMs, with outputs bit-identical to the existing program's, by \E{X--Y}$\times$ at prompts of 1{,}024 tokens and more (Figure~\ref{fig:headline}).
+% VALUE: OPCORD shortens TTFT on every LLM wherever the condition holds, against the baseline, with bit-identical outputs; the gain rises with the prompt length, peaks in the middle of the sweep and falls at 32K, as the shape of the exposed work predicts, and at prompts of one or two chunks OPCORD keeps the original order
+OPCORD shortens TTFT on all five LLMs, with outputs bit-identical to the original program's, by \E{X--Y}$\times$ at prompts of 1{,}024 tokens and more (Figure~\ref{fig:headline}).
 The gain rises with the prompt length and peaks at \E{8--16K} tokens, where the overlap between the groups and the alternation within attention together are largest (Section~\ref{subsec:shape-eval}).
-At prompts of one or two chunks, OPCORD keeps the existing order, whose TTFT it then equals.
+At prompts of one or two chunks, OPCORD keeps the original order, whose TTFT it then equals.
 % SOURCE: valid end-to-end cells so far, pre-final (vault decisions log, issue check 8d2eac19): Qwen3-4B 1.33-1.57x (8-32K); LFM2-1.2B 1.10-1.24x (1-2K) and 1.45x (32K); Gemma3-4B 1.20x (1K), 1.22-1.30x (2-8K), 1.18x (32K); Llama-3.1-8B 1.04-1.25x (512-2K); the rest from the amendment-1 batch.
 
-% VALUE: absolute standing, as a snapshot of two releases: OPCORD on MLIR-AIR's designs reaches the first token sooner than FastFlowLM's current release on all five LLMs at every length compared, whereas the existing program is slower than that engine at 16K on four of the five; in decode FastFlowLM stays faster on all five, most on the three whose decode designs differ in more than their order, and the loop pass brings the other two within a few percent
+% VALUE: absolute standing, as a snapshot of two releases: OPCORD on MLIR-AIR's designs reaches the first token sooner than FastFlowLM's current release on all five LLMs at every length compared, whereas the original program is slower than that engine at 16K on four of the five; in decode FastFlowLM stays faster on all five, most on the three whose decode designs differ in more than their order, and the loop pass brings the other two within a few percent
 In absolute terms, OPCORD on MLIR-AIR's designs reaches the first token sooner than FastFlowLM's current release, version 1.0.8, by its own prefill timer, on all five LLMs at every prompt length we compare, by \E{1.2--2.3}$\times$ at 1K to 16K tokens (Table~\ref{tab:absolute}).
-The existing program on its default split, by contrast, is slower than that engine at 16K tokens on four of the five.
+The original program on its default split, by contrast, is slower than that engine at 16K tokens on four of the five.
 Both comparisons are of two releases that their developers will keep improving.
 In decode, FastFlowLM's engine stays faster on all five LLMs, by the widest margins on the three whose MLIR-AIR decode designs differ in more than their order.
 The loop pass brings Llama-3.2-1B and Llama-3.1-8B within \E{3}\% of that engine at 16K tokens.
-% SOURCE: D1 (amd-npu 45421aa3, 3c07fde9, ab/results/d1-2026-10-25; one batch 11:20-14:30 at pin 4c56faa, every gate passed): TTFT medians FastFlowLM (server prefill_duration_ttft) / existing S2 / OPCORD's pick, ms, at 1K / 4K / 16K: Llama-3.2-1B 576.7 / 326.0 / 284.8, 1769.1 / 1909.9 / 1076.0, 10980.5 / 17999.2 / 6057.4; LFM2-1.2B 609.6 / 296.6 / 270.2, 1665.6 / 1386.7 / 1053.9, 7962.3 / 9421.2 / 4906.0; Qwen3-4B 1816.5 / 1076.9 / 860.6, 5858.0 / 6557.5 / 3742.7, 34669.4 / 62990.2 / 22142.0; Gemma3-4B 1597.4 / 874.2 / 735.8, 4601.8 / 3903.1 / 2996.2, 19484.0 / 18386.8 / 13926.9; Llama-3.1-8B 2445.6 / 1682.7 / 1528.4, 8004.0 / 8735.5 / 6212.5, 41822.5 / 67623.4 / 34033.5; at 128 tokens FastFlowLM 345-1176 ms against 56-252 ms. Decode ms per token at 16K, FastFlowLM / existing / loop pass: 27.18 / 34.99 / 27.29 (1B), 20.80 / 45.40 / 37.48 (LFM2), 100.09 / 155.89 / 139.76 (Qwen3-4B), 65.84 / 147.89 / 144.42 (Gemma3-4B), 133.16 / 148.43 / 136.20 (8B). The two TTFT timers differ in definition (FastFlowLM's server timer against our prefill call to logits); some FastFlowLM decode reps ended early on EOS (NOTES).
+% SOURCE: D1 (amd-npu 45421aa3, 3c07fde9, ab/results/d1-2026-10-25; one batch 11:20-14:30 at pin 4c56faa, every gate passed): TTFT medians FastFlowLM (server prefill_duration_ttft) / original S2 / OPCORD's pick, ms, at 1K / 4K / 16K: Llama-3.2-1B 576.7 / 326.0 / 284.8, 1769.1 / 1909.9 / 1076.0, 10980.5 / 17999.2 / 6057.4; LFM2-1.2B 609.6 / 296.6 / 270.2, 1665.6 / 1386.7 / 1053.9, 7962.3 / 9421.2 / 4906.0; Qwen3-4B 1816.5 / 1076.9 / 860.6, 5858.0 / 6557.5 / 3742.7, 34669.4 / 62990.2 / 22142.0; Gemma3-4B 1597.4 / 874.2 / 735.8, 4601.8 / 3903.1 / 2996.2, 19484.0 / 18386.8 / 13926.9; Llama-3.1-8B 2445.6 / 1682.7 / 1528.4, 8004.0 / 8735.5 / 6212.5, 41822.5 / 67623.4 / 34033.5; at 128 tokens FastFlowLM 345-1176 ms against 56-252 ms. Decode ms per token at 16K, FastFlowLM / original / loop pass: 27.18 / 34.99 / 27.29 (1B), 20.80 / 45.40 / 37.48 (LFM2), 100.09 / 155.89 / 139.76 (Qwen3-4B), 65.84 / 147.89 / 144.42 (Gemma3-4B), 133.16 / 148.43 / 136.20 (8B). The two TTFT timers differ in definition (FastFlowLM's server timer against our prefill call to logits); some FastFlowLM decode reps ended early on EOS (NOTES).
 
 \begin{table}[t]
     \centering
-    \caption{Time to First Token. FastFlowLM 1.0.8 by its own prefill timer, the existing program on its default split $S_2$, and OPCORD on the split it chooses.}
+    \caption{Time to First Token. FastFlowLM 1.0.8 by its own prefill timer, the original program on its default split $S_2$, and OPCORD on the split it chooses.}
     \label{tab:absolute}
-    % VALUE: TTFT of FastFlowLM's current release, the existing program, and OPCORD on the five LLMs at three prompt lengths
-    % SOURCE: D1, the source line above (FastFlowLM by its server's prefill timer; the existing program on $S_2$; OPCORD at its own pick).
+    % VALUE: TTFT of FastFlowLM's current release, the original program, and OPCORD on the five LLMs at three prompt lengths
+    % SOURCE: D1, the source line above (FastFlowLM by its server's prefill timer; the original program on $S_2$; OPCORD at its own pick).
     \small
     \begin{tabular*}{\linewidth}{@{}ll@{\extracolsep{\fill}}rrr@{}}
         \toprule
          & & \multicolumn{3}{c}{TTFT (ms)} \\
         \cmidrule(l){3-5}
-         & & FastFlowLM & Existing, & \\
+         & & FastFlowLM & Original, & \\
         LLM & Tokens & 1.0.8 & $S_2$ & OPCORD \\
         \midrule
         Llama-3.2-1B & 1K & \E{576.7} & \E{326.0} & \E{284.8} \\
@@ -127,32 +127,32 @@ Its time per token and the loop pass's gain of \E{3}\% therefore stay flat with 
 % COMMENT: amendment-1's picks include the two-column split (8B, LFM2 and Qwen at 4-16K), where the stream pass alone gains 1.21-1.60x; check "nearly all of the prefill gain comes from the composer" against the final sweep's picks before the freeze.
 % VALUE: at OPCORD's choices (order and split), nearly all of the prefill gain is the composer's reorder across commands: the stream pass changes nothing at four columns and finds no move at one, and at the default two-column split it contributes a within-operator share that grows with the prompt; packing alone contributes nothing; decode's gain needs the whole cycle renamed
 Nearly all of the prefill gain comes from the new order of issue, first alternating attention's columns and then overlapping the column groups across commands, while the host time it hides matters only at short prompts.
-We credit the prefill gain in one fixed order at the split OPCORD chooses, from the existing order to the existing order after the stream pass and then to the composed order.
+We credit the prefill gain in one fixed order at the split OPCORD chooses, from the original order to the original order after the stream pass and then to the composed order.
 The stream pass changes nothing on the four-column split, whose attention stream already issues each column's work before it waits, and finds no move on the one-column split.
 On the default two-column split, by contrast, it gains \E{1.21--1.60}$\times$ at 16K tokens.
 The composer's reorder across commands carries the rest, \E{X}$\times$ at the splits OPCORD chooses, while packing alone gains nothing (Section~\ref{subsec:semantics}).
 Of the composer's own saving, nearly all is overlap between the column groups, a median of \E{96}\% across cells, and the rest the host and dispatch time it hides, which matters only at short prompts.
 For Llama-3.2-1B at 4{,}096 tokens on the two-column split, which Figure~\ref{fig:timeline} shows, alternating attention's columns gives \E{1.19}$\times$, the overlap between the groups \E{1.42}$\times$, and the hidden host time \E{1.02}$\times$.
-Our runtime package issuing the existing order is slower than the existing program, so the whole gain comes from the order.
+Our runtime package issuing the original order is slower than the original program, so the whole gain comes from the order.
 % SOURCE: at the picks the stream arm measures 1.000 at S4 and the pass makes no move at S1 (amd-npu s4-cells, s1-cells NOTES; vault decisions log, issue check); stream-pass-only at S2 1.21-1.60x at 16K on three LLMs, a same-split figure, pre-final (development grids).
 
 % VALUE: decode's gain needs the whole cycle renamed: keys and values alone gain nothing while the score buffer closes the cycle
 In decode, renaming the keys and values alone, as a production mapping of another LLM does by hand~\citep{du2026gemma3}, is worth 0.3\%.
 This is because the shared score buffer still closes the loop's critical cycle, as the critical-path test of Section~\ref{subsec:removal} requires.
-% SOURCE: keys and values renamed with the existing score buffer kept: 1.002x (16,384) and 1.003x (32,512), tokens and logits bit-identical (vault lab-decode-long-context (28); amd-npu d8f0bd4c, score 5e1017a5); all three renamed (the loop pass): 1.269x / 1.391x (lab-decode-long-context (22)).
+% SOURCE: keys and values renamed with the original score buffer kept: 1.002x (16,384) and 1.003x (32,512), tokens and logits bit-identical (vault lab-decode-long-context (28); amd-npu d8f0bd4c, score 5e1017a5); all three renamed (the loop pass): 1.269x / 1.391x (lab-decode-long-context (22)).
 
 \subsection{Does OPCORD Choose Well?}
 \label{subsec:decision}
 
-% VALUE: the composer's choice of order and split stays within a small margin of the best measured option on every configuration, whereas each fixed rule loses badly somewhere: never reordering gives up the long-prompt gains, always reordering loses at one or two chunks, a fixed split loses where the balance moves, and even the rule that reorders from four chunks at the existing program's best split loses where the composed order's best split differs; the event model's unaided choice is reported beside the measured tie-break
+% VALUE: the composer's choice of order and split stays within a small margin of the best measured option on every configuration, whereas each fixed rule loses badly somewhere: never reordering gives up the long-prompt gains, always reordering loses at one or two chunks, a fixed split loses where the balance moves, and even the rule that reorders from four chunks at the original program's best split loses where the composed order's best split differs; the event model's unaided choice is reported beside the measured tie-break
 % COMMENT: the outcome stated in this paragraph is the hypothesis the table tests; reword to what the table shows (if a fixed rule ties the price, state the regret bound instead).
 The composer's choice stays within \E{X}\% of the measured minimum on every cell, and its unaided choice, before any tie is settled by measurement, within \E{Y}\% (Table~\ref{tab:decision}).
-We compare its choice on every cell against the minimum measured over every supported split of the existing and the composed order, and against fixed rules.
+We compare its choice on every cell against the minimum measured over every supported split of the original and the composed order, and against fixed rules.
 The tie-break fires on \E{X} of the cells, at the cost per prompt length that Section~\ref{subsec:impl} gives, whereas measuring every candidate on every cell would take \E{Z}.
 Each fixed rule loses badly somewhere, since never reordering gives up the long prompts' gains, always reordering loses at two chunks (Section~\ref{subsec:shape-eval}), and a fixed split loses where the balance between the groups moves.
-% SOURCE: the two four-chunk rules (tmp/issue-check/rules.py): R3 composes from four chunks on the in-tree split S2, R5 from four chunks on the split of the fastest measured existing program.
+% SOURCE: the two four-chunk rules (tmp/issue-check/rules.py): R3 composes from four chunks on the in-tree split S2, R5 from four chunks on the split of the fastest measured original program.
 Reordering from four chunks loses \E{Y}\% on the default split, and even on the baseline's split it loses \E{Z}\% where the composed order runs faster on another split.
-% SOURCE: per configuration, the measured best = the minimum over every supported split of the composed and existing orders (final sweep: comp and orig at every supported split); development data so far: Qwen3-4B 8,192 regret 2.6% (paired, 0.9739 [0.9729, 0.9743]); Qwen3-4B 512 3.1%, Gemma3-4B 512 4.0%, Llama-3.2-1B 512 3.3% (unaided, before measure-when-close and the model rebuild) (vault decisions log, issue check 8d2eac19; tmp/issue-check/rules.py).
+% SOURCE: per configuration, the measured best = the minimum over every supported split of the composed and original orders (final sweep: comp and orig at every supported split); development data so far: Qwen3-4B 8,192 regret 2.6% (paired, 0.9739 [0.9729, 0.9743]); Qwen3-4B 512 3.1%, Gemma3-4B 512 4.0%, Llama-3.2-1B 512 3.3% (unaided, before measure-when-close and the model rebuild) (vault decisions log, issue check 8d2eac19; tmp/issue-check/rules.py).
 
 \begin{table}[t]
     \centering
@@ -236,7 +236,7 @@ In the MLIR-AIR designs our passes rewrite, the costly instances in the prefill'
 In decode attention's loop, they are name dependences on its keys, its values, and its scores, whereas its running maximum and accumulator carry true dependences.
 The other two combinations, name dependences in the stream and order dependences in a loop, occur in these designs only off every longest path or critical cycle we compute with the critical-path test of Section~\ref{subsec:removal}.
 % SOURCE: aie-cosched 93f491b, mlir-aie f9ad95dc02f (lab-cosched-passes (62), P7c; lit 36/36): cost-free over 792 analysed streams, NAME edges on 543/543 MLIR-AIR streams (30,198 edges, 25,016 able to lie on a blocking path), 209/218 production-engine streams (272,582, all able), 6/31 IRON (504); kinds descriptor and control-register everywhere, configuration writes on the fused decode only (7,244), queue-slot reuse (104 MLIR-AIR, 27 IRON), dispatch end; with measured task costs (the S4 prefill cell, 34 streams) 246 end-kind NAME edges lie on a longest path but removing every NAME edge leaves every stream's length unchanged (34/34). Corrected 2026-10-23: the earlier text said no name dependence appears in the stream.
-% SOURCE: the score buffer shared_l10 is name x loop in the existing build (lab-cosched-passes (30), item 5).
+% SOURCE: the score buffer shared_l10 is name x loop in the original build (lab-cosched-passes (30), item 5).
 % SOURCE: aie-cosched results/2026-10-23-order-loop (registered ca13ac5, 579d8d1; results 579d8d1, 0ae7bc9; mlir-aie dev 58569749d3e..36f725e8e6e, lit 49/49): decode attention's 34 group leads carry #6 BD-chaining and #11 program-order edges; with (59)'s costs the critical cycle is 28 RAW + 12 name edges as shipped (1.1466 per iteration) and 36 RAW after the loop pass (0.6487), no order edge on either, and removing every order edge leaves both ratios unchanged; the steady-state order edges are memtile (3,1) MM2S channel 0's chain buf169 -> buf168 (census.mlir 4871-4883), two slots of one ring with separate locks. Decodes, structure only: in 9 groups (core 5_3) a memtile (4,1) #6 edge is on a critical cycle but removing order edges moves no group's ratio (an equal cycle remains). Prefill: 279 groups fail to fold to one steady edge set, the rest exceed the attribution cap, so no verdict.
 
 \subsection{Where Does Rescheduling Pay?}
@@ -338,7 +338,7 @@ Across balances from one eighth to eight and 1 to 32 chunks, the gain peaks wher
     \centering
     % VALUE: gain against the number of chunks for four balances of the synthetic LLM, with the event model's prediction
     \figph{Synthetic sweep: gain against chunks for four balances (pending)}
-    \caption{TTFT speedup of the composed order over the existing order at one split for a synthetic LLM, against the number of 128-token chunks, for four ratios of attention to GEMM work, with the event model's prediction as lines.}
+    \caption{TTFT speedup of the composed order over the original order at one split for a synthetic LLM, against the number of 128-token chunks, for four ratios of attention to GEMM work, with the event model's prediction as lines.}
     \label{fig:synthetic}
 \end{figure}
 

@@ -54,7 +54,7 @@ COLUMN = 3.25  # MLSys column width, inches
 # IBM's color-blind-safe palette, softened; each series keeps its color and marker in every figure.
 BLUE, PURPLE, MAGENTA, ORANGE, GOLD = "#6E95F0", "#8770E0", "#D04A8A", "#EB7A3A", "#F0B840"
 GRAY = "#B0B0B0"
-INK = "#262626"  # existing schedules: near-black
+INK = "#262626"  # original schedules: near-black
 
 
 def e2_decomposition():
@@ -192,7 +192,7 @@ def fig_accuracy():
     ax.fill_between([lo, hi], [lo * (1 - tol), hi * (1 - tol)], [lo * (1 + tol), hi * (1 + tol)],
                     color=GRAY, alpha=0.35, linewidth=0, zorder=0,
                     label=rf"Band, $\pm${tol * 100:.1f}\%")
-    style = {"ship": (INK, "^", "Existing"), "shipar": (INK, "s", "Alternated"),
+    style = {"ship": (INK, "^", "Original"), "shipar": (INK, "s", "Alternated"),
              "comp": (MAGENTA, "o", "Composed")}
     for sched, (color, marker, label) in style.items():
         for rows, claimed in ((d["reported"], False), (d["claimed"], True)):
@@ -379,7 +379,7 @@ def fig_decode():
             keep.append((p, v))
         x = [p for p, _ in keep]
         ax.plot(x, [v["census_ms_tok"] for _, v in keep], color=INK, marker=marker, linestyle=(0, (4, 2)),
-                markerfacecolor="white", label="Existing")
+                markerfacecolor="white", label="Original")
         ax.plot(x, [v["R_ms_tok"] for _, v in keep], color=color, marker=marker, label="Renamed")
         for p, v in keep[-1:]:
             ax.annotate(f"${v['census_ms_tok'] / v['R_ms_tok']:.2f}\\times$",
@@ -409,7 +409,7 @@ def fig_schedules():
     cell = "append:8192:4096"
     models = [("llama32_1b_q4nx", "Llama-3.2-1B"), ("qwen3_4b_q4nx", "Qwen3-4B"),
               ("gemma3_4b_q4nx", "Gemma3-4B"), ("llama31_8b_q4nx", "Llama-3.1-8B")]
-    series = [("ship", "Existing", INK, "^", (0, (1, 1.5))),
+    series = [("ship", "Original", INK, "^", (0, (1, 1.5))),
               ("shipar", "Alternated", GRAY, "s", (0, (4, 2))),
               ("comp", "Composed", MAGENTA, "o", (0, ()))]
     fig, axes = plt.subplots(2, 2, figsize=(COLUMN, 2.6))
@@ -467,7 +467,7 @@ def fig_timeline():
     third lane is their intersection, so the overlap the figure shows is the overlap the data holds; it is checked
     against the reader's own both-outstanding total."""
     d = json.loads((DATA / "fig1-intervals-1b.json").read_text())["arms"]
-    arms = (("ship", "Existing"), ("comp", "OPCORD"))
+    arms = (("ship", "Original"), ("comp", "OPCORD"))
     rows = (("A", "Attention", ORANGE), ("G", "GEMMs", BLUE))
     fig, axes = plt.subplots(2, 1, figsize=(COLUMN, 1.45), sharex=True)
     base = d["ship"]["ttft_ms"]
@@ -504,7 +504,7 @@ MAGENTA_PASTEL = "#EBA8C8"  # pastel step of MAGENTA, for the first size in each
 
 
 def fig_headline():
-    """Headline: OPCORD's TTFT speedup over the fastest existing schedule measured, per LLM, from scratch and on appends.
+    """Headline: OPCORD's TTFT speedup over the fastest original schedule measured, per LLM, from scratch and on appends.
 
     One source for all five LLMs, the split sweep (figs/headline_data.py -> data/headline.json): existing = the lowest
     median of the shipped order and the shipped order with attention's columns alternated over every measured split;
