@@ -557,7 +557,7 @@ def fig_headline():
                     solid_capstyle="butt", zorder=2)
             if c.get("lo") is None:
                 # the baseline and the pick ran in different batches with no shared version: no interval
-                ax.text(i, c["gain"] + 0.01, r"$\dagger$", ha="center", va="bottom", fontsize=FS_NOTE)
+                ax.text(i, c["gain"] + 0.02, r"$\dagger$", ha="center", va="bottom", fontsize=FS_NOTE)
             elif c["hi"] > c["lo"]:
                 ax.errorbar(i, c["gain"], yerr=[[c["gain"] - c["lo"]], [c["hi"] - c["gain"]]], fmt="none",
                             ecolor=INK, elinewidth=0.5, capsize=1.0, zorder=3)
@@ -570,7 +570,7 @@ def fig_headline():
     axes[0].set_ylim(0.9, 1.72)
     handles = [plt.Rectangle((0, 0), 1, 1, **split_style(s)) for s in ("S1", "S2", "S4")]
     axes[0].legend(handles, ["$S_1$", "$S_2$", "$S_4$"], title="Configuration", loc="upper left", handlelength=0.9,
-                   handletextpad=0.4, borderaxespad=0.2, labelspacing=0.2)
+                   handletextpad=0.4, borderaxespad=0.2, labelspacing=0.3)
     fig.supxlabel("Prompt length (tokens)", y=-0.02)
     save(fig, "headline.pdf", width=WIDE, relayout=lambda: fig.tight_layout(pad=0.2, w_pad=0.8))
     plt.close(fig)
@@ -709,7 +709,7 @@ def fig_vs_flm():
             marker, fill, _ = DECODE_STYLE[llm]
             ax.plot([x, x], [o, p], color=GRAY, linewidth=0.6, zorder=1)
             for v, c, z in ((o, INK, 2), (p, OURS, 3)):
-                ax.plot(x, v, marker=marker, markersize=3.2, color=c, markerfacecolor=c if fill == "full" else "white",
+                ax.plot(x, v, marker=marker, markersize=2.9, color=c, markerfacecolor=c if fill == "full" else "white",
                         markeredgewidth=0.6, linestyle="none", zorder=z)
     centers = [g * (len(LLMS) * step + gap) + (len(LLMS) - 1) * step / 2 for g in range(len(lengths))]
     ax.set_xticks(centers, ["1K", "4K", "16K"])
@@ -722,13 +722,13 @@ def fig_vs_flm():
     ax.minorticks_off()
     ax.set_ylim(0.45, 2.6)
     ax.set_ylabel("TTFT speedup", labelpad=1)
-    llm_h = [plt.Line2D([], [], marker=DECODE_STYLE[m][0], markersize=3.2, color=INK, linestyle="none",
+    llm_h = [plt.Line2D([], [], marker=DECODE_STYLE[m][0], markersize=2.9, color=INK, linestyle="none",
                         markerfacecolor=INK if DECODE_STYLE[m][1] == "full" else "white", markeredgewidth=0.6)
              for m in LLMS]
     arm_h = [plt.Rectangle((0, 0), 1, 1, color=c) for c in (INK, OURS)]
     ax.legend(llm_h + arm_h, list(LLMS) + [r"AIR, $S_2$", "AIR with OPCORD"], loc="upper center",
               bbox_to_anchor=(0.5, -0.23), ncol=3, handlelength=0.8, handletextpad=0.3, columnspacing=0.8,
-              labelspacing=0.2)
+              labelspacing=0.2, borderpad=0.1)
     save(fig, "vs-flm.pdf")
     plt.close(fig)
 
