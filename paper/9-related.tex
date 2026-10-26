@@ -5,6 +5,44 @@
 % DECISION: one run-in per group, one takeaway sentence per work or group, and each paragraph ends with one sentence on how this setting differs, never a finding or a design consequence a later section derives (STYLE.md, Related work). Works and detail that do not fit stand verbatim in appendix-body.tex's Further Related Work (cut 2026-10-24).
 % DECISION: the dependence classes, renaming, critical-cycle analysis, and the critical-path condition are cited where §4 and §5 define or use them, never claimed, and are not argued again here (outline v9 section 2, "Not contributions"; contract, Fixed).
 
+% VALUE: one representative per class of work a reviewer may name, against the capabilities that distinguish OPCORD; every mark is what that work's own text states (evidence in the vault's related-work table notes)
+Table~\ref{tab:relwork} sets OPCORD beside one representative of each class of work that this section discusses.
+
+\begin{table}[t]
+    \centering
+    \caption{OPCORD Beside Prior Work}
+    \label{tab:relwork}
+    % SOURCE: per-cell quotes from each work's own text (vault paper-cosched-relwork-table-evidence, Revision 2); column 6 is "predicts or bounds what a candidate change is worth before running that change on the target", applied to every row.
+    \footnotesize
+    \setlength{\tabcolsep}{1.9pt}
+    \begin{threeparttable}
+    \begin{tabular}{@{}lccccccc@{}}
+        \toprule
+         & \rotatebox{90}{Binary in} & \rotatebox{90}{Closed} & \rotatebox{90}{No trace} & \rotatebox{90}{Reorder} & \rotatebox{90}{Rename} & \rotatebox{90}{Gain first} & \rotatebox{90}{Per input} \\
+        \midrule
+        Rammer~\citep{ma2020rammer} & \xmark & \xmark & \xmark & \cmark & \xmark & \xmark & \xmark \\
+        XLA~\citep{jax-pgle} & \xmark & \xmark & \cmark & \cmark & \xmark & \cmark & \xmark \\
+        NanoFlow~\citep{zhu2025nanoflow} & \xmark & \xmark & \xmark & \cmark & \xmark & \cmark & \xmark \\
+        AIR~\citep{wang2026mlirair} & \xmark & \xmark & \cmark & \cmark & \cmark & \xmark & \xmark \\
+        AscendNPU-IR~\citep{ascend-autosync} & \xmark & \xmark & \cmark & \pmark\tnote{b} & \xmark & \xmark & \xmark \\
+        LATTICE~\citep{liu2026lattice} & \pmark\tnote{a} & \xmark & \xmark & \cmark & \xmark & \cmark & \xmark \\
+        BOLT~\citep{panchenko2019bolt} & \cmark & \cmark & \xmark & \xmark & \xmark & \xmark & \xmark \\
+        Daydream~\citep{zhu2020daydream} & \xmark & \xmark & \xmark & \xmark & \xmark & \cmark & \xmark \\
+        CUDA Graphs & \xmark & \xmark & \cmark & \pmark\tnote{c} & \xmark & \xmark & \xmark \\
+        \midrule
+        OPCORD & \cmark & \pmark\tnote{d} & \cmark & \cmark & \cmark & \cmark & \cmark \\
+        \bottomrule
+    \end{tabular}
+    \begin{tablenotes}\footnotesize
+    \item XLA is its latency-hiding scheduler; CUDA Graphs are as NVIDIA documents them~\citep{nvidia-cudagraphs}. Columns: the input is an artifact a toolchain has already emitted; it can be a closed binary; no trace of a run is needed; it reorders emitted work so that independent work overlaps; it adds buffer instances so that a write need not wait for a read; it predicts or bounds a change's worth before running it on the target; and it deploys a different order per input size without compiling or searching again. \pmark{}: in part.
+    \item[a] A lowered command graph from traces, held fixed.
+    \item[b] It moves synchronization, not the work.
+    \item[c] It runs independent nodes concurrently, with the dependences the program gives it.
+    \item[d] It reads and bounds closed binaries; its deployed rewrites are on open designs.
+    \end{tablenotes}
+    \end{threeparttable}
+\end{table}
+
 \textbf{NPU and AI Engine Compilers.}
 % VALUE: compilers and mapping frameworks decide what a design computes and where it runs, and one places a kernel's synchronization while lowering it, with the fewest events; each generates a design from a program, and reconfiguration work serves the modular end of the spectrum, whereas we take fused designs as compiled, closed ones included, and remove false dependences, which cost time even where no synchronization is redundant
 AIR and IRON compile operators and fused multi-operator designs onto the AIE array~\citep{wang2026mlirair,hunhoff2025iron}, and Stream explores layer-fused mappings with memory- and communication-aware cost models~\citep{symons2025stream}.
