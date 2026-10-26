@@ -6,7 +6,7 @@ Concurrency on the array comes from one dispatch that issues two groups' work be
 We pair one attention operator of the original program with one GEMM on disjoint column groups, with outputs bit-identical to those of the operators run alone.
 Two dispatches queued on one hardware context, like one dispatch that holds both streams in sequence, take the sum of the two operators' times less at most one dispatch floor, within 3\% on each of seven pairs.
 Packing operators into one dispatch, as AIR's multi-launch programs also do, therefore creates no overlap on the NPU (Figure~\ref{fig:rewrites}a, before).
-Nor does a second hardware context, because the driver gives every context all eight columns and shares them in time~\citep{xdna-driver}.
+Nor does a second hardware context, because the driver gives every context all eight columns and shares them in time.
 % SOURCE: queued / in-sequence = 1.007-1.029 on 7 pairs, 20 runs per pair (amd-npu 17f7ec3 prefill-overlap/ovl4/, lab-prefill-overlap (5)b); in-sequence / (A + G - F) = 0.996-1.021 over 17 pair runs (ovl/, ovl2/ at 8f13e05 and ovl4/; report.txt H1 column).
 % SOURCE: XRT run list, /opt/xilinx/xrt/include/xrt/experimental/xrt_kernel.h:21 (XRT 2.25.0); MLIR-AIR stitch_elf (vault src-mlir-air-llms).
 % SOURCE: amd-npu d8c63fb1 roofline/two-ctx-hold/two_ctx.json: rho 1.970, 95% bootstrap CI [1.955, 1.976], same-context ratio 1.970; medians solo 19.76 / 19.81 ms, pair 39.10 ms, same 39.09 ms (vault lab-prefill-overlap (34)); driver allocation amdxdna 2.25.0 npu4_regs.c:94-106, aie2_ctx.c:604-608 (vault lab-prefill-overlap (31)). Full SOURCE lines in appendix-body.tex, app:contexts (cut 2026-10-24).

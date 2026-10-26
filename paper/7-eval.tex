@@ -229,10 +229,11 @@ The two imply a ceiling of $1 / \bigl((1 - M) + M / B\bigr)$ on the end-to-end g
 Read from the artifacts alone, the two clauses rule out 25\% of the 4.4 million false dependences in our census before any duration is measured, 94\% of those in loops but only 20\% of those in streams, where most false dependences meet both clauses and the bounds below decide what they free.
 In FLM's flash prefill, whose dispatches we time, none of the false dependences that the clauses rule out lies on a longest path.
 % SOURCE: pass-0 P3 on manifest3 (aie-cosched aee93af output; per stack and kind table 888a033, passes/results/2026-10-25-p3/p3-manifest3-table.md): 4,381,365 false dependences decided, 1,084,053 ruled out (24.74%: clause 1 only 645,148, both 431,756, clause 2 only 7,149); loops 257,752 / 272,986 (94.4%), streams 818,269 / 4,086,037 (20.0%), runtime boundary 8,032 / 22,342 (36.0%); counted apart: 32 with clause 2 undecided, 128 MLIR-AIR per-operator loop instances whose clause 2 the cache cannot decide. Timed flash runs (E2B, E4B, 8 rows each): the ruled-out edges, 47 and 74 per run, all command to command, lie on no longest path; of the survivors, 202 / 203 and 266 / 267 lie on one (every host wait; the one command-to-command survivor does not).
-% VALUE: the census by design class, each placed by its cuts, with what the condition predicts and what the bounds and measurements show: MLIR-AIR's prefill and decode gain, the prefill through the composer's re-cut of its one-operator dispatches; FastFlowLM's current release leaves little overlap in either prefill engine, because the flash prefill's turns are true dependences (attention once over the whole prompt; B 1.000, joint bound over every order 1.04-1.09 from overlap, 1.13 at most with merges) and the per-operator engine shares columns between consecutive dispatches; IRON's modular sequences bound at one, as do the non-LLM designs in the table; so every design the condition says can gain is one whose gain we measure
+% VALUE: the census by design class, each placed by its cuts, with what the condition predicts and what the bounds and measurements show: MLIR-AIR's prefill and decode gain, the prefill through the composer's re-cut of its one-operator dispatches; FastFlowLM's current release leaves little overlap in either prefill engine, because the flash prefill's turns are true dependences (attention once over the whole prompt; B 1.000, joint bound over every order 1.04-1.09 from overlap, 1.13 at most with merges) and the per-operator engine shares columns between consecutive dispatches; IRON's modular sequences bound at one, as do the non-LLM designs in the table; so every design the condition says can gain is one whose gain we measure; among the released LLM designs only MLIR-AIR's meet both clauses, so the gains follow the design class rather than the stack, which the fused design we write with IRON's interface confirms (the clause test below)
 Across our census (Table~\ref{tab:census}), the condition, read from each design's artifacts, predicts gains only where a false dependence in a fused configuration meets both clauses, and measurement bears this out on AIR's prefill and decode (Section~\ref{subsec:e2e}).
 The table marks, for each class, whether each clause holds, and gives its measured speedup or its bound.
-Although the prefill's exposure is near one, nearly all of its gain at the configurations OPCORD chooses comes from the composer's re-cut of its one-operator dispatches (Section~\ref{subsec:ablation}), which the bound of each false dependence across dispatches covers.
+Among the released LLM designs we read, only AIR's prefill and decode meet both clauses, so the gains follow the design class rather than the stack, as a fused design that we write with IRON's interface confirms below.
+Although AIR's prefill has an exposure near one, nearly all of its gain at the configurations OPCORD chooses comes from the composer's re-cut of its one-operator dispatches (Section~\ref{subsec:ablation}), which the bound of each false dependence across dispatches covers.
 % SOURCE: moved detail behind the census paragraph: MLIR-AIR's prefill, whose column groups take turns on work that meets both clauses, and its decode, whose loop keeps one buffer per role, are where the gains of Section subsec:e2e are measured; the prefill's exposure is near one because it spends nearly all of its time in one configuration that holds every operator; the re-cut makes operators issued one per command come to share commands; inside its one-operator commands the prefill leaves room only for the stream pass's alternation within attention.
 
 FLM's current release leaves little overlap to recover in either of its prefill engines.
@@ -269,8 +270,9 @@ Their 32 streams, at an exposure of zero and with their transfers already issued
     \centering
     \caption{The Census by Design Class}
     \label{tab:census}
-    % VALUE: each design class read from its artifacts against the two clauses of the condition, grouped by how its work is packaged: only the classes where both clauses hold (AIR's prefill and decode) gain; every other class is bounded at or near 1x
+    % VALUE: each design class read from its artifacts against the two clauses of the condition, grouped by how its work is packaged: only the classes where both clauses hold gain (AIR's prefill and decode, and a two-group fused design of ours written with IRON's interface, marked as ours with a note); every other class is bounded at or near 1x
     % SOURCE: AIR prefill bound against measured, 185 of 187 cells, and decode at 99-100% of the bound on Llama-3.2-1B (Section 4.6's SOURCE lines); FLM flash prefill B 1.000, joint bound over every order 1.04-1.09, at most 1.13 with merges, merge replays 2.9-3.3% (terms4, terms5, replay stage 1, Section 4.6-4.7's SOURCE lines); FLM per-operator prefill 99.6-100% of consecutive dispatches share a column (first clause fails; the bound follows from the rule in Section 3.2); FLM decode 1.000 inside dispatches, at most 1.009 between steps (e679463); IRON's 32 LLM streams and 3 non-LLM builds (mobilenet, resnet, bottleneck) at 1.000 (aie-cosched 1a87bc6).
+    % SOURCE: IRON (ours) is D8's two-group design on its own columns and DMA channels (normal arm): sequential / composed in one dispatch 1.915 [1.868, 1.932], 20 calls, outputs bit-exact (npu-gap amd-npu 3e677dfa registered, 73620601 results, route-i/iron2g/d8/NOTES.md); both clauses hold by construction (disjoint groups; no host step or device read between them).
     % SOURCE: FLM flash prefill clause 1 holds: it issues each dispatch to one column group, as AIR's prefill does (Section 4.7's SOURCE line on the flash prefill); clause 2 fails on the turns between groups.
     \small
     \setlength{\tabcolsep}{4pt}
@@ -283,6 +285,7 @@ Their 32 streams, at an exposure of zero and with their transfers already issued
         \tabgroup{Several operators in one configuration} \\
         \quad AIR prefill & \cmark & \cmark & \PrefillGainLo--\PrefillGainHi$\times$ \\
         \quad AIR decode & \cmark & \cmark & \DecodeGainLo--\DecodeGainHi$\times$ \\
+        \quad IRON (ours)\tnote{a} & \cmark & \cmark & 1.92$\times$ \\
         \quad FLM flash prefill & \cmark & \xmark & $\le$1.09$\times$ \\
         \quad FLM decode & \xmark & N/A & $\le$1.01$\times$ \\
         \tabgroup{One operator per configuration} \\
@@ -294,6 +297,7 @@ Their 32 streams, at an exposure of zero and with their transfers already issued
     \end{tabular*}
     \begin{tablenotes}\footnotesize
     \item Speedup is measured where both clauses hold and bounded ($\le$) elsewhere.
+    \item[a] A two-group design of ours, written with IRON's interface to test the condition.
     \end{tablenotes}
     \end{threeparttable}
 \end{table}
