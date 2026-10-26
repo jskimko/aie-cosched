@@ -107,7 +107,7 @@ The joint bound is $T$ over that largest time, so it bounds every order of the d
 
 % VALUE: the bound is prescriptive (build a removal only where its bound exceeds its cost); since it never falls below one it cannot predict a loss, which the event model prices instead (the short prompts, in the evaluation)
 A kind of removal is therefore worth a rewrite only where its bound exceeds its cost, namely the local memory, BDs, locks, and channels that a rename takes or the synchronization and planning that a reorder adds.
-The bound cannot predict a loss, such as the per-dispatch costs that make reordering lose on prompts of two chunks, so OPCORD's event model prices those (Section~\ref{subsec:pricing}).
+The bound cannot predict a loss, such as the exposed host post-processing that makes reordering lose on prompts of two chunks, so OPCORD's event model prices it (Section~\ref{subsec:pricing}).
 % SOURCE: the bound and its typed resources (outline v9 section 2, C1; vault lab-bound-validation (1)).
 
 \subsection{Legality}
