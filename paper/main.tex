@@ -17,6 +17,7 @@
 \usepackage{textcomp}
 \usepackage{xcolor}
 \usepackage{threeparttable}
+\usepackage{pifont}  % check and cross marks in the census table
 \usepackage[hyphens]{url}
 
 % hyperref makes hyperlinks in the resulting PDF.
@@ -42,6 +43,9 @@
 
 \newcommand{\us}{\,\textmu{}s}
 \newcommand{\ms}{\,ms}
+\newcommand{\cmark}{\ding{51}}
+\newcommand{\xmark}{\ding{55}}
+\newcommand{\tabgroup}[1]{\multicolumn{4}{@{}l}{\textit{#1}}}
 
 \let\oldtexttt\texttt
 \renewcommand{\texttt}[1]{{\small\oldtexttt{#1}}}

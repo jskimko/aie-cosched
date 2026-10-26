@@ -269,27 +269,34 @@ Every overlap gain we measure on the designs we rewrite therefore falls where th
     \centering
     \caption{The Census by Design Class}
     \label{tab:census}
-    % VALUE: each design class read from its artifacts: its cut, which clause of the condition fails, and the bound: gains only where no clause fails (AIR's prefill and decode), bounds at or near one elsewhere
+    % VALUE: each design class read from its artifacts against the two clauses of the condition, grouped by how its work is packaged: only the classes where both clauses hold (AIR's prefill and decode) gain; every other class is bounded at or near 1x
     % SOURCE: AIR prefill bound against measured, 185 of 187 cells, and decode at 99-100% of the bound on Llama-3.2-1B (Section 4.6's SOURCE lines); FLM flash prefill B 1.000, joint bound over every order 1.04-1.09, at most 1.13 with merges, merge replays 2.9-3.3% (terms4, terms5, replay stage 1, Section 4.6-4.7's SOURCE lines); FLM per-operator prefill 99.6-100% of consecutive dispatches share a column (first clause fails; the bound follows from the rule in Section 3.2); FLM decode 1.000 inside dispatches, at most 1.009 between steps (e679463); IRON's 32 LLM streams and 3 non-LLM builds (mobilenet, resnet, bottleneck) at 1.000 (aie-cosched 1a87bc6).
+    % SOURCE: FLM flash prefill clause 1 holds: it issues each dispatch to one column group, as AIR's prefill does (Section 4.7's SOURCE line on the flash prefill); clause 2 fails on the turns between groups.
     \small
+    \setlength{\tabcolsep}{4pt}
     \begin{threeparttable}
-    \begin{tabular*}{\linewidth}{@{}l@{\extracolsep{\fill}}llr@{}}
+    \begin{tabular*}{\linewidth}{@{}l@{\extracolsep{\fill}}ccr@{}}
         \toprule
-        Design & Cut & Clause failed & Bound \\
+         & \multicolumn{2}{c}{Clause holds} & \\
+        \cmidrule(lr){2-3}
+        Design class & (1) & (2) & Speedup \\
         \midrule
-        AIR prefill & fused & none & $\ge$ gain\tnote{a} \\
-        AIR decode & fused & none & $\ge$ gain\tnote{a} \\
-        FLM flash prefill & fused & second & $1.13\times$ \\
-        FLM per-op.\ prefill & modular & first & $1.000\times$ \\
-        FLM decode & fused & first & $1.009\times$ \\
-        IRON LLM designs & modular & first & $1.000\times$ \\
-        Non-LLM designs & one dispatch & none\tnote{b} & $1.000\times$ \\
+        \tabgroup{Several operators in one configuration} \\
+        \quad AIR prefill & \cmark & \cmark & \PrefillGainLo--\PrefillGainHi$\times$ \\
+        \quad AIR decode & \cmark & \cmark & \DecodeGainLo--\DecodeGainHi$\times$ \\
+        \quad FLM flash prefill & \cmark & \xmark & $\le$1.09$\times$\tnote{a} \\
+        \quad FLM decode & \xmark & not needed & $\le$1.01$\times$\tnote{b} \\
+        \tabgroup{One operator per configuration} \\
+        \quad FLM prefill & \xmark & not needed & $\le$1.00$\times$ \\
+        \quad IRON LLM designs & \xmark & not needed & $\le$1.00$\times$ \\
+        \tabgroup{One dispatch, stages already overlapped} \\
+        \quad IRON non-LLM (3) & \multicolumn{2}{c}{nothing to free} & $\le$1.00$\times$ \\
         \bottomrule
     \end{tabular*}
     \begin{tablenotes}\footnotesize
-    \item First clause: the freed work runs on core tiles and DMA channels that the awaited work does not use. Second: no true dependence lies between them. A false dependence that fails either is bounded at $1.000\times$. Bounds span every order the checkers accept, merges included.
-    \item[a] At or above the measured gain on 185 of 187 prefill cells; the decode gain reaches 99--100\% of its bound.
-    \item[b] The stages already overlap through the array's dataflow.
+    \item Clause (1): the freed work runs on core tiles and DMA channels that the awaited work does not use. Clause (2): no true dependence, on the device or through the host program, lies between them. Failing either bounds the speedup at 1.00$\times$, so the other is not needed. Speedup: the measured range, or $\le$ the bound, the most that removing every false dependence the checkers accept could save. AIR's bound is at or above its measured speedup on 185 of 187 prefill cells, and decode reaches 99--100\% of its bound.
+    \item[a] 1.00$\times$ within a dispatch, 1.04--1.09$\times$ over every dispatch order. Merging dispatches reaches 1.13$\times$ by saving dispatches rather than freeing overlap, and a replayed merge saved about 3\%.
+    \item[b] 1.00$\times$ within a step, 1.01$\times$ between steps.
     \end{tablenotes}
     \end{threeparttable}
 \end{table}
