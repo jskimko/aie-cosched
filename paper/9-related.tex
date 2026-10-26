@@ -33,10 +33,10 @@ There, binaries are analysed and parallelized without their source~\citep{kotha2
 Each of these works on one processor's instruction stream, whereas we analyse and rewrite the instruction streams that coordinate several kinds of engines, and decide legality from the access sets of every agent that touches state.
 
 \textbf{Performance Analysis and Models.}
-% VALUE: what-if tools take order and durations from traces and simulate transformed graphs; GPA attributes stalls inside a kernel; interaction cost prices a set of events together; analytical and SDF models predict or bound time from a given mapping or graph; here the program fixes the order, only durations are measured, and the quantity bounded is what removing one wait is worth
+% VALUE: what-if tools take order and durations from traces and simulate transformed graphs; GPA attributes stalls inside a kernel; interaction cost prices a set of events together; analytical and SDF models predict or bound time from a given mapping or graph; we bound what removing one wait is worth from the program's order and measured durations alone (that the program fixes the order is stated in the statically ordered machines paragraph)
 To predict what an optimization gains, Daydream and dPRO build dependency graphs from run-time traces and simulate the transformed graphs~\citep{zhu2020daydream,hu2022dpro}, and xPU-Shark replays production traces in a microarchitecture simulator~\citep{zarkadas2025xpushark}.
 GPA attributes GPU instruction stalls within a kernel and estimates each fix's speedup~\citep{zhou2021gpa}, interaction-cost analysis costs a set of events together~\citep{fields2003interaction}, and analytical and SDF models predict or bound time from a given mapping or graph~\citep{parashar2019timeloop,kwon2019maestro,ghamarian2006throughput}.
-In contrast, the NPU's program fixes the order between its engines, so only durations are measured, and the quantity we bound is what removing one wait is worth before it is rewritten.
+In contrast, we bound what removing one wait is worth before it is rewritten, from the program's order and measured durations alone.
 Our event model prices the orders and configurations a compiled design could take, per prompt length, from each operator's time alone.
 
 \textbf{LLM Inference on Edge Accelerators.}
