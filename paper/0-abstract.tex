@@ -4,10 +4,10 @@
 % COMMENT: \E values come from the amendment-1 batch and the final sweep.
 On AMD Ryzen\texttrademark{} AI processors, the neural processing unit (NPU) runs a large language model (LLM) on a spatial array of AI Engine tiles, where each operator executes as a dataflow on its own group of tiles.
 Designs that keep several operators resident on the array avoid reconfiguring it, but their compiled order and buffers often make an operation wait for another whose results it does not use, and such false dependences can leave tiles idle.
-A single command processor issues all of the array's work strictly in the order that the compiled program lists it, so that order is the array's schedule.
-Because that order and the buffers are both fixed in the compiled program, false dependences can be read, bounded, and removed from it after compilation.
-We show that the usual remedies of packing more operators into each dispatch and adding a second hardware context recover none of the lost overlap.
-How much a rewrite can recover is set by the design's partitioning and the prompt length, and where it can recover nothing shows in the compiled design and its host program before anything is timed.
+We identify that the array's schedule is fixed in the compiled program rather than decided at run time, because a single command processor issues all of the array's work strictly in the order that the program lists it.
+Since the program fixes the buffers as well, its false dependences can be read, bounded, and removed from the program itself, after compilation.
+We show that the usual remedies of packing more operators into each dispatch and adding a second hardware context recover none of the lost overlap, whereas rewriting the order and the buffers can.
+How much such a rewrite recovers depends on how the design is partitioned and on the prompt length, and the compiled design and its host program show, before anything is timed, where it recovers nothing.
 We present OPCORD, which reads compiled NPU programs, open or closed, as dependence graphs and bounds what each false dependence costs.
 It reorders instructions and renames buffers under checkers that reject any rewrite they cannot prove legal, and it chooses the order and the configuration for each prompt length with an event model of the device and its host.
 Across five LLMs, OPCORD shortens the time to first token (TTFT) by \E{X--Y}$\times$ at 1K- to 32K-token prompts against each design's original program on the configuration that minimizes its TTFT.
