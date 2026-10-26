@@ -3,7 +3,7 @@
 
 % VALUE: (1) stakes and symptom: client NPUs are standard equipment and run LLMs; a spatial dataflow NPU runs each operator's flow on a group of tiles while one in-order CP issues every group's work, so the order in the compiled commands is the schedule the array runs; in the original prefill the groups take turns while the measure a developer can compute reads busy; issued in another order the same operators run together (Figure 1); gap: issue order through the CP has received far less attention than what each operator computes and where
 % DECISION: the symptom is "the measure a developer can compute reads 92-97% busy", never "invisible to every metric".
-Neural processing units (NPUs) such as the AMD XDNA~2 bring large language model (LLM) inference to client machines~\citep{rico2024xdna,linux-amdnpu}, and a platform requirement of 40 trillion operations per second has made such an NPU standard equipment in mainstream laptops~\citep{copilotplus-reqs}.
+Neural processing units (NPUs) such as the AMD XDNA~2 bring large language model (LLM) inference to client machines~\citep{rico2024xdna}, and a platform requirement of 40 trillion operations per second has made such an NPU standard equipment in mainstream laptops~\citep{copilotplus-reqs}.
 % SOURCE: the Copilot+ PC hardware requirement of 40+ TOPS for the NPU (copilotplus-reqs).
 The NPU is a spatial dataflow array, on which a design runs each LLM operator as a flow on its own group of tiles, laid out in today's designs as whole columns, which we call a column group.
 Yet one in-order command processor (CP) issues the work of every group, so the order of issues and waits compiled into the commands is the schedule that the array runs.

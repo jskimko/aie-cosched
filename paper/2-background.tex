@@ -19,10 +19,10 @@ Once configured, the AI Engine array of an XDNA~2 NPU computes on all of its til
 \textbf{AI Engine Array.}
 % VALUE: a spatial dataflow array of 8 columns of shim, memory, and compute tiles; DMAs follow BDs, locks hand buffers over; a design is one configuration; once configured it runs data-driven, so a design maps each operator's flow onto a group of tiles that computes independently; today's LLM designs map those groups to whole columns (the column group), which the hardware does not require
 The AMD XDNA~2 neural processing unit (NPU) in Ryzen\texttrademark{} AI processors is a spatial dataflow array of AI Engine (AIE) tiles in 8 columns~\citep{linux-amdnpu}.
-Each column holds a shim tile that moves data to and from DRAM, a memory tile, and 4 compute tiles with local memory~\citep{amd_am027,linux-amdnpu}.
+Each column holds a shim tile that moves data to and from DRAM, a memory tile, and 4 compute tiles with local memory.
 % SOURCE: tile anatomy (AM027): the shim tile is at the bottom of each column with the memory tile above it; the compute tiles are VLIW, SIMD vector cores; DMAs move data over a stream switch network.
 Direct memory access (DMA) engines move data by following buffer descriptors (BDs), which can chain, and locks hand each buffer from its producer to its consumer~\citep{amd_am027}.
-A configuration of the array is its core programs, stream routes, BDs, and locks, which a compiler such as MLIR-AIE~\citep{hunhoff2025iron,mlir-aie-repo} or MLIR-AIR~\citep{wang2026mlirair} emits, and a design is one or more configurations with the host program that issues their commands.
+A configuration of the array is its core programs, stream routes, BDs, and locks, which a compiler such as MLIR-AIE~\citep{mlir-aie-repo} or MLIR-AIR emits, and a design is one or more configurations with the host program that issues their commands.
 The configured array runs data-driven, so a design maps each operator's flow onto a group of tiles that computes independently whenever its input locks are released.
 The LLM designs we study map each group to whole columns, which the hardware does not require, and we call the columns that one operator occupies its \emph{column group}.
 % SOURCE: the XDNA 2 topology is the kernel documentation's, which states 4 rows of compute tiles in 8 columns, 1 memory-tile row per column, and 4,096 KB of L2 (docs.kernel.org/accel/amdxdna/amdnpu.html, read 2026-10-21; the same citation FCPR Section 2.1 uses for the column count). Confirmed on the Ryzen AI Max+ 395 NPU of this paper's machine. NOTE: Rico et al. (IEEE Micro 2024) is the FIRST XDNA generation (5 columns, 10 TOPS) and must not be cited for an XDNA 2 figure.
@@ -31,7 +31,7 @@ The LLM designs we study map each group to whole columns, which the hardware doe
 
 \textbf{Command Processor.}
 % VALUE: the host reaches the array only through commands whose instruction streams one in-order CP executes; register write, address patch, issue (returns at once), synchronization (blocks), so the CP's order decides when each group receives work
-The host never drives the array directly but submits \emph{commands}, each carrying an \emph{instruction stream} that the NPU's command processor (CP) executes in order~\citep{rico2024xdna,linux-amdnpu}.
+The host never drives the array directly but submits \emph{commands}, each carrying an \emph{instruction stream} that the NPU's command processor (CP) executes in order~\citep{linux-amdnpu}.
 A \emph{register write} configures shim BDs, DMA queues, locks, or a core's runtime parameters, and an \emph{address patch} writes a host buffer's address into a shim BD.
 An \emph{issue} pushes a BD into a shim DMA queue and returns at once, whereas a \emph{synchronization} blocks the CP until a named transfer completes.
 The CP's instruction order therefore decides when each column receives work, and a synchronization on one column delays every later issue, whichever column it targets.
@@ -40,7 +40,7 @@ The CP's instruction order therefore decides when each column receives work, and
 
 \textbf{Host Runtime.}
 % VALUE: commands go to a hardware context that holds one configuration and runs them in submission order; argument slots bind buffers for address patches; each command costs a fixed dispatch floor F that queuing partly hides
-The host submits commands through XRT~\citep{xrt-repo} and the amdxdna driver~\citep{xdna-driver} to a \emph{hardware context}, which holds one configuration and runs its commands in submission order.
+The host submits commands through XRT and the amdxdna driver to a \emph{hardware context}, which holds one configuration and runs its commands in submission order.
 Each command binds host buffers to the \emph{argument slots} that the configuration's kernel declares, and an address patch names its buffer by a slot and a byte offset.
 Submitting and completing a command costs a fixed \emph{dispatch floor} $F$ of about 0.1\ms{} on our platform, which queuing further commands before waiting on the first partly hides behind the device's work.
 % SOURCE: XRT empty dispatch (4 KB bypass), 93.0-98.5 us at every bracket of lab-prefill-device (3); 92-99 us in lab-prefill-overlap (3).
@@ -59,8 +59,8 @@ A second cut splits a fused design's work into commands, each with one operator 
 This cut decides which waits the CP's order places between operators.
 A third cut decides whether each role in a loop keeps one buffer or several, and so which waits the loop places between its blocks.
 IRON, a close-to-metal Python interface to MLIR-AIE~\citep{hunhoff2025iron} that can also express fused designs, composes an LLM's operators as an operator sequence that reconfigures the whole array for each one.
-In contrast, MLIR-AIR~\citep{wang2026mlirair} and Stream~\citep{symons2025stream} generate fused designs.
-FastFlowLM ships both fused flash designs and a modular per-operator engine as binaries, together with the runtime that issues them~\citep{fastflowlm-repo}.
+In contrast, MLIR-AIR and Stream~\citep{symons2025stream} generate fused designs.
+FastFlowLM ships both fused flash designs and a modular per-operator engine as binaries, together with the runtime that issues them.
 % SOURCE: how each tool builds its fused designs (Related Work names both as generating fused designs): MLIR-AIR maps loop nests onto fused multi-operator designs; Stream generates fused designs from its mapping search.
 MLIR-AIR, IRON, and FastFlowLM, the three stacks we read, reach the array through the same commands and instruction streams (Sections~\ref{subsec:closed} and~\ref{subsec:census}), and so do Stream's designs, which compile through MLIR-AIE.
 % SOURCE: IRON's OperatorSequence keeps each operator its own aie.device and emits configure/run per runlist entry in runlist order (amd-iron 1fd3dab, iron/common/sequence.py:89-96, 286; iron/common/compilation/sequence.py:243-324; pass-0 census check, decisions log 2026-10-24 late). Stream's fused design: iron/operators/swiglu_prefill_stream (PR #122, stream-dse 2.1.1 at d03bfd10) places gate, up, silu, mul and down on disjoint columns in one design. FastFlowLM's engines reach the runtime through libhrx and ship as compiled libraries and xclbins (FastFlowLM 44d01787, lib/hrx/libgemma4e_flash.so; vault lab-cosched-passes (14)); its flash prefill spends 82-87% of its time in commands whose configuration holds several operators (exposure a3ef131).
@@ -72,7 +72,7 @@ MLIR-AIR, IRON, and FastFlowLM, the three stacks we read, reach the array throug
 % VALUE: prefill and TTFT; the decoder layer's operators; the original fused prefill puts GEMMs and attention on disjoint column groups of one configuration (its default split, the number of columns attention takes), so its operators differ only in their streams; it runs a layer stage by stage over 128-token chunks with host work between commands
 \emph{Prefill} processes a prompt to produce the first output token, and its latency is the TTFT.
 Each decoder layer applies a QKV projection, attention, an output projection, and a gated feed-forward network of gate, up, and down projections.
-MLIR-AIR's open fused prefill~\citep{wang2026mlirair} places every operator of a decoder layer in one configuration, with the GEMMs on columns 1--6 and attention on columns 0 and 7.
+MLIR-AIR's open fused prefill places every operator of a decoder layer in one configuration, with the GEMMs on columns 1--6 and attention on columns 0 and 7.
 This placement is its default \emph{split}, where the split is the number of columns that attention takes.
 The split is a parameter of the design's build, whose admitted values we call the \emph{supported splits}.
 Since each attention group serves an equal share of the KV heads, an LLM with 8 KV heads admits attention on 1, 2, or 4 columns.
