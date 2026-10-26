@@ -289,7 +289,7 @@ Their 32 streams, at an exposure of zero and with their transfers already issued
         \tabgroup{Several operators in one configuration} \\
         \quad AIR prefill & \cmark & \cmark & \PrefillGainLo--\PrefillGainHi$\times$ \\
         \quad AIR decode & \cmark & \cmark & \DecodeGainLo--\DecodeGainHi$\times$ \\
-        \quad IRON (ours)\tnote{a} & \cmark & \cmark & 1.92$\times$ \\
+        \quad IRON (ours)\tnote{*} & \cmark & \cmark & 1.92$\times$ \\
         \quad FLM flash prefill & \cmark & \xmark & $\le$1.09$\times$ \\
         \quad FLM decode & \xmark & N/A & $\le$1.01$\times$ \\
         \tabgroup{One operator per configuration} \\
@@ -301,7 +301,7 @@ Their 32 streams, at an exposure of zero and with their transfers already issued
     \end{tabular*}
     \begin{tablenotes}\footnotesize
     \item Speedup is measured where both clauses hold and bounded ($\le$) elsewhere.
-    \item[a] A two-group design of ours, written with IRON's interface to test the condition.
+    \item[*] A two-group design of ours, written with IRON's interface to test the condition.
     \end{tablenotes}
     \end{threeparttable}
 \end{table}

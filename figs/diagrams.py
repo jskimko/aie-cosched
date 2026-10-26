@@ -154,10 +154,14 @@ MAGENTA = OURS  # ours, as in the data figures
 
 
 def _strip(ax, x, y, kinds, cw=0.075, h=0.10, z=5):
-    """An instruction stream: issues dark, synchronizations light, left to right in execution order."""
+    """An instruction stream, drawn as in the architecture figure: one framed block of contiguous equal cells, issues
+    dark and synchronizations light, left to right in execution order, a mid-gray rule between every pair."""
     for k, kind in enumerate(kinds):
-        ax.add_patch(Rectangle((x + k * cw + 0.004, y), cw - 0.008, h, facecolor=INK if kind == "i" else MIST,
-                               edgecolor=INK, linewidth=0.3, zorder=z))
+        ax.add_patch(Rectangle((x + k * cw, y), cw, h, facecolor=INK if kind == "i" else MIST, edgecolor="none",
+                               zorder=z))
+    for k in range(1, len(kinds)):
+        ax.plot([x + k * cw] * 2, [y, y + h], color=STONE, lw=0.5, zorder=z + 1)
+    ax.add_patch(Rectangle((x, y), len(kinds) * cw, h, fill=False, edgecolor=INK, linewidth=0.4, zorder=z + 2))
     return x + len(kinds) * cw
 
 
@@ -244,12 +248,12 @@ def fig_framework():
     rew = ((1.20, "Composer", "Reorder across operators"), (0.86, "Stream pass", "Reorder within a stream"),
            (0.48, "Loop pass", "Rename into rings"))
     what_x = 0.09 + tw(*(n for _, n, _ in rew)) + 0.10  # the description column, from the checkmark's center
-    wi = 2 * (ins + pad) + 0.208 + 0.07 + tw("Compiled design", "Host program", "Operator probes", "Prompt length")
+    wi = 2 * (ins + pad) + 0.216 + 0.07 + tw("Compiled design", "Host program", "Operator probes", "Prompt length")
     wa = 2 * (ins + pad) + max(0.03 + 0.86 + 0.12 + tw("True", "Name", "Order"),
                                tw("Dependence graph", "Legality conditions", "Bound per false dependence"))
     wr = 2 * (ins + pad) + 0.04 + what_x + tw(*(w for _, _, w in rew))
     we = 2 * (ins + pad) + max(0.36, tw(*ev_lines))  # the lanes are 0.36 wide
-    wo = 2 * (ins + pad) + max(0.367, tw(out_label, "Refusal"))  # the strip's ink is 0.367 wide
+    wo = 2 * (ins + pad) + max(5 * 0.075, tw(out_label, "Refusal"))  # the strip: five cells of 0.075
     gap = (W - 0.04 - wi - wa - wr - we - wo) / 4
     xi = 0.02
     xa = xi + wi + gap
@@ -264,8 +268,8 @@ def fig_framework():
     # ---- inputs: the design and its host program, then the probes and the prompt length (the event model's inputs)
     _stage(ax, xi, bot, wi, top - bot, "Inputs", ours=False)
     bx, bw = xi + ins, wi - 2 * ins
-    ic = bx + pad + 0.104  # the icon column's center (the strips, 0.208 wide, fill it)
-    tx = bx + pad + 0.208 + 0.07  # the label column
+    ic = bx + pad + 0.108  # the icon column's center (the strips, six cells of 0.036, fill it)
+    tx = bx + pad + 0.216 + 0.07  # the label column
     item(bx, 1.02, 1.30, bw)
     for k, kinds in enumerate(("iisiis", "isiiis")):
         _strip(ax, ic - 0.108, 1.1775 - k * 0.11, kinds, cw=0.036, h=0.075)
@@ -336,7 +340,7 @@ def fig_framework():
     ax.text(oc + 0.13, 1.16, "Refusal", ha="left", va="center_baseline", fontsize=fs, zorder=6)
     item(oi, 0.38, 0.96, ow)
     om = (0.58 - (0.09 + 0.05 + sum(lab))) / 2
-    _strip(ax, oc - 0.004, 0.96 - om - 0.09, "iiiss", cw=0.075, h=0.09)
+    _strip(ax, oc, 0.96 - om - 0.09, "iiiss", cw=0.075, h=0.09)
     ax.text(oc, 0.96 - om - 0.14 - lab[0], out_label, ha="left", va="center_baseline", fontsize=fs, zorder=6)
     # ---- flows
     _arrow(ax, (xi + wi, 1.0), (xa, 1.0))

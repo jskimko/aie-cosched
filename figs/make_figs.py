@@ -552,9 +552,6 @@ def fig_headline():
             if c is None or c.get("unpriced"):
                 continue
             ax.bar(i, c["gain"] - 1.0, bottom=1.0, width=0.72, zorder=2, **split_style(c["pick_split"]))
-            # a cap at the value, so a pick that keeps the original order (exactly 1) still shows its split
-            ax.plot([i - 0.36, i + 0.36], [c["gain"]] * 2, color=OURS, linewidth=1.4,
-                    solid_capstyle="butt", zorder=2)
             if c.get("lo") is None:
                 # the baseline and the pick ran in different batches with no shared version: no interval
                 ax.text(i, c["gain"] + 0.02, r"$\dagger$", ha="center", va="bottom", fontsize=FS_NOTE)
