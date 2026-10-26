@@ -34,7 +34,7 @@ TEX = ROOT.parent / "paper" / "fig" / "numbers.tex"
 
 AMD_NPU = Path.home() / "git" / "amd-npu.git"
 FROZEN_PIN = "e4e3b209"  # choose() at the event model's final form (opcord 4c56faa) over the same cells
-AMD_NPU_PIN = "a6abaf19"  # npu-gap-0 head, 2026-10-25 night; holds every result read below
+AMD_NPU_PIN = "4ce61672"  # npu-gap-0 head, 2026-10-26 evening (a6abaf19 plus additions only); holds every result read below
 COSCHED = Path.home() / "aie2p-gmk" / "aie-cosched-pass-0" / "aie-cosched"
 DECOMP = ("c4a8650", "passes/results/2026-10-25-gain-decompose/decompose.json")
 
@@ -46,6 +46,11 @@ GRID = {"1b": ["grid-1b-2026-10-23/cells", "large-1b-2026-10-24"], "8b": ["grid-
         "qwen": ["grid-qwen-2026-10-24", "qwen-32768-shared-2026-10-24"], "lfm2": ["grid-lfm2-shared-2026-10-24"],
         "gemma": ["grid-gemma-shared-2026-10-24"]}
 ARM = {"ship": "orig", "shipar": "stream", "comp": "comp"}
+# Cells measured after the grid, each with the pick that priced it: the grid left Llama-3.2-1B at 32K unpriced (chunk 160
+# lay outside its probes); choose() at opcord b8fe009, which holds those probes, picked comp on S4, and the cell ran the pick
+# beside the original on every split in one batch (amd-npu 4ce61672, NOTES there).
+EXTRA = {("1b", 32768): dict(dir="fig5-1b32k-2026-10-26/cell", sub={"S1": "S1-other", "S2": "S2-other", "S4": "S4-pick"},
+                             pick={"split": "S4", "arm": "comp"}, form="opcord b8fe009")}
 
 
 class Tree:
@@ -148,10 +153,16 @@ def prefill(ab):
             a, s = k.split("-")
             med.setdefault((t, int(N)), {})[(s, a)] = (v, "comps4")
 
+    for (t, N), e in EXTRA.items():
+        for X, sub in e["sub"].items():
+            put(t, N, X, kept(ab.json(R + e["dir"] + f"/{sub}/ab-{N}.json")), e["dir"])
+
     cells = []
     for t in MOD:
         for N in NS:
             c = choose.get((MOD[t], N))
+            if not c and (t, N) in EXTRA:
+                c = {"pick": EXTRA[(t, N)]["pick"]}
             d = med.get((t, N), {})
             row = {"llm": NAME[t], "key": t, "N": N}
             if not c:
@@ -183,6 +194,10 @@ def prefill(ab):
                     p = R + dd + f"/ab-{N}.json"
                     if p in ab.files:
                         f = p
+                if (t, N) in EXTRA:
+                    e = EXTRA[(t, N)]
+                    f = R + e["dir"] + f"/{e['sub'][X]}/ab-{N}.json"
+                    row["pick_form"] = e["form"]
                 assert f, (t, N, X)
                 k = kept(ab.json(f))
                 base = min(("orig", "identb"), key=lambda a: st.median(k[a]) if a in k else float("inf"))
@@ -208,7 +223,7 @@ def choice(cells, med):
     from four chunks on S2, and composing from four chunks on the baseline's split."""
     out = []
     for r in cells:
-        if r.get("unpriced"):
+        if r.get("unpriced") or r.get("pick_form"):  # the choice figure scores the grid's picks, one form throughout
             continue
         d = {k: v[0] for k, v in med[(r["key"], r["N"])].items()}
         best = min(v for (s, a), v in d.items() if a in ("orig", "identb", "stream", "comp"))
@@ -260,7 +275,7 @@ def frozen_choice(ab, frozen, cells, med):
     for f in frozen:
         t = next(k for k, v in MOD.items() if v == f["model"])
         c = by.get((t, f["N"]))
-        if not c:
+        if not c or "pick" not in f:  # a cell the final form left unpriced
             continue
         d = {k: v[0] for k, v in med[(t, f["N"])].items()}
         best = min(v for (s, a), v in d.items() if a in ("orig", "identb", "stream", "comp"))

@@ -1,6 +1,6 @@
 {
  "source": {
-  "amd-npu": "a6abaf19",
+  "amd-npu": "4ce61672",
   "aie-cosched (census workspace)": "c4a8650"
  },
  "cells": [
@@ -307,7 +307,33 @@
    "llm": "Llama-3.2-1B",
    "key": "1b",
    "N": 32768,
-   "unpriced": true
+   "pick_split": "S4",
+   "pick_arm": "comp",
+   "orig_ms": {
+    "S2": 63730.48930100049,
+    "S1": 81826.29436899879,
+    "S4": 28914.1989369964
+   },
+   "baseline_split": "S4",
+   "baseline_ms": 28914.1989369964,
+   "measured": {
+    "comp@S1": 74885.09149500169,
+    "orig@S1": 81826.29436899879,
+    "comp@S2": 37815.77793500037,
+    "identb@S2": 70779.6434250049,
+    "orig@S2": 63730.48930100049,
+    "stream@S2": 45197.32287200168,
+    "comp@S4": 20149.43950700399,
+    "identb@S4": 28928.369397995993,
+    "orig@S4": 28914.1989369964,
+    "stream@S4": 28918.0757130016
+   },
+   "pick_form": "opcord b8fe009",
+   "gain": 1.4349877537261402,
+   "lo": 1.4217371555483393,
+   "hi": 1.435147567720423,
+   "source": "fig5-1b32k-2026-10-26/cell/S4-pick/ab-32768.json orig/comp, paired",
+   "pick_ms": 20149.43950700399
   },
   {
    "llm": "Llama-3.1-8B",
