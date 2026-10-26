@@ -39,10 +39,11 @@ The CP's instruction order therefore decides when each column receives work, and
 % SOURCE: the original prefill's operators write only shim BDs and queues (row 0, 0x1D000/0x1D200), their own cores' lock registers (0x1F000), and runtime-parameter words in their cores' memory (0x3C00 GEMM, 0x2000 attention); no program loads, core resets, or memory-tile writes (decoded from the shipped streams, lab-prefill-overlap (3)).
 
 \textbf{Host Runtime.}
-% VALUE: dispatches go to a hardware context that holds one configuration and runs them in submission order; argument slots bind buffers for address patches; each dispatch costs a fixed dispatch floor F that queuing partly hides
+% VALUE: dispatches go to a hardware context that holds one configuration and runs them in submission order; argument slots bind buffers for address patches; each dispatch costs a fixed dispatch floor F, about a quarter of a short prompt's TTFT in sum, that queuing partly hides
 The host submits dispatches through XRT and the amdxdna driver to a \emph{hardware context}, which holds one configuration and runs its dispatches in submission order.
 Each dispatch binds host buffers to the \emph{argument slots} that the configuration's kernel declares, and an address patch names its buffer by a slot and a byte offset.
-Submitting and completing a dispatch costs a fixed \emph{dispatch floor} $F$ of about 0.1\ms{} on our platform.
+Submitting and completing a dispatch costs a fixed \emph{dispatch floor} $F$, and the 395 dispatches of Llama-3.2-1B's original prefill at a 512-token prompt carry floors worth about 24\% of its TTFT.
+% SOURCE: figs/data/e2-decomp.txt, n=512 line: N=395 dispatches x floor 97 us = 38.2 ms against TTFT 158.3 ms (24.1%); F alone is 93.0-98.5 us (next SOURCE line).
 Queuing further dispatches before waiting on the first partly hides this floor behind the device's work.
 % SOURCE: XRT empty dispatch (4 KB bypass), 93.0-98.5 us at every bracket of lab-prefill-device (3); 92-99 us in lab-prefill-overlap (3).
 % DECISION: the frozen event model prices one dispatch floor F (dev form, amd-npu 12250226, FORM-A2.md); the per-build command cost c_cmd is measured and reported, not used in pricing (vault decisions log, event-model form, 2026-10-25).
