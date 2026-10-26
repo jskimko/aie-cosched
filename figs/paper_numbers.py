@@ -347,6 +347,7 @@ def main():
     m["DecompAlt"] = fmt(one["(1) alternation orig / stream"])
     m["DecompOverlap"] = fmt(one["(2) overlap factor"])
     m["DecompHost"] = fmt(one["(3) host / dispatch factor"])
+    m["DecompTotal"] = fmt(one["gain orig / comp"])
     m["DecompOverlapShare"] = f"{100 * dc['overlap share of stream - comp, median over cells']:.0f}" \
         if not isinstance(dc["overlap share of stream - comp, median over cells"], dict) else \
         f"{100 * list(dc['overlap share of stream - comp, median over cells'].values())[0]:.0f}"
