@@ -10,6 +10,7 @@ Outputs (into FIGS_OUT, default paper/fig):
   decode.pdf       decode time per token against the cached context, baseline against our loop pass
   timeline.pdf     Figure 1: per column group, work outstanding and the CP blocked, existing against OPCORD
   schedules.pdf    TTFT by split for the three schedules, one panel per model
+  synthetic.pdf    the composed order's speedup over the original on three synthetic builds, against the chunks
   params-rows.tex  rows of the event model's parameter table
 """
 import json
@@ -431,20 +432,23 @@ def fig_timeline():
     arms = (("ship", "Original"), ("comp", "OPCORD"))
     rows = (("A", "Attention", ORANGE), ("G", "GEMMs", BLUE))
     fig, axes = plt.subplots(2, 1, figsize=(COLUMN, 1.45), sharex=True)
-    base = d["ship"]["ttft_ms"]
+    base = d["ship"]["ttft_ms"]  # time is drawn relative to the original's TTFT
+
+    def rel(spans):
+        return [(s / base, (e - s) / base) for s, e in spans]
     for ax, (arm, name) in zip(axes, arms):
         a = d[arm]
         groups = {g: _merge(a["outstanding"][g]) for g, _, _ in rows}
         for y, (g, label, color) in zip((3, 2), rows):
-            ax.broken_barh([(s, e - s) for s, e in groups[g]], (y - 0.32, 0.64), facecolors=color, edgecolor="none")
+            ax.broken_barh(rel(groups[g]), (y - 0.32, 0.64), facecolors=color, edgecolor="none")
         both = _intersect(groups["A"], groups["G"])
-        ax.broken_barh([(s, e - s) for s, e in both], (1 - 0.32, 0.64), facecolors=INK, edgecolor="none")
+        ax.broken_barh(rel(both), (1 - 0.32, 0.64), facecolors=INK, edgecolor="none")
         overlap = sum(e - s for s, e in both)
         assert abs(overlap - a["both_outstanding_ms"]) < 1e-3, (arm, overlap, a["both_outstanding_ms"])
         ttft = a["ttft_ms"]
-        ax.axvline(ttft, color="black", linewidth=0.6, linestyle=(0, (4, 2)))
-        ax.text(ttft + 15, 2.5, rf"TTFT {ttft / 1000:.2f}\,s", ha="left", va="center", fontsize=6.5)
-        ax.text(ttft + 15, 1, rf"{overlap:.0f}\,ms", ha="left", va="center", fontsize=6.5)
+        ax.axvline(ttft / base, color="black", linewidth=0.6, linestyle=(0, (4, 2)))
+        ax.text(ttft / base + 0.008, 2.5, rf"TTFT {ttft / base:.2f}", ha="left", va="center", fontsize=6.5)
+        ax.text(ttft / base + 0.008, 1, rf"{overlap / base:.2f}", ha="left", va="center", fontsize=6.5)
         ax.set_title(name, fontsize=7, pad=2, loc="left")
         ax.set_yticks([3, 2, 1], ["Attention", "GEMMs", "Both"], fontsize=6.5)
         ax.set_ylim(0.45, 3.55)
@@ -452,8 +456,8 @@ def fig_timeline():
         for side in ("top", "right", "left"):
             ax.spines[side].set_visible(False)
         ax.tick_params(axis="x", top=False)
-    axes[-1].set_xlim(0, 2150)
-    axes[-1].set_xlabel("Time into the prefill (ms)", labelpad=1)
+    axes[-1].set_xlim(0, 1.12)
+    axes[-1].set_xlabel("Normalized time into the prefill (original TTFT = 1)", labelpad=1)
     fig.tight_layout(pad=0.2, h_pad=0.3)
     fig.savefig(OUT / "timeline.pdf")
     plt.close(fig)
@@ -462,7 +466,8 @@ def fig_timeline():
 WIDE = 6.75  # MLSys two-column width, inches
 MAGENTA_PASTEL = "#EBA8C8"  # pastel step of MAGENTA
 MAGENTA_DARK = "#8A2259"  # dark step of MAGENTA
-SPLIT_COLOR = {"S1": MAGENTA_PASTEL, "S2": MAGENTA, "S4": MAGENTA_DARK}
+# light steps of MAGENTA, so the near-black error bars stay visible on every bar
+SPLIT_COLOR = {"S1": "#F7DCE9", "S2": "#EBA8C8", "S4": "#D77AAA"}
 LLMS = ("Llama-3.2-1B", "LFM2-1.2B", "Qwen3-4B", "Gemma3-4B", "Llama-3.1-8B")
 
 
@@ -501,7 +506,7 @@ def fig_headline():
     axes[0].set_ylabel("TTFT speedup", labelpad=2)
     axes[0].set_ylim(0.9, 1.72)
     handles = [plt.Rectangle((0, 0), 1, 1, color=SPLIT_COLOR[s]) for s in ("S1", "S2", "S4")]
-    axes[0].legend(handles, ["$S_1$", "$S_2$", "$S_4$"], title="Split", title_fontsize=6, loc="upper left",
+    axes[0].legend(handles, ["$S_1$", "$S_2$", "$S_4$"], title="Configuration", title_fontsize=6, loc="upper left",
                    fontsize=6, handlelength=0.9,
                    handletextpad=0.4, borderaxespad=0.2, labelspacing=0.2)
     fig.supxlabel("Prompt length (tokens)", fontsize=7, y=-0.02)
@@ -544,6 +549,38 @@ def fig_decode():
     plt.close(fig)
 
 
+# Three synthetic builds told apart by marker, in the decode figure's neutral ink.
+SYNTH_STYLE = {"synth_ag_d1024_i768": ("Light GEMMs", "o", "full", (0, ())),
+               "synth_ag_d2048_i2304": ("Medium GEMMs", "s", "none", (0, (4, 1.5))),
+               "synth_ag_d2048_i12288": ("Heavy GEMMs", "^", "full", (0, (1, 1.2)))}
+
+
+def fig_synthetic():
+    """The synthetic sweep: the composed order's TTFT speedup over the original order against the prompt length in
+    128-token chunks, for three two-layer builds of MLIR-AIR's fused prefill that keep attention fixed and vary the
+    GEMMs' work. data/synthetic.json: the repeat-position ratio, median with its 95% interval."""
+    cells = json.loads((DATA / "synthetic.json").read_text())
+    fig, ax = plt.subplots(figsize=(COLUMN + 0.37, 1.5))
+    for model, (label, marker, fill, dash) in SYNTH_STYLE.items():
+        pts = sorted((c["C"], c["repeat"]) for c in cells if c["model"] == model)
+        xs = [c for c, _ in pts]
+        med, lo, hi = ([r[k] for _, r in pts] for k in range(3))
+        ax.errorbar(xs, med, yerr=[[m - l for m, l in zip(med, lo)], [h - m for m, h in zip(med, hi)]], fmt="none",
+                    ecolor=INK, elinewidth=0.5, capsize=1.0)
+        ax.plot(xs, med, color=INK, marker=marker, markersize=2.6, linestyle=dash, linewidth=0.7,
+                markerfacecolor=INK if fill == "full" else "white", markeredgewidth=0.6, label=label)
+    ax.axhline(1.0, color="black", linewidth=0.5)
+    ax.set_xscale("log", base=2)
+    ax.set_xticks([1, 2, 4, 8, 16, 32], ["1", "2", "4", "8", "16", "32"])
+    ax.minorticks_off()
+    ax.set_xlabel("Prompt length (128-token chunks)", labelpad=1)
+    ax.set_ylabel("TTFT speedup", labelpad=2)
+    ax.set_ylim(0.8, 1.8)
+    ax.legend(loc="upper left", fontsize=6, handlelength=1.6, labelspacing=0.2)
+    fig.savefig(OUT / "synthetic.pdf")
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     fig_busy()
@@ -557,4 +594,5 @@ if __name__ == "__main__":
     fig_schedules()
     fig_timeline()
     fig_headline()
+    fig_synthetic()
     params_rows()
