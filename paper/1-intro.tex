@@ -52,7 +52,7 @@ Its flash designs run each layer's attention once over the whole prompt, so ever
 % VALUE: why the order must be priced per prompt length: the original program's chunks make the balance between the groups move with the prompt, and the split moves with it
 The original program, by contrast, runs fixed-size chunks, in which attention's work grows with the chunk's position while the GEMMs' work stays fixed.
 The balance between the groups therefore shifts with the prompt length, and with it whether the overlap repays a new order's per-dispatch costs.
-The issue order that pays therefore changes with the prompt and must be priced per length rather than fixed, as must the split of the columns between attention and the GEMMs, which moves with the same balance because more attention columns shorten attention but lengthen every GEMM.
+The issue order that pays therefore changes with the prompt and must be priced per length rather than fixed, as must the configuration, whose split of the columns between attention and the GEMMs moves with the same balance because more attention columns shorten attention but lengthen every GEMM.
 
 % VALUE: (4) this work: OPCORD, one sentence per part with what it is and why: the analysis reads compiled artifacts across every agent and decides legality from them; the event model, analytical in form with microbenchmark constants, prices orders and splits per prompt length, and a bound limits what each false dependence can gain; the composer, the stream pass and the loop pass remove the false dependences the price clears, under checkers; headline results against the original program on its best supported split, and the event model's choice quality
 % DECISION: the general benefit (author, 2026-10-25; core rule): OPCORD serves any developer of this hardware; the stacks demonstrate it.
@@ -61,16 +61,16 @@ Designs from open compilers such as MLIR-AIR and IRON, on which researchers and 
 A team that holds a closed stack's source can recover that loss in its own designs the same way.
 First, because the order sits in binaries whose source may be closed, its analysis reads a design's artifacts as a dependence graph over every agent that touches state, accepts a reorder or a rename only where the artifacts and the host's accesses show it legal, and bounds what removing each false dependence can gain.
 On a closed stack's binaries, OPCORD stops at the analysis and replays only rewrites that leave the host program unchanged, to check a bound against measurement.
-Second, because the artifact fixes the order of the work but not its durations, an analytical event model, with constants measured once by microbenchmarks, prices each candidate order and split per prompt length from timings of each operator run alone.
+Second, because the artifact fixes the order of the work but not its durations, an analytical event model, with constants measured once by microbenchmarks, prices each candidate order and configuration per prompt length from timings of each operator run alone.
 When two candidates are priced close, OPCORD can settle the choice by a short measurement while it plans the prompt length.
 Third, a composer reorders issue across dispatches, a stream pass within one operator's stream, and a loop pass renames decode attention's buffers into rings.
 Because OPCORD rewrites designs it did not compile, each stands behind a checker that refuses any rewrite it cannot show legal, with kernels, driver, and firmware unchanged.
 
 % VALUE: the evidence in brief: headline gains against the baseline, the absolute standing, choice quality, exactness and legality, and the condition's scope across the census
-Against the original program on its fastest supported split that we measure, OPCORD shortens TTFT across five LLMs by \PrefillGainLo--\PrefillGainHi$\times$ at prompts of 1K to 32K tokens, with bit-identical outputs.
+Against the original program on its fastest supported configuration that we measure, OPCORD shortens TTFT across five LLMs by \PrefillGainLo--\PrefillGainHi$\times$ at prompts of 1K to 32K tokens, with bit-identical outputs.
 Against the unmodified decode design, its loop pass shortens decode by \DecodeGainLo--\DecodeGainHi$\times$ at contexts of about 30K tokens, again with bit-identical outputs.
 On MLIR-AIR's designs, OPCORD also reaches the first token sooner than FastFlowLM's current release, on every LLM and prompt length we compare.
-Its choice of order and split stays within \ChoiceOpcordMax\% of the measured minimum on every LLM and prompt length it prices, whereas each fixed rule we test loses \ChoiceAlwaysMax--\ChoiceFourSTwoMax\% on some of them.
+Its choice of order and configuration stays within \ChoiceOpcordMax\% of the measured minimum on every LLM and prompt length it prices, whereas each fixed rule we test loses \ChoiceAlwaysMax--\ChoiceFourSTwoMax\% on some of them.
 Its analysis re-emits every stream we read from three stacks byte for byte, and its checkers refuse every illegal rewrite we inject.
 Across the designs we read, every overlap gain we measure falls where the condition says one can arise, and FastFlowLM's two prefill engines leave little overlap to recover, as the condition predicts.
 % DECISION: the census's counts are stated once, in Section 6.6, as distinct designs read (author, 2026-10-25: accurate, and not repeated everywhere).
@@ -81,5 +81,5 @@ In summary, the primary contributions of this work are as follows:
 \begin{itemize}
     \item We show that on a spatial NPU whose work one in-order command processor issues, the order compiled into a design's artifacts is the array's schedule: fused designs serialize independent work through that order and their buffers, the usual remedies of packing dispatches and adding a hardware context recover none of it, and how much rescheduling can recover is set by how a design cuts its work and by the prompt length, as a condition checkable from the artifacts predicts.
     \item We develop an analysis that reads compiled NPU programs, closed ones included, as dependence graphs over every agent that touches state, accepts a reorder or a rename only where the artifact and the host's accesses show it legal, and bounds what each false dependence can recover.
-    \item We design and implement OPCORD, a post-compilation rescheduler that, building on this analysis, rewrites issue order and buffers behind legality checkers and chooses the order and the column split per prompt length with an analytical event model, leaving kernels, driver, and firmware unchanged.
+    \item We design and implement OPCORD, a post-compilation rescheduler that, building on this analysis, rewrites issue order and buffers behind legality checkers and chooses the order and the configuration per prompt length with an analytical event model, leaving kernels, driver, and firmware unchanged.
 \end{itemize}
