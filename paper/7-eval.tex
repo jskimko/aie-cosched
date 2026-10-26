@@ -134,7 +134,7 @@ Reordering from four chunks loses up to \ChoiceFourSTwoMax\% on the default conf
     % VALUE: (a) the event model's error per development cell stays within a few percent except where it underprices Llama-3.2-1B's largest gains; (b) the event model's own choice stays within a few percent of the fastest measured choice on every cell, whereas each fixed rule loses tens of percent somewhere
     % SOURCE: (a) figs/data/accuracy-cells.json (the frozen form's 70 development cells); (b) figs/data/choice.json (59 cells; the four-chunk rule on the baseline's configuration over the 53 cells where its choice was measured); figs/make_figs.py fig_choice.
     \includegraphics[width=\textwidth]{fig/choice.pdf}
-    \caption{(a) The event model's error on the ratio between the original and the composed order, against the measured ratio, on 70 cells, with a gray band at $\pm5\%$. (b) The loss of each choice rule against the fastest choice measured on each cell, one dot per cell and a bar at the median, on 59 cells, or on the 53 where the four-chunk rule's choice on the baseline's configuration was measured. Never reordering is not shown, since its loss is the composed order's gain forgone.}
+    \caption{(a) The event model's error on the ratio between the original and the composed order, against the measured ratio, on 70 cells, with a gray band at $\pm5\%$. (b) The worst loss of each choice rule against the fastest choice measured on each cell, over 59 cells, or over the 53 where the four-chunk rule's choice on the baseline's configuration was measured; every rule's median loss is 0. Never reordering is not shown, since its loss is the composed order's gain forgone.}
     \label{fig:choice}
 \end{figure*}
 
@@ -265,33 +265,34 @@ Every overlap gain we measure on the designs we rewrite therefore falls where th
 % DECISION: FastFlowLM, taken as released, is an observation of the condition, never a like-for-like comparison and never evidence that the cost is avoidable; no claim about how its order was chosen.
 % SOURCE: IRON in-command pricing, 35 at 1.000 = the population's 32 IRON streams plus 3 non-LLM designs (mobilenet, resnet, bottleneck) (aie-cosched 1a87bc6; membership adf0e2c).
 
-\begin{table*}[t]
+\begin{table}[t]
     \centering
     \caption{The Census by Design Class}
     \label{tab:census}
-    % VALUE: each design class read from its artifacts: its structure, whether the condition holds or which clause fails, and its bound (with the measured gain where we rewrite it): gains where both clauses hold (AIR's prefill and decode), bounds at or near one where a clause fails
+    % VALUE: each design class read from its artifacts: its cut, which clause of the condition fails, and the bound: gains only where no clause fails (AIR's prefill and decode), bounds at or near one elsewhere
     % SOURCE: AIR prefill bound against measured, 185 of 187 cells, and decode at 99-100% of the bound on Llama-3.2-1B (Section 4.6's SOURCE lines); FLM flash prefill B 1.000, joint bound over every order 1.04-1.09, at most 1.13 with merges, merge replays 2.9-3.3% (terms4, terms5, replay stage 1, Section 4.6-4.7's SOURCE lines); FLM per-operator prefill 99.6-100% of consecutive dispatches share a column (first clause fails; the bound follows from the rule in Section 3.2); FLM decode 1.000 inside dispatches, at most 1.009 between steps (e679463); IRON's 32 LLM streams and 3 non-LLM builds (mobilenet, resnet, bottleneck) at 1.000 (aie-cosched 1a87bc6).
     \small
     \begin{threeparttable}
-    \begin{tabular*}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.15\textwidth}@{\extracolsep{\fill}}>{\raggedright\arraybackslash}p{0.27\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.27\textwidth}@{}}
+    \begin{tabular*}{\linewidth}{@{}l@{\extracolsep{\fill}}llr@{}}
         \toprule
-        Design & Structure & Condition & Bound (measured where run) \\
+        Design & Cut & Clause failed & Bound \\
         \midrule
-        AIR prefill & fused; one operator per dispatch over 128-token chunks & holds & at or above the measured gain on 185 of 187 cells; measured \PrefillGainLo--\PrefillGainHi$\times$ \\
-        AIR decode & fused; one buffer per role & holds & the loop form, which the measured gain reaches at 99--100\% on Llama-3.2-1B; measured \DecodeGainLo--\DecodeGainHi$\times$ \\
-        FLM flash prefill & fused; one column group per dispatch, attention once over the whole prompt & second clause fails: true dependences between dispatches & $1.000\times$ inside dispatches; 1.04--1.09$\times$ over every order; at most 1.13$\times$ with merges; a replayed merge saves 2.9--3.3\% \\
-        FLM per-operator prefill & modular; nearly every operator on all eight columns & first clause fails: consecutive dispatches share columns & $1.000\times$ \\
-        FLM decode & fused; one dispatch per step & first clause fails inside dispatches: a shared core tile or DMA channel & $1.000\times$ inside dispatches; ${\le}\,1.009\times$ between steps \\
-        IRON LLM designs & modular; each operator on the whole array & first clause fails: consecutive operators share every tile and channel & $1.000\times$ \\
-        Non-LLM designs & one dispatch whose stages overlap through the array's dataflow & nothing to free: the stages already overlap & $1.000\times$ (3 IRON builds) \\
+        AIR prefill & fused & none & $\ge$ gain\tnote{a} \\
+        AIR decode & fused & none & $\ge$ gain\tnote{a} \\
+        FLM flash prefill & fused & second & $1.13\times$ \\
+        FLM per-op.\ prefill & modular & first & $1.000\times$ \\
+        FLM decode & fused & first & $1.009\times$ \\
+        IRON LLM designs & modular & first & $1.000\times$ \\
+        Non-LLM designs & one dispatch & none\tnote{b} & $1.000\times$ \\
         \bottomrule
     \end{tabular*}
     \begin{tablenotes}\footnotesize
-    \item The first clause holds where the freed work runs on core tiles and DMA channels that the awaited work does not use; the second, where no true dependence, on the device or through the host, lies between the two.
-    \item A false dependence that fails either clause frees no overlap, so its bound is $1.000\times$ without any duration.
+    \item First clause: the freed work runs on core tiles and DMA channels that the awaited work does not use. Second: no true dependence lies between them. A false dependence that fails either is bounded at $1.000\times$. Bounds span every order the checkers accept, merges included.
+    \item[a] At or above the measured gain on 185 of 187 prefill cells; the decode gain reaches 99--100\% of its bound.
+    \item[b] The stages already overlap through the array's dataflow.
     \end{tablenotes}
     \end{threeparttable}
-\end{table*}
+\end{table}
 
 \label{subsec:shape-eval}
 % VALUE: the prompt length sets the balance of the exposed work: attention per chunk grows with the chunk's position while the GEMMs' work per chunk is fixed; at the default configuration on every LLM the reorder ties at one chunk and loses at two (per-dispatch costs and the pipeline's fill and drain outweigh the overlap), gains from four and rises to about twice at 8-16K, peaking at or past the balance on four LLMs, while Gemma3-4B stays near 1.3x; in the middle range an estimate from the groups' busy times and the hidden host time tracks the gain, while only the event model prices the few-chunk costs and the incomplete overlap at long balanced prompts

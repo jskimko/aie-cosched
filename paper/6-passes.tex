@@ -21,23 +21,23 @@ A dispatch concatenates its operators' segments under the conditions of Section~
 \label{alg:compose}
 \small
 \begin{algorithmic}[1]
-\renewcommand{\algorithmiccomment}[1]{\hfill$\triangleright$~#1}
-\REQUIRE operator graph $G$, segments, work $w(\cdot)$, packing $k$
-\ENSURE dispatches $C$ in the composed order, or a refusal
-\STATE $C \gets [\,]$; $R \gets \textsc{Sources}(G)$ \COMMENT{by layer, then chunk}
-\WHILE{some operator is in no dispatch}
-\STATE $a \gets \textsc{FirstAttention}(R)$ \COMMENT{may be none}
-\STATE $P \gets$ fewest next GEMMs with $w(P) \ge w(a)$ \COMMENT{else $k$}
-\STATE $\mathcal{G} \gets \textsc{Columns}(a) \cup \{P\}$ \COMMENT{$P$'s GEMMs in turn}
-\STATE $s \gets \textsc{Openings}(\mathcal{G})$
-\FORALL{$y \in \textsc{Syncs}(\mathcal{G})$, by predicted completion}
-\STATE $s \gets s \cdot y \cdot \textsc{Gated}(y)$
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
+\REQUIRE operator graph $G$, estimated work $w$, packing limit $k$
+\ENSURE dispatches $D$ in the composed order, or a refusal
+\STATE $D \gets [\,]$; $R \gets$ operators of $G$ without producers
+\WHILE{$R \neq \emptyset$}
+\STATE $a \gets$ the first attention operator in $R$, if any
+\STATE $P \gets$ next GEMMs in $R$ until $w(P) \ge w(a)$, or $k$ if no $a$
+\STATE $s \gets$ the opening segment of each column of $a$ and of $P$
+\FORALL{synchronizations $y$, by predicted completion}
+\STATE append $y$ and the issue it gates to $s$
 \ENDFOR
-\STATE \textbf{if} $\neg\textsc{Legal}(s)$ \textbf{then refuse} with the failed condition
-\STATE $C \gets C \cdot s$; $R \gets R \setminus \textsc{Ops}(s)$
-\STATE $R \gets R \cup \textsc{Ready}(G, C)$ \COMMENT{producers, host steps done}
+\STATE \textbf{if} $s$ fails a legality condition \textbf{then refuse} with it
+\STATE append $s$ to $D$; remove $a$ and $P$ from $R$
+\STATE add to $R$ the operators whose inputs are ready
 \ENDWHILE
-\STATE \textbf{return} $C$
+\STATE \textbf{return} $D$
 \end{algorithmic}
 \end{algorithm}
 
@@ -46,10 +46,10 @@ The composer matches each dispatch's GEMMs to its attention operator by estimate
 Where no attention operator is ready, the packing that the host policy sets (Section~\ref{subsec:formulation}) bounds the GEMMs per dispatch.
 
 % VALUE: the reasons behind Algorithm 1's steps within a dispatch: packing in turn leaves the GEMMs idle while the CP walks attention's synchronizations, so every group's work opens first, attention's two columns as two groups; synchronizations in predicted-completion order let each gated issue follow its own transfer; the order is fixed at build time and runs without the host; a dispatch failing the whole-operator condition stops the composition with its reason; its price is the shared DRAM read rate
-Packing the operators into one dispatch in turn would still leave the GEMM group idle while the CP walks attention's synchronizations (Figure~\ref{fig:rewrites}a, before), so the composer opens every group's work first, counting attention's two columns as two groups, whose segments then alternate as well (lines~\mbox{5--6}).
-It then places the CP's synchronizations in the order in which the probes predict their transfers complete, so where the predictions hold, each gated issue follows its own transfer rather than another group's later one (lines~\mbox{7--9}).
+Packing the operators into one dispatch in turn would still leave the GEMM group idle while the CP walks attention's synchronizations (Figure~\ref{fig:rewrites}a, before), so the composer opens every group's work first, counting attention's two columns as two groups, whose segments then alternate as well (line~5).
+It then places the CP's synchronizations in the order in which the probes predict their transfers complete, so where the predictions hold, each gated issue follows its own transfer rather than another group's later one (lines~\mbox{6--8}).
 The estimates fix this order when the dispatch is built, and the CP executes it without the host.
-A dispatch that fails the condition of Section~\ref{subsec:legality} for whole operators stops the composition, with that condition as its reason (line~10).
+A dispatch that fails the condition of Section~\ref{subsec:legality} for whole operators stops the composition, with that condition as its reason (line~9).
 Running both groups at once makes a group that reads at the shared DRAM read cap also carry its co-runner's reads (Section~\ref{subsec:semantics}), so a design already near the cap gains little.
 % SOURCE: merged.cp_order (a0ee2ed, now opcord/compose/merged.py): the opening segments of both attention columns and of the first GEMM, then synchronizations by predicted completion; mid-stream fractions (0.25, 0.5) of attention's estimate, the lowest of five placements tried; the in-turn order takes 1.26x as long on the same 38 commands (lab-prefill-overlap (16)).
 % DECISION: tradeoffs are stated beside the decision that incurs them rather than collected in a section (author, 2026-10-21).
