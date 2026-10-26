@@ -1,11 +1,11 @@
-\subsection{Command Semantics}
+\subsection{Dispatch Semantics}
 \label{subsec:semantics}
 
-% VALUE: observation 1: concurrency comes from one command issuing two groups' work before it waits on either, not from queued commands (packing is neutral) or a second hardware context; measured on the original prefill's own operators with bit-identical outputs
-Concurrency on the array comes from one command that issues two groups' work before it waits on either, not from queued commands or a second hardware context.
+% VALUE: observation 1: concurrency comes from one dispatch issuing two groups' work before it waits on either, not from queued dispatches (packing is neutral) or a second hardware context; measured on the original prefill's own operators with bit-identical outputs
+Concurrency on the array comes from one dispatch that issues two groups' work before it waits on either, not from queued dispatches or a second hardware context.
 We pair one attention operator of the original program with one GEMM on disjoint column groups, with outputs bit-identical to those of the operators run alone.
-Two commands queued on one hardware context, like one command that holds both streams in sequence, take the sum of the two operators' times less at most one dispatch floor, within 3\% on each of seven pairs.
-Packing operators into one command, as MLIR-AIR's multi-launch programs also do, therefore creates no overlap on the NPU (Figure~\ref{fig:order}a).
+Two dispatches queued on one hardware context, like one dispatch that holds both streams in sequence, take the sum of the two operators' times less at most one dispatch floor, within 3\% on each of seven pairs.
+Packing operators into one dispatch, as MLIR-AIR's multi-launch programs also do, therefore creates no overlap on the NPU (Figure~\ref{fig:order}a).
 Nor does a second hardware context, because the driver gives every context all eight columns and shares them in time~\citep{xdna-driver}.
 % SOURCE: queued / in-sequence = 1.007-1.029 on 7 pairs, 20 runs per pair (amd-npu 17f7ec3 prefill-overlap/ovl4/, lab-prefill-overlap (5)b); in-sequence / (A + G - F) = 0.996-1.021 over 17 pair runs (ovl/, ovl2/ at 8f13e05 and ovl4/; report.txt H1 column).
 % SOURCE: XRT run list, /opt/xilinx/xrt/include/xrt/experimental/xrt_kernel.h:21 (XRT 2.25.0); MLIR-AIR stitch_elf (vault src-mlir-air-llms).
@@ -14,18 +14,18 @@ Nor does a second hardware context, because the driver gives every context all e
 
 \begin{figure}[t]
     \centering
-    % VALUE: the mechanism behind the paired measurements: packing in turn (a) leaves one group idle while the CP blocks on the other, as one command per operator does; issuing every group's work before any wait (b) runs the groups together
+    % VALUE: the mechanism behind the paired measurements: packing in turn (a) leaves one group idle while the CP blocks on the other, as one dispatch per operator does; issuing every group's work before any wait (b) runs the groups together
     \includegraphics{fig/order.pdf}
-    \caption{CP instruction order and the activity of the column groups for one attention operator and three GEMMs, with illustrative durations. In (a), the CP blocks on one group while the other is idle, as with one command per operator, whereas in (b) the groups run together.}
+    \caption{CP instruction order and the activity of the column groups for one attention operator and three GEMMs, with illustrative durations. In (a), the CP blocks on one group while the other is idle, as with one dispatch per operator, whereas in (b) the groups run together.}
     \label{fig:order}
 \end{figure}
 % DECISION: the schematic moves here from the introduction, whose Figure 1 is the measured timeline; it explains why packing creates no overlap, which the paired measurements show but do not explain, and Section 7 refers to it for the composer's order.
 
-% VALUE: one command that issues all of one group's work before any synchronization runs the pair at the longer one's time; the cost appears near the DRAM read cap; because the CP is in order, the order inside a command is itself a scheduling decision, so serial execution is a property of composition, not of the array
-In contrast, one command that issues all of the GEMM's work, then the attention operator's stream, and only then the GEMM's synchronizations runs the pair within 6\% of the longer operator's time alone on each of nine pairs (Figure~\ref{fig:order}b).
+% VALUE: one dispatch that issues all of one group's work before any synchronization runs the pair at the longer one's time; the cost appears near the DRAM read cap; because the CP is in order, the order inside a dispatch is itself a scheduling decision, so serial execution is a property of composition, not of the array
+In contrast, one dispatch that issues all of the GEMM's work, then the attention operator's stream, and only then the GEMM's synchronizations runs the pair within 6\% of the longer operator's time alone on each of nine pairs (Figure~\ref{fig:order}b).
 The small excess appears where the pair's DRAM reads approach the \emph{read cap}, which is the maximum DRAM read rate that the column groups together sustain.
-Because a synchronization on one group delays every later issue to the other (Section~\ref{subsec:platform}), the order of instructions within a command, and not only which operators share it, is a scheduling decision.
-The serial execution of the original program is thus a property of how its commands are composed, not of the array.
+Because a synchronization on one group delays every later issue to the other (Section~\ref{subsec:platform}), the order of instructions within a dispatch, and not only which operators share it, is a scheduling decision.
+The serial execution of the original program is thus a property of how its dispatches are composed, not of the array.
 % SOURCE: interleaved / max(A, G) = 0.998-1.058 over 10 pair runs = 9 pairs (c8 + lm measured twice, 1.054 and 1.058; the figure keeps each pair's first measurement); GEMM shapes up, LM head chunk, down; attention chunks 0, 4, 8, 12, 15 (lab-prefill-overlap (3)).
 % SOURCE: DRAM rate during the interleaved command 52.2 GB/s against a same-batch 8x2 cap of 53.9-55.3 GB/s for c8 + lm, the costliest overlap (1.054-1.058) (lab-prefill-overlap (3)); the cap is the 8x2 bracket's read of 256 MiB (7-eval Setup SOURCE).
 
@@ -38,8 +38,8 @@ It is an \emph{order} dependence where the instruction order alone places the wa
 % DECISION: false dependences, the order and name causes, reordering, and renaming are textbook and cited; the paper claims their analysis on this platform, never the classes. Section 4 classes each wait formally.
 
 \textbf{Column Groups in Prefill.}
-% VALUE: one operator per command and no overlap across commands make the prefill's column groups take turns, an order dependence in the CP's stream between operators; the array idles while the device reads busy: the computable occupancy reads 92-97% of TTFT and counts neither idle group; attention's share grows 12% -> 49%; the counters show the cores waiting
-The original program issues one operator per command, about 1{,}500 commands for a 2{,}048-token prompt, so its column groups take turns (Figure~\ref{fig:timeline}), which is an order dependence in the CP's stream between operators.
+% VALUE: one operator per dispatch and no overlap across dispatches make the prefill's column groups take turns, an order dependence in the CP's stream between operators; the array idles while the device reads busy: the computable occupancy reads 92-97% of TTFT and counts neither idle group; attention's share grows 12% -> 49%; the counters show the cores waiting
+The original program issues one operator per dispatch, about 1{,}500 dispatches for a 2{,}048-token prompt, so its column groups take turns (Figure~\ref{fig:timeline}), which is an order dependence in the CP's stream between operators.
 Attention on one chunk reads the QKV projections of that chunk and earlier ones, and only that chunk's output projection reads its result, so the GEMMs of the layer's later chunks could run beside it.
 The host, however, runs each layer stage by stage (Section~\ref{subsec:prefill}), so the CP issues no GEMM beside attention.
 The runtime reports nothing per column.
@@ -80,7 +80,7 @@ MLIR-AIR's double-buffering transformation declines the loop because its running
 % DECISION: the critical-path condition is textbook and cited; the paper's claim is the condition's platform terms (non-duplicable resources, the host as an agent) and its dependence on the cut and the prompt length, never "false dependences cost time".
 Removing a false dependence frees overlap only where the work it frees runs on core tiles and DMA channels that the work it waited on does not use.
 These are resources a rewrite cannot duplicate, because every engine runs its own work in order, and a buffer can be renamed into several slots whereas a core tile or a DMA channel cannot.
-It also frees overlap only where no true dependence, on the device or through a host step that reads one command's output before it issues the next, separates the two pieces of work.
+It also frees overlap only where no true dependence, on the device or through a host step that reads one dispatch's output before it issues the next, separates the two pieces of work.
 We call these two checkable clauses together the \emph{condition}.
 They refine the rule that removing a false dependence gains time only on the critical path~\citep{fields2003interaction}, since on this platform removing one shortens that path only when both hold.
 Both clauses name resources and dependences that the analysis reads from the artifacts and the host's accesses (Section~\ref{sec:order}).
@@ -88,7 +88,7 @@ The condition therefore screens out the false dependences that cannot free overl
 Durations decide the rest: how much each remaining false dependence frees, whether that exceeds its cost, and what a rewrite saves beyond overlap, such as a dispatch.
 The bound of Section~\ref{subsec:removal} and the event model of Section~\ref{subsec:pricing} supply them.
 
-How much work meets both clauses is set by how the design cuts its work, into configurations, into commands, and into buffers, and by the prompt length, which sets the balance between attention and the GEMMs.
+How much work meets both clauses is set by how the design cuts its work, into configurations, into dispatches, and into buffers, and by the prompt length, which sets the balance between attention and the GEMMs.
 The issue order that pays therefore changes with the prompt and must be priced per length rather than fixed.
 The split that pays moves with the same balance, because more attention columns shorten attention but lengthen every GEMM.
 We call the designs we read from three stacks our \emph{census}, and Section~\ref{subsec:pays} tests the condition across its design classes and across prompt lengths, and the first clause directly.

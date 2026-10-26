@@ -27,10 +27,10 @@ We then price which of its false dependences to remove per prompt length.
 % SOURCE: LATTICE (arXiv 2607.17422v3, abstract read 2026-10-22): three stages, the last recovering pipeline parallelism; six command traces from a DaVinci NPU; reports peak memory, extra DDR traffic, spill count and modeled makespan (vault src-lattice).
 
 \textbf{Binary Analysis and Rewriting.}
-% VALUE: analysis and rewriting after compilation exist for CPUs and GPUs (Kotha et al. analyse binaries; BOLT lays out code from profiles; CuAsmRL reorders a compiled GPU kernel's schedule by a measured search); each works on one processor's instruction stream, whereas we analyse and rewrite the command streams that coordinate several kinds of engines, with legality decided from every agent's access sets
+% VALUE: analysis and rewriting after compilation exist for CPUs and GPUs (Kotha et al. analyse binaries; BOLT lays out code from profiles; CuAsmRL reorders a compiled GPU kernel's schedule by a measured search); each works on one processor's instruction stream, whereas we analyse and rewrite the instruction streams that coordinate several kinds of engines, with legality decided from every agent's access sets
 Analysis and rewriting after compilation are established for CPUs and GPUs.
 There, binaries are analysed and parallelized without their source~\citep{kotha2010automatic}, code layout is optimized from profiles~\citep{panchenko2019bolt}, and a compiled GPU kernel's instruction schedule is reordered by a search over measured candidates~\citep{he2025cuasmrl}.
-Each of these works on one processor's instruction stream, whereas we analyse and rewrite the command streams that coordinate several kinds of engines, and decide legality from the access sets of every agent that touches state.
+Each of these works on one processor's instruction stream, whereas we analyse and rewrite the instruction streams that coordinate several kinds of engines, and decide legality from the access sets of every agent that touches state.
 
 \textbf{Performance Analysis and Models.}
 % VALUE: what-if tools take order and durations from traces and simulate transformed graphs; GPA attributes stalls inside a kernel; interaction cost prices a set of events together; analytical and SDF models predict or bound time from a given mapping or graph; here the program fixes the order, only durations are measured, and the quantity bounded is what removing one wait is worth
