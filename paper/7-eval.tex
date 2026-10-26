@@ -9,7 +9,7 @@
     % VALUE: the headline at a glance: OPCORD's TTFT gain over the baseline on every LLM across the prompt sweep, with the split it runs on
     % SOURCE: figs/make_figs.py fig_headline over figs/data/prefill-cells.json (figs/paper_numbers.py at amd-npu a6abaf19): the amendment-1 batch's registered analysis on its 38 cells (paired, or chained through orig-S2 where the baseline split differs from the pick's), the grid or split cells' paired ratio elsewhere, unpaired (no whisker) for LFM2-1.2B at 2K and Gemma3-4B at 1K; picks by choose() at opcord d6caf8b; Llama-3.2-1B at 32,768 unpriced (chunk 160 outside its probed chunks, n1 NOTES).
     \includegraphics[width=\textwidth]{fig/headline.pdf}
-    \caption{TTFT speedup of OPCORD over AIR's original program on its fastest supported configuration that we measure, at each power-of-two prompt length, for each LLM. Bars are ratios of medians with 95\% intervals, a dagger marks a ratio across batches with no interval, and the shade gives the configuration that OPCORD chooses. Llama-3.2-1B has no point at 32K tokens, where its attention operators were not probed.}
+    \caption{TTFT speedup of OPCORD over AIR's original program on its fastest supported configuration that we measure, as ratios of medians with 95\% intervals. A dagger marks a ratio across batches, which has no interval, and shades give the configuration that OPCORD chooses.}
     \label{fig:headline}
 \end{figure*}
 
@@ -54,6 +54,7 @@ OPCORD shortens TTFT on all five LLMs, with outputs bit-identical to the origina
 The gain rises with the prompt length and peaks at 8K or 16K tokens, where the overlap between the groups and the alternation within attention together are largest (Section~\ref{subsec:shape-eval}).
 It dips where four attention columns already shorten attention, either in OPCORD's choice (Llama-3.2-1B and Qwen3-4B at 8K, Gemma3-4B at 32K) or in the baseline's (Llama-3.1-8B at 16K), which suggests that less of attention is left for the overlap to hide.
 The two wide intervals, Llama-3.2-1B at 16K and Llama-3.1-8B at 32K tokens, each come from one slow timed run.
+Llama-3.2-1B has no bar at 32K tokens, where its attention operators were not probed.
 At prompts of one to four chunks, where the groups have little work to overlap, OPCORD composes dispatches at only one of the 20 cells, and its TTFT stays within \ShortGainLo--\ShortGainHi$\times$ of the baseline's.
 % SOURCE: figs/data/prefill-cells.json (figs/paper_numbers.py, amd-npu a6abaf19): 39 cells at 1,024-32,768 tokens, 1.097 (LFM2-1.2B 1,024, S1) to 1.625 [1.337, 1.632] (Llama-3.2-1B 16,384, S4); per LLM 1B 1.22-1.63, LFM2 1.10-1.49, Qwen 1.25-1.57, Gemma 1.18-1.30, 8B 1.11-1.56; peaks 1B 16K, LFM2 8K (16K 1.485), Qwen 16K, Gemma 8K, 8B 8K; prompts of 128-512 tokens 0.985-1.040 (LFM2-1.2B 256 0.985 [0.971, 0.999], Llama-3.1-8B 512 1.040). Pre-final: picks by choose() at opcord d6caf8b, the event model before its frozen form.
 
@@ -70,7 +71,7 @@ The loop pass brings Llama-3.2-1B and Llama-3.1-8B within \AbsDecodeClosePct\% o
     % VALUE: absolute standing as a snapshot: FLM's TTFT over AIR's original program and over AIR with OPCORD, at three lengths on the five LLMs; OPCORD is faster than FLM everywhere, the original is slower at 16K on four of the five
     % SOURCE: D1, the source line above (FLM by its server's prefill timer; the original program on $S_2$; OPCORD at its own pick); figs/make_figs.py fig_vs_flm from figs/data/absolute.json.
     \includegraphics{fig/vs-flm.pdf}
-    \caption{TTFT speedup over FLM's current release, by its own prefill timer, of AIR's original program on its default configuration $S_2$ and of the same design under OPCORD on the configuration it chooses.}
+    \caption{Speedup in median TTFT over FLM's current release, by its own prefill timer, of AIR's original program on its default configuration and of the same design under OPCORD on the configuration it chooses.}
     \label{fig:vs-flm}
 \end{figure}
 
@@ -79,7 +80,7 @@ The loop pass brings Llama-3.2-1B and Llama-3.1-8B within \AbsDecodeClosePct\% o
     % VALUE: the decode result as a curve, because what the renaming removes grows with the context: the gain rises with the cached context on every LLM whose attention reads the whole context, and stays flat on Gemma3-4B, whose decode design reads a fixed window
     % SOURCE: figs/make_figs.py fig_decode over figs/data/decode-cells.json (figs/paper_numbers.py): the decode development batch (amd-npu decode-rename/decode-dev-2026-10-24, pin 572ec79c), 5 ABBA repetitions x 256 greedy tokens per point, medians of ms per token, logits bit-identical; contexts 2,048, 16,384 and 30,208 (Qwen3-4B 28,800).
     \includegraphics{fig/decode.pdf}
-    \caption{Speedup in median time per token of our loop pass, which renames attention's keys, values, and scores into rings, over AIR's decode design as released, which is the baseline for all five LLMs. Every step's logits are bit-identical between the two designs, and the 95\% intervals lie within the markers. The last context is 30{,}208 tokens, or 28{,}800 on Qwen3-4B.}
+    \caption{Speedup in median time per token of AIR's decode design under our loop pass over the design as released. The 95\% intervals lie within the markers.}
     \label{fig:decode}
 \end{figure}
 
@@ -125,7 +126,7 @@ We compare its choice on every cell against the fastest order and configuration 
 Always reordering composes on the configuration that OPCORD chooses, always running $S_2$ takes the faster order on that configuration, and reordering from $C \ge 4$ chunks composes from 512 tokens on, on the baseline's configuration, and keeps the original order below.
 Every cell where the choice misses the minimum falls inside the band in which the composer settles a near-tie by a short measurement (Section~\ref{subsec:pricing}), which these runs do not use.
 Where the candidates of a cell ran in different batches, the comparison crosses batches, so a loss of a few percent lies within the drift between them.
-Each fixed rule loses far more somewhere, since never reordering gives up the long prompts' gains, always reordering loses at one or two chunks (Section~\ref{subsec:shape-eval}), and a fixed configuration loses where the balance between the groups moves.
+Each fixed rule loses far more somewhere, since never reordering, which Figure~\ref{fig:choice}b omits, gives up the long prompts' gains, always reordering loses at one or two chunks (Section~\ref{subsec:shape-eval}), and a fixed configuration loses where the balance between the groups moves.
 Reordering from four chunks, even on the baseline's configuration, loses up to \ChoiceFourBaseMax\% where the composed order runs faster on another one.
 % SOURCE: figs/data/choice.json (figs/paper_numbers.py, amd-npu a6abaf19): per cell, the measured minimum over every split and order measured there (the original order as the faster of orig and identb); the picks are choose() at opcord d6caf8b, the event model before its frozen form, with no near-tie measurement; OPCORD max 4.3% at Gemma3-4B 512 (S2 ship against S2 comp), then Llama-3.2-1B 512 3.3%, Qwen3-4B 512 3.1%, Qwen3-4B 8192 2.7%; final form (choose() at opcord 4c56faa, amd-npu e4e3b209 choose-frozen-2026-10-26): 11 of 59 picks change (8 short-prompt cells from a shipped arm to comp at the same split; 1B and LFM2-1.2B 1,024 S1 -> S2; Gemma3-4B 32,768 S4 -> S2); scored where an A/B file ran the exact plan (split, depth, GEMM cap, packing), 42 cells, median 0.0%, max 6.7% (Llama-3.2-1B 1,024, S2 comp d4 284.8 ms against S1 comp 267.0 ms), figs/data/choice-final-form.json; all 14 cells with a nonzero loss of the earlier form are among the 36 cells whose top candidates fall in the near-tie band (amd-npu ab/sweep-cost/close-cost.txt, device time 1-276 s per cell, 1,144 s in total). Never reorder max 62.5% (Llama-3.2-1B 16,384); always reorder max 9.3% (Llama-3.2-1B 256); fixed S2 and four chunks on S2 max 97.1% (Qwen3-4B 32,768, comp-S2 against comp-S4 across batches); four chunks on the baseline's split max 32.5% (Llama-3.1-8B 8,192, paired comps4 1.325 [1.322, 1.326]) over the 53 cells where the composed order was measured on the baseline's split. The losses are lower bounds where a candidate was not measured.
 
@@ -134,7 +135,7 @@ Reordering from four chunks, even on the baseline's configuration, loses up to \
     % VALUE: (a) the event model's error per development cell stays within a few percent except where it underprices Llama-3.2-1B's largest gains; (b) the event model's own choice stays within a few percent of the fastest measured choice on every cell, whereas each fixed rule loses tens of percent somewhere
     % SOURCE: (a) figs/data/accuracy-cells.json (the frozen form's 70 development cells); (b) figs/data/choice.json (59 cells; the four-chunk rule on the baseline's configuration over the 53 cells where its choice was measured); figs/make_figs.py fig_choice.
     \includegraphics[width=\linewidth]{fig/choice.pdf}
-    \caption{(a) The event model's error on the ratio between the original and the composed order, against the measured ratio, on 70 cells, with a gray band at $\pm5\%$. (b) The worst loss of OPCORD's choice and of three fixed rules against the fastest choice measured on each cell, over 59 cells, or 53 for the last rule. The rules always reorder, always run $S_2$, or reorder from $C \ge 4$ chunks of 128 tokens on the baseline's configuration. Never reordering is not shown, since its loss is the composed order's gain forgone.}
+    \caption{(a) The event model's error on the composed order's speedup over the original order, on \AccCells{} cells, with a gray band at $\pm5\%$ that holds \AccWithinFive{} of them. (b) The worst loss of OPCORD's choice and three fixed rules against each cell's measured minimum TTFT, over \ChoiceCells{} cells. The last rule reorders from $C \ge 4$ chunks of 128 tokens on the baseline's configuration and covers \ChoiceFourBaseCells{} cells.}
     \label{fig:choice}
 \end{figure}
 
@@ -317,12 +318,13 @@ Only the event model prices the exposed host time at few chunks and the incomple
     \centering
     % VALUE: the shape over prompt length on a controlled design: the composed order ties at one chunk, loses at two and four, and gains from eight chunks on, on three builds that vary the GEMMs' work at fixed attention; at 32 chunks the build nearest balance gains least
     \includegraphics[width=\linewidth]{fig/synthetic.pdf}
-    \caption{TTFT speedup of the composed order over the original order on a synthetic two-layer prefill built like AIR's, against the prompt length in 128-token chunks, for three builds that keep Llama-3.2-1B's attention and vary the GEMMs' work through the hidden size and FFN width: light (1{,}024 and 768), medium (2{,}048 and 2{,}304), and heavy (2{,}048 and 12{,}288). Points are ratios of medians, whose 95\% intervals mostly lie within the markers.}
+    \caption{TTFT speedup of the composed order over the original order, as ratios of medians, on a synthetic two-layer prefill built like AIR's. Its three builds keep Llama-3.2-1B's attention and vary the GEMMs' work through the hidden size and feed-forward width. Most 95\% intervals lie within the markers.}
     \label{fig:synthetic}
 \end{figure}
 
 % VALUE: the shape tested directly: on a synthetic design that varies the GEMMs' work at fixed attention, the composed order ties at one chunk, loses at two and four because its host program leaves the post-processing exposed while there is almost nothing to overlap, and gains from eight chunks on; the event model prices the original order lower at two and four chunks, so OPCORD keeps it there; at a fixed number of chunks the gain does not peak at the balance
 To vary the balance directly, we run OPCORD unmodified on a synthetic two-layer LLM built like AIR's fused prefill, with attention's work fixed and three amounts of GEMM work, and force the composed order at every length (Figure~\ref{fig:synthetic}).
+The light, medium, and heavy builds set the hidden size and the feed-forward width to 1{,}024 and 768, 2{,}048 and 2{,}304, and 2{,}048 and 12{,}288.
 The composed order ties at one chunk on every build, loses 0--13\% at two and four chunks, and gains from eight chunks on, reaching 1.53--1.73$\times$ at 32 chunks.
 It loses at two and four chunks for the same reason as the LLMs, since the exposed host post-processing outweighs its cheaper device work.
 The event model prices the original order lower at two and four chunks on all three builds, so OPCORD keeps the original order there, as it does at such lengths on the five LLMs.
