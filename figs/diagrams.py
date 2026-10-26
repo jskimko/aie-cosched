@@ -166,15 +166,17 @@ def _stage(ax, x, y, w, h, title, ours=True):
     ax.text(x + w / 2, y + h - 0.075, title, ha="center", va="center_baseline", fontsize=FS, zorder=6)
 
 
-def _doc(ax, x, y, w=0.12, h=0.16, z=5):
-    """A program: a page with a folded corner and three text lines; (x, y) is its lower left."""
-    f = 0.04
+def _doc(ax, x, y, w=0.1125, h=0.15, z=5):
+    """A program: a page with a folded corner and three text lines; (x, y) is its lower left. The fold and the lines
+    scale with the page (drawn first at 0.12 by 0.16)."""
+    s = h / 0.16
+    f = 0.04 * s
     ax.add_patch(Polygon([(x, y), (x + w, y), (x + w, y + h - f), (x + w - f, y + h), (x, y + h)], closed=True,
                          facecolor="white", edgecolor=INK, linewidth=0.45, joinstyle="miter", zorder=z))
     ax.plot([x + w - f, x + w - f, x + w], [y + h, y + h - f, y + h - f], color=INK, lw=0.45, zorder=z + 1)
     for k in range(3):
-        ly = y + h - 0.065 - k * 0.035
-        ax.plot([x + 0.025, x + w - (0.025 if k else 0.05)], [ly, ly], color=INK, lw=0.4, zorder=z + 1)
+        ly = y + h - (0.065 + k * 0.035) * s
+        ax.plot([x + 0.025 * s, x + w - (0.025 if k else 0.05) * s], [ly, ly], color=INK, lw=0.4, zorder=z + 1)
 
 
 def _bars(ax, x, y, z=5):
@@ -184,10 +186,10 @@ def _bars(ax, x, y, z=5):
     ax.plot([x - 0.01, x + 0.14], [y, y], color=INK, lw=0.45, zorder=z + 1)
 
 
-def _tokens(ax, x, y, n=5, z=5):
-    """A prompt: a row of token squares; (x, y) is the row's lower left."""
+def _tokens(ax, x, y, n=5, cw=0.036, z=5):
+    """A prompt: a row of token cells, at the pitch of the instruction streams; (x, y) is the row's lower left."""
     for k in range(n):
-        ax.add_patch(Rectangle((x + k * 0.032, y), 0.026, 0.026 * 1.6, facecolor="white", edgecolor=INK,
+        ax.add_patch(Rectangle((x + k * cw, y), cw - 0.006, 0.048, facecolor="white", edgecolor=INK,
                                linewidth=0.35, zorder=z))
 
 
@@ -222,34 +224,51 @@ def fig_framework():
     fig, ax = _canvas(W, H)
     fs = FS + 0.5
     top, bot = H - 0.02, 0.30  # the panels' common top and bottom; the probe rail runs beneath them
+    # One grid for every panel: items inset `ins` from the panel's sides and `ins + 0.01` from its bottom; each item's
+    # content inset `pad` from its sides. The panels' widths follow their widest content (TeX widths at 6.5 pt), the
+    # output panel's centers its narrower content, and the gaps share what is left, with a 0.02 margin at either side.
+    ins, pad = 0.07, 0.06
+    lab = 0.031, 0.050  # a 6.5 pt label's TeX box above and below its anchor (va="center_baseline")
+    wi = 2 * (ins + pad) + 0.208 + 0.07 + 0.612  # icon column, gap, "Compiled design"
+    wa = 2 * (ins + pad) + 1.206  # the graph's left node to the legend's "Name"
+    wr = 2 * (ins + pad) + 1.522  # the checkmark to "Reorder across operators"
+    we = 2 * (ins + pad) + 0.645  # "per prompt length"
+    wo = 0.73
+    gap = (W - 0.04 - wi - wa - wr - we - wo) / 4
+    xi = 0.02
+    xa = xi + wi + gap
+    xr = xa + wa + gap
+    xe = xr + wr + gap
+    xo = xe + we + gap
+    reach = (0.33 - 0.20) / 72  # an arrowhead's ink stops 0.33 pt short of its end; a 0.4 pt item edge is 0.2 pt deep
 
     def item(x, y0, y1, w):  # one item's (or group's) frame
         _box(ax, x, y0, w, y1 - y0, fc="white", lw=0.4, z=3)
 
     # ---- inputs: the design and its host program, then the probes and the prompt length (the event model's inputs)
-    xi, wi = 0.02, 1.16
     _stage(ax, xi, bot, wi, top - bot, "Inputs", ours=False)
-    bx, bw = xi + 0.07, wi - 0.14
-    ix, tx = bx + 0.05, bx + 0.31  # the icon column and the label column
+    bx, bw = xi + ins, wi - 2 * ins
+    ic = bx + pad + 0.104  # the icon column's center (the strips, 0.208 wide, fill it)
+    tx = bx + pad + 0.208 + 0.07  # the label column
     item(bx, 1.02, 1.30, bw)
     for k, kinds in enumerate(("iisiis", "isiiis")):
-        _strip(ax, ix, 1.175 - k * 0.11, kinds, cw=0.036, h=0.075)
+        _strip(ax, ic - 0.108, 1.1775 - k * 0.11, kinds, cw=0.036, h=0.075)
     ax.text(tx, 1.16, "Compiled design", ha="left", va="center_baseline", fontsize=fs, zorder=6)
     item(bx, 0.78, 0.98, bw)
-    _doc(ax, ix + 0.04, 0.80)
+    _doc(ax, ic - 0.1125 / 2, 0.805)
     ax.text(tx, 0.88, "Host program", ha="left", va="center_baseline", fontsize=fs, zorder=6)
     gy0 = 0.38  # the probes group's bottom, where the rail to the event model starts
     item(bx, gy0, 0.74, bw)
-    _bars(ax, ix + 0.02, 0.61)
-    _tokens(ax, ix + 0.02, 0.45)
-    for y, label in ((0.645, "Operator probes"), (0.475, "Prompt length")):
+    py = 0.655, 0.455  # the probes' and the prompt length's lines, at the analysis rows' 0.20 pitch
+    _bars(ax, ic - 0.065, py[0] - 0.06)
+    _tokens(ax, ic - 0.087, py[1] - 0.024)
+    for y, label in zip(py, ("Operator probes", "Prompt length")):
         ax.text(tx, y, label, ha="left", va="center_baseline", fontsize=fs, zorder=6)
     # ---- the analysis: dependence graph, legality, bound
-    xa, wa = 1.34, 1.44
     _stage(ax, xa, bot, wa, top - bot, "Analysis")
-    ax0, aw = xa + 0.07, wa - 0.14
+    ax0, aw = xa + ins, wa - 2 * ins
     item(ax0, 0.78, 1.30, aw)
-    ox, oy = ax0 + 0.08, 0.95
+    ox, oy = ax0 + pad + 0.03, 0.97
     nodes = {"a": (0.0, 0.26), "b": (0.0, 0.03), "c": (0.26, 0.25), "d": (0.26, 0.02), "e": (0.52, 0.26),
              "f": (0.52, 0.03), "g": (0.69, 0.145)}
     nodes = {k: (ox + x, oy + y) for k, (x, y) in nodes.items()}
@@ -263,56 +282,65 @@ def fig_framework():
     for x, y in nodes.values():
         ax.add_patch(plt.Circle((x, y), 0.03, facecolor="white", edgecolor=INK, linewidth=0.5, zorder=5))
     for k, (kind, label) in enumerate((("true", "True"), ("name", "Name"), ("order", "Order"))):
-        lx, ly = ox + 0.86, 1.21 - k * 0.11
+        lx, ly = ox + 0.86, 1.23 - k * 0.11
         ax.plot([lx, lx + 0.09], [ly, ly], lw=0.7, zorder=4, **style[kind])
         ax.text(lx + 0.12, ly, label, ha="left", va="center_baseline", fontsize=fs - 0.5, zorder=6)
-    ax.text(ox - 0.03, 0.85, "Dependence graph", ha="left", va="center_baseline", fontsize=fs, zorder=6)
+    ax.text(ox - 0.03, 0.87, "Dependence graph", ha="left", va="center_baseline", fontsize=fs, zorder=6)
     rows_a = ((0.66, "Legality conditions"), (0.46, "Bound per false dependence"))
     for y, label in rows_a:
         item(ax0, y - 0.08, y + 0.08, aw)
         ax.text(ox - 0.03, y, label, ha="left", va="center_baseline", fontsize=fs, zorder=6)
-    # ---- the rewrites, each behind its checker
-    xr, wr = 2.96, 1.80
+    # ---- the rewrites, each behind its checker; rows on the other panels' top and bottom, the loop pass set apart
     _stage(ax, xr, bot, wr, top - bot, "Checked rewrites")
-    rew = ((1.16, "Composer", "Reorder across operators"), (0.86, "Stream pass", "Reorder within a stream"),
-           (0.50, "Loop pass", "Rename into rings"))
+    rx0, rw = xr + ins, wr - 2 * ins
+    ck = rx0 + pad + 0.04  # the checkmark's center (its TeX box is 0.08 wide)
+    rew = ((1.20, "Composer", "Reorder across operators"), (0.86, "Stream pass", "Reorder within a stream"),
+           (0.48, "Loop pass", "Rename into rings"))
     for y, name, what in rew:
-        _box(ax, xr + 0.08, y - 0.10, wr - 0.16, 0.20, fc="white", lw=0.4, z=3)
-        ax.text(xr + 0.17, y, r"\checkmark", ha="center", va="center_baseline", fontsize=fs + 1, color=MAGENTA,
-                zorder=5)
-        ax.text(xr + 0.26, y, name, ha="left", va="center_baseline", fontsize=fs, fontweight="bold", zorder=5)
-        ax.text(xr + 0.76, y, what, ha="left", va="center_baseline", fontsize=fs, zorder=5)
-    # ---- the event model, prefill only: one item, a priced schedule
-    xe, we, be = 4.94, 0.88, 0.57
+        _box(ax, rx0, y - 0.10, rw, 0.20, fc="white", lw=0.4, z=3)
+        ax.text(ck, y, r"\checkmark", ha="center", va="center_baseline", fontsize=fs + 1, color=MAGENTA, zorder=5)
+        ax.text(ck + 0.09, y, name, ha="left", va="center_baseline", fontsize=fs, fontweight="bold", zorder=5)
+        ax.text(ck + 0.59, y, what, ha="left", va="center_baseline", fontsize=fs, zorder=5)
+    # ---- the event model, prefill only: one item, a priced schedule over its label, centered in the item
+    be = 0.57
     _stage(ax, xe, be, we, top - be, "Event model")
-    item(xe + 0.06, 0.64, 1.30, we - 0.12)
-    _lanes(ax, xe + 0.13, 1.10)
+    ey0 = be + ins + 0.01
+    item(xe + ins, ey0, 1.30, we - 2 * ins)
+    ex = xe + ins + pad
+    em = (1.30 - ey0 - (0.125 + 0.05 + 0.24 + sum(lab))) / 2  # lanes, a gap, three lines at 0.12
+    _lanes(ax, ex, 1.30 - em - 0.125)
     for k, label in enumerate(("Order and", "configuration", "per prompt length")):
-        ax.text(xe + 0.12, 0.98 - k * 0.12, label, ha="left", va="center_baseline", fontsize=fs, zorder=6)
-    # ---- output: a refusal, or the rewritten design, which both priced prefill and decode's rings reach
-    xo = 5.98
-    wo = W - xo
+        ax.text(ex, 1.30 - em - 0.175 - lab[0] - k * 0.12, label, ha="left", va="center_baseline", fontsize=fs,
+                zorder=6)
+    # ---- output: a refusal, or the rewritten design, which both priced prefill and decode's rings reach; each item's
+    # icon above its label, the column centered on the strip, the widest content
     _stage(ax, xo, bot, wo, top - bot, "Output", ours=False)
-    item(xo + 0.06, 1.02, 1.30, wo - 0.12)
-    _cross(ax, xo + 0.16, 1.16)
-    ax.text(xo + 0.26, 1.16, "Refusal", ha="left", va="center_baseline", fontsize=fs, zorder=6)
-    item(xo + 0.06, 0.38, 0.96, wo - 0.12)
-    _strip(ax, xo + 0.12, 0.80, "iiiss", cw=0.075, h=0.09)
+    oi, ow = xo + ins, wo - 2 * ins
+    oc = oi + (ow - 0.367) / 2  # the column's left: the strip's ink is 0.367 wide
+    item(oi, 1.02, 1.30, ow)
+    om = (0.28 - (0.09 + 0.05 + sum(lab))) / 2
+    _cross(ax, oc + 0.045, 1.30 - om - 0.045)
+    ax.text(oc, 1.30 - om - 0.14 - lab[0], "Refusal", ha="left", va="center_baseline", fontsize=fs, zorder=6)
+    item(oi, 0.38, 0.96, ow)
+    om = (0.58 - (0.09 + 0.05 + 0.12 + sum(lab))) / 2
+    _strip(ax, oc - 0.004, 0.96 - om - 0.09, "iiiss", cw=0.075, h=0.09)
     for k, label in enumerate(("Rewritten", "design")):
-        ax.text(xo + 0.12, 0.66 - k * 0.12, label, ha="left", va="center_baseline", fontsize=fs, zorder=6)
+        ax.text(oc, 0.96 - om - 0.14 - lab[0] - k * 0.12, label, ha="left", va="center_baseline", fontsize=fs,
+                zorder=6)
     # ---- flows
     _arrow(ax, (xi + wi, 1.0), (xa, 1.0))
     _arrow(ax, (xa + wa, 1.0), (xr, 1.0))
     for y, _, _ in rew[:2]:
-        _arrow(ax, (xr + wr - 0.08, y), (xe, y))
-    _arrow(ax, (xe + we, 0.80), (xo + 0.06, 0.80))
+        _arrow(ax, (rx0 + rw, y), (xe, y))
+    _arrow(ax, (xe + we, 0.80), (oi + reach, 0.80))
     # decode: the loop pass's rings go straight to the output, passing under the probe rail with a break, so the
     # two do not read as joined
-    _arrow(ax, (xr + wr - 0.08, rew[2][0]), (xo + 0.06, rew[2][0]), z=3)
-    # the probes and the prompt length feed the event model along a rail beneath the panels, from their own group
-    ry, rx, gx = 0.15, xe + we / 2, ix + 0.10
+    _arrow(ax, (rx0 + rw, rew[2][0]), (oi + reach, rew[2][0]), z=3)
+    # the probes and the prompt length feed the event model along a rail beneath the panels, from their own group's
+    # icon column, centered in the band below the panels and under the event model
+    ry, rx = bot / 2, xe + we / 2
     ax.add_patch(Rectangle((rx - 0.04, rew[2][0] - 0.02), 0.08, 0.04, facecolor="white", edgecolor="none", zorder=4))
-    ax.plot([gx, gx, rx], [gy0, ry, ry], color=INK, lw=0.6, solid_joinstyle="miter", zorder=2)
+    ax.plot([ic, ic, rx, rx], [gy0, ry, ry, ry + 0.05], color=INK, lw=0.6, solid_joinstyle="miter", solid_capstyle="butt", zorder=2)
     _arrow(ax, (rx, ry), (rx, be))
     fig.savefig(OUT / "framework.pdf", metadata={"CreationDate": None})
     plt.close(fig)
