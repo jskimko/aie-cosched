@@ -103,7 +103,10 @@ The prefill needs no renaming, because the original program already gives every 
 % VALUE: the problem in words: a schedule makes three essential decisions (the split; the order in which the CP interleaves each command's segments, each operator's kept in order; the buffer assignment); operators hand data over through DRAM, so a consumer issues after its producer's last synchronization and any host work, in a separate command; D and packing manage only the host boundary and are reported apart; the objective is the makespan
 % DECISION: no NP-hardness claim until a reduction is written; with negligible issue cost and one layer's fixed per-chunk pattern the problem has the structure of a two-machine chain-reentrant shop (wang1997reentrant), and with non-negligible issue cost the CP acts as a shared server (glass2000dedicated, hall2000common) (vault ch3-formulation, Relation to classical scheduling).
 \label{subsec:formulation}
-A schedule of a compiled design makes three essential decisions, namely the split, which sets which operators can run at once (Section~\ref{subsec:prefill}), the order in which the CP interleaves each command's segments, with each operator's segments kept in their own order, and the slot that each use of a buffer takes, since two uses of one slot run in turn even when neither consumes the other's data.
+A schedule of a compiled design makes three essential decisions.
+The split sets which operators can run at once (Section~\ref{subsec:prefill}).
+The order sets how the CP interleaves each command's segments, with each operator's segments kept in their own order.
+The buffer assignment sets the slot that each use of a buffer takes, since two uses of one slot run in turn even when neither consumes the other's data.
 Because operators hand data over through DRAM with no lock between them, a consumer issues only after its producer's final synchronization and any host work between the two, in a separate command.
 The number $D$ of commands in flight and the packing of commands manage only the boundary with the host, so we treat them as host policy, which the composer chooses with the split.
 The objective is the makespan, which for prefill is the TTFT less the work before the first decoder layer and after the last.

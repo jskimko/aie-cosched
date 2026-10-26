@@ -27,7 +27,8 @@ Every wait in a design can therefore be read from that artifact, together with t
 
 % VALUE: (2) why the waits exist and why they persist: developers trade modular designs (one operator per configuration, reconfiguration between operators) for fused ones (several operators in one configuration), which avoid reconfiguration but inherit an operator-at-a-time order; that order is fixed when the design and its host program are written, and the toolchain's lowering keeps it; the obvious fixes recover nothing (packing, a second hardware context); the GPU precedent (single-queue streams, breadth-first issue, then Hyper-Q's hardware queues) has no hardware fix here, so the order must be rewritten in the stream; a closed production stack's released designs likewise drive each column group from its own commands, but over the whole prompt, so their turns are true (pass-0, aa4df07, 232dafe)
 % DECISION: packing several operators per command is cited as standard practice (batching), never presented as ours. No claim about how FastFlowLM chose its order; it is described by what it ships.
-Fused designs such as this one keep several operators resident in one configuration and so avoid the reconfiguration that modular designs, which give each operator its own configuration, pay between operators, but they inherit an order of issue fixed when the design and its host program are written.
+Modular designs give each operator its own configuration and pay to reconfigure the array between operators.
+Fused designs such as this one keep several operators resident in one configuration and so avoid that cost, but they inherit an order of issue fixed when the design and its host program are written.
 Packing operators into one command, as CUDA Graphs~\citep{nvidia-cudagraphs} and XRT's run lists~\citep{xrt-repo} do, amortizes launch cost but recovers none of the lost overlap, because a wait on one group delays every later issue.
 Nor does a second hardware context, which shares the whole array in time~\citep{xdna-driver}.
 % SOURCE: packing neutral and queued commands non-overlapping, 1.007-1.029 (vault lab-prefill-overlap (5)(b)); every hardware context is allocated all eight columns per the driver's source, and a one-column design on two contexts takes 1.97x one alone (Section 3).
@@ -39,7 +40,7 @@ This NPU, in contrast, has one in-order CP per hardware context, so the order mu
 % DECISION: false dependences, their classes, reordering and renaming are textbook and cited; the claim is the condition on this platform and its dependence on the cut and the shape, never "false dependences cost time".
 The waits above are textbook order dependences, and decode attention's loop, which keeps one buffer per role, adds textbook name dependences~\citep{bernstein1966analysis,kuck1981dependence}.
 We call both kinds false orders (Section~\ref{subsec:losses}), and removing one can save time only if it lies on the critical path~\citep{fields2003interaction}.
-What this platform adds is when removing one frees overlap, namely only where two clauses hold.
+What this platform adds is when removing one frees overlap, which happens only where two clauses hold.
 The first is that the work it frees runs on core tiles and DMA channels that the work it waited on does not use, which are resources a rewrite cannot duplicate.
 The second is that no true dependence, on the device or through the host, lies between the two.
 Both clauses name resources and dependences that the artifacts and the host's accesses establish, so they can be decided before any duration is measured.

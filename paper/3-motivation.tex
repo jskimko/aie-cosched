@@ -86,7 +86,8 @@ We call these two checkable clauses together the \emph{condition}.
 They refine the rule that removing a false dependence gains time only on the critical path~\citep{fields2003interaction}, since on this platform removing a false order shortens that path only when both hold.
 Both clauses name resources and dependences that the analysis reads from the artifacts and the host's accesses (Section~\ref{sec:order}).
 The condition therefore screens out the false orders that cannot free overlap before any duration is measured, whereas the critical-path rule needs durations to say which do.
-How much each remaining one frees, whether that exceeds its cost, and what a rewrite saves beyond overlap, such as a dispatch, need durations, which the bound of Section~\ref{subsec:removal} and the event model of Section~\ref{subsec:pricing} supply.
+Durations decide the rest: how much each remaining false order frees, whether that exceeds its cost, and what a rewrite saves beyond overlap, such as a dispatch.
+The bound of Section~\ref{subsec:removal} and the event model of Section~\ref{subsec:pricing} supply them.
 
 How much work meets both clauses is set by how the design cuts its work, into configurations, into commands, and into buffers, and by the prompt length, which sets the balance between attention and the GEMMs.
 The issue order that pays therefore changes with the prompt and must be priced per length rather than fixed.

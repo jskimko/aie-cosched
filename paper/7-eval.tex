@@ -29,7 +29,7 @@ The sweep thus spans the prompts of every MLPerf Client task and the contexts of
 % SOURCE: MLPerf Client v2.0 tasks (mlcommons.org/benchmarks/client, read 2026-10-25; release 2026-08-18): input tokens 128 (content generation), 512 (creative writing), 830 (structured text), 1,856 (code analysis), 3,906 (summarization ~4K), 7,631 (summarization ~8K, extended, unscored); SWE agent ~27K in / ~1K out; data-analyst agent (experimental) ~29K in / ~2K out, reaching ~31K, past the 30,208 decode context; its harness is not run.
 
 % VALUE: one baseline: the original program on the supported split that minimizes its TTFT, with every split predicted within 5% of it measured, run on the faster of its own host code and our runner, so it differs from OPCORD only in the order and the split OPCORD chooses; the remedies are their own rows; FastFlowLM appears only as an observation for the condition
-Every end-to-end result compares against one baseline, namely the original program on whichever supported split runs it fastest at each prompt length.
+Every end-to-end result compares against one baseline, the original program on whichever supported split runs it fastest at each prompt length.
 We measure it on the default split and on every other split whose time the event model predicts within 5\% of the fastest prediction.
 The baseline runs on the faster of its own host code and our runtime package (Section~\ref{subsec:impl}) issuing the original order, so it differs from OPCORD only in what OPCORD chooses, namely the order and the split for that order.
 For decode, the baseline is the unmodified decode design.
