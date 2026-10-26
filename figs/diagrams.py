@@ -5,7 +5,7 @@
 
 Outputs:
   framework.pdf  OPCORD's components over a compiled design, full width: inputs, analysis, checked rewrites, event
-                 model, output, each with its section
+                 model, output
   arch.pdf  the XDNA 2 NPU as the paper uses it: host, hardware context, the CP's in-order instruction stream, the
             array of shim, memory and compute tiles over DRAM, and one compute tile and one shim tile magnified
   rewrites.pdf  what the loop pass does: its two-slot ring on decode attention's block loop, against one buffer per role
@@ -63,7 +63,7 @@ def fig_arch():
     _arrow(ax, (0.40, ty + th / 2), (0.52, ty + th / 2))
     _arrow(ax, (1.14, ty + th / 2), (1.26, ty + th / 2))
     kinds = "iisiiis"  # issue, issue, synchronize, ...
-    cw, sx = 0.1, 1.66
+    cw, sx = 0.085, 1.66
     for k, kind in enumerate(kinds):
         ax.add_patch(Rectangle((sx + k * cw, ty + 0.02), cw, th - 0.04, facecolor=INK if kind == "i" else MIST,
                                edgecolor="white", linewidth=0.6, zorder=3))
@@ -71,7 +71,7 @@ def fig_arch():
                            zorder=4))
     _arrow(ax, (1.56, ty + th / 2), (sx, ty + th / 2))
     lx = sx + len(kinds) * cw + 0.08
-    for y, fc, label in ((ty + 0.145, INK, "issue, returns"), (ty + 0.055, MIST, "synchronize, blocks")):
+    for y, fc, label in ((ty + 0.145, INK, "issue, returns"), (ty + 0.055, MIST, "synchronization, blocks")):
         ax.add_patch(Rectangle((lx, y - 0.03), 0.06, 0.06, facecolor=fc, edgecolor=INK, linewidth=0.4, zorder=3))
         ax.text(lx + 0.09, y, label, ha="left", va="center_baseline", fontsize=FS)
     # ---- the array: 8 columns of a shim tile, a memory tile and 4 compute tiles, over DRAM
@@ -161,14 +161,14 @@ def _stage(ax, x, y, w, h, title, ours=True):
 
 
 def fig_framework():
-    """OPCORD's components over a design its stack has already compiled, full width, with the section that describes each:
+    """OPCORD's components over a design its stack has already compiled, full width:
     the analysis reads the design and the host program into a dependence graph whose edges are true, name or order
     dependences, with legality conditions and a bound per false order; the composer and the stream pass reorder issue
     and the loop pass renames buffers into rings, each behind its checker; the event model prices each candidate order
     and split per prompt length from the probes, for prefill; the runtime package runs the result on the design's own
     hardware context, or the checkers refuse with a reason. On closed binaries OPCORD reads and bounds, and replays only
     rewrites that leave the host program as it is."""
-    W, H = _m.WIDE - 0.04, 1.62
+    W, H = _m.WIDE - 0.04, 1.48
     fig, ax = _canvas(W, H)
     fs = FS + 0.5
     top, bot = H - 0.02, 0.30  # the panels' common top and bottom; the probe rail runs beneath them
@@ -184,7 +184,7 @@ def fig_framework():
         ax.text(xi + 0.08, y, label, ha="left", va="center_baseline", fontsize=fs)
     # ---- the analysis: dependence graph, legality, bound
     xa, wa = 1.26, 1.52
-    _stage(ax, xa, bot, wa, top - bot, r"Analysis (\S3.2--3.3)")
+    _stage(ax, xa, bot, wa, top - bot, "Analysis")
     ox, oy = xa + 0.10, 0.92
     nodes = {"a": (0.0, 0.30), "b": (0.0, 0.04), "c": (0.28, 0.28), "d": (0.28, 0.02), "e": (0.56, 0.30),
              "f": (0.56, 0.04), "g": (0.74, 0.17)}
@@ -207,7 +207,7 @@ def fig_framework():
         ax.text(xa + 0.10, y, label, ha="left", va="center_baseline", fontsize=fs)
     # ---- the rewrites, each behind its checker
     xr, wr = 2.96, 1.80
-    _stage(ax, xr, bot, wr, top - bot, r"Rewrites, each behind a checker (\S3.3--3.5)")
+    _stage(ax, xr, bot, wr, top - bot, "Rewrites, each behind a checker")
     rew = ((1.16, "Composer", "reorder across operators"), (0.86, "Stream pass", "reorder within a stream"),
            (0.50, "Loop pass", "rename into rings"))
     for y, name, what in rew:
@@ -217,17 +217,17 @@ def fig_framework():
         ax.text(xr + 0.26, y, name, ha="left", va="center_baseline", fontsize=fs, fontweight="bold", zorder=5)
         ax.text(xr + 0.82, y, what, ha="left", va="center_baseline", fontsize=fs, zorder=5)
     # ---- the event model, prefill only
-    xe, we, be = 4.94, 0.88, 0.70
-    _stage(ax, xe, be, we, top - be, r"Event model (\S3.6)")
-    for lane, bars in ((1.22, ((xe + 0.08, 0.20), (xe + 0.32, 0.28))), (1.06, ((xe + 0.08, 0.36), (xe + 0.48, 0.16)))):
+    xe, we, be = 4.94, 0.88, 0.57
+    _stage(ax, xe, be, we, top - be, "Event model")
+    for lane, bars in ((1.17, ((xe + 0.08, 0.20), (xe + 0.32, 0.28))), (1.02, ((xe + 0.08, 0.36), (xe + 0.48, 0.16)))):
         for x0, w in bars:
             ax.add_patch(Rectangle((x0, lane), w, 0.09, facecolor=GRAY, edgecolor="white", linewidth=0.5, zorder=3))
-    ax.text(xe + 0.08, 0.90, "order and split", ha="left", va="center_baseline", fontsize=fs)
-    ax.text(xe + 0.08, 0.78, "per prompt length", ha="left", va="center_baseline", fontsize=fs)
+    for k, label in enumerate(("order and", "configuration", "per prompt length")):
+        ax.text(xe + 0.08, 0.91 - k * 0.12, label, ha="left", va="center_baseline", fontsize=fs)
     # ---- output
     xo = 5.98
     wo = W - xo
-    _stage(ax, xo, bot, wo, top - bot, r"Output (\S3.7)", ours=False)
+    _stage(ax, xo, bot, wo, top - bot, "Output", ours=False)
     _strip(ax, xo + 0.07, 1.16, "iiiss", cw=0.075, h=0.09)
     for k, label in enumerate(("rewritten design", "on its own", "hardware context,", "or a refusal", "with its reason")):
         ax.text(xo + 0.07, 0.98 - k * 0.12, label, ha="left", va="center_baseline", fontsize=fs)

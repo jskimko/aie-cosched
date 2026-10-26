@@ -9,7 +9,7 @@
     % VALUE: OPCORD's components and the section that describes each: inputs (compiled design, open or closed; host program; operator probes; prompt length), the analysis (dependence graph with true, name and order edges; legality conditions; a bound per false order), the composer, stream pass and loop pass each behind its checker, the event model choosing order and split per prompt length for prefill, the output (rewritten design on its own hardware context, or a refusal with its reason); on closed binaries, read and bound, replaying only rewrites that leave the host program as it is
     % DECISION: the overview figure (figs/diagrams.py fig_framework), full width as the comparable systems papers' overviews are (author, 2026-10-25); the loop pass's rings go straight to the output because the event model prices prefill only
     \includegraphics[width=\textwidth]{fig/framework.pdf}
-    \caption{OPCORD's components over a design its stack has already compiled, each with the section that describes it. The event model prices prefill only, so the loop pass's decode rings go straight to the output. On a closed stack's binaries, OPCORD stops at the analysis and replays only rewrites that leave the host program unchanged.}
+    \caption{OPCORD's components over a design its stack has already compiled. The event model prices prefill only, so the loop pass's decode rings go straight to the output. On a closed stack's binaries, OPCORD stops at the analysis and replays only rewrites that leave the host program unchanged.}
     \label{fig:framework}
 \end{figure*}
 
