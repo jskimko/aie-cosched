@@ -203,7 +203,7 @@ def fig_framework():
         ax.plot([lx, lx + 0.09], [ly, ly], lw=0.7, zorder=3, **style[kind])
         ax.text(lx + 0.12, ly, label, ha="left", va="center_baseline", fontsize=fs - 0.5)
     for y, label in ((0.70, "dependence graph over every agent"), (0.56, "legality conditions"),
-                     (0.42, "a bound per false order")):
+                     (0.42, "a bound per false dependence")):
         ax.text(xa + 0.10, y, label, ha="left", va="center_baseline", fontsize=fs)
     # ---- the rewrites, each behind its checker
     xr, wr = 2.96, 1.80
@@ -287,7 +287,7 @@ def fig_rewrites():
         for side in ("top", "right", "bottom"):
             ax.spines[side].set_visible(False)
     handles = [plt.Line2D([], [], color=INK, linewidth=0.6, linestyle=(0, (1, 1.2)))]
-    fig.legend(handles, ["false order"], loc="lower right", bbox_to_anchor=(0.99, -0.13), handlelength=1.2)
+    fig.legend(handles, ["false dependence"], loc="lower right", bbox_to_anchor=(0.99, -0.13), handlelength=1.2)
     fig.supxlabel("Time (illustrative)", fontsize=8, y=-0.06)
     fig.savefig(OUT / "rewrites.pdf", metadata={"CreationDate": None})
     plt.close(fig)

@@ -267,8 +267,8 @@ def fig_order():
     ours_cp = [(i * ISS, ISS, 0) for i in range(4)]
     ours_cp += [(4 * ISS, max(A, 3 * G) - 4 * ISS, 1)]
     panels = [
-        ("(a) One command, operators in turn", serial_attn, serial_gemm, serial_cp, A + 3 * G),
-        ("(b) One command, every group's work issued before any wait",
+        ("(a) One dispatch, operators in turn", serial_attn, serial_gemm, serial_cp, A + 3 * G),
+        ("(b) One dispatch, every group's work issued before any wait",
          serial_attn, [(i * G, G) for i in range(3)], ours_cp, max(A, 3 * G)),
     ]
     fig, axes = plt.subplots(2, 1, figsize=(COLUMN, 1.85))
