@@ -15,6 +15,7 @@ Outputs (into FIGS_OUT, default paper/fig):
   synthetic.pdf    the composed order's speedup over the original on three synthetic builds, against the chunks
   params-rows.tex  rows of the event model's parameter table
 """
+import functools
 import json
 import os
 import re
@@ -34,6 +35,9 @@ OUT = Path(os.environ.get("FIGS_OUT", ROOT.parent / "paper" / "fig"))
 # sizes on the page. Axis labels and panel titles; tick labels, legends and category labels; annotations on the data.
 # The diagrams in diagrams.py take the scale one step down (titles FS_TICK, labels FS_NOTE).
 FS_LABEL, FS_TICK, FS_NOTE = 8, 7, 6
+# Figures 6 and 8 take the scale uniformly larger (type_scale).
+CHOICE_SCALE = float(os.environ.get("CHOICE_SCALE", 1.15))
+VS_FLM_SCALE = float(os.environ.get("VS_FLM_SCALE", 1.0))
 
 # The MLSys template sets Times; the figures use Times through LaTeX as well.
 plt.rcParams.update({
@@ -64,6 +68,25 @@ plt.rcParams.update({
 })
 COLUMN = 3.25  # MLSys column width, inches
 WIDE = 6.75  # MLSys two-column width, inches
+
+
+def type_scale(s):
+    """Decorator: the figure takes the whole type scale larger by s, every tier alike, so its ratios stay those of the
+    other figures. Inside it, note() gives the annotation tier at that scale."""
+    def deco(f):
+        @functools.wraps(f)
+        def g(*args, **kw):
+            with plt.rc_context({k: FS_LABEL * s for k in ("font.size", "axes.titlesize", "figure.labelsize")}
+                                | {k: FS_TICK * s for k in ("xtick.labelsize", "ytick.labelsize", "legend.fontsize",
+                                                            "legend.title_fontsize")}):
+                return f(*args, **kw)
+        return g
+    return deco
+
+
+def note():
+    """The annotation tier at the current figure's type scale."""
+    return FS_NOTE * plt.rcParams["font.size"] / FS_LABEL
 
 
 def save(fig, name, width=COLUMN, relayout=None, **kw):
@@ -616,6 +639,7 @@ CHOICE_RULES = (("opcord", "OPCORD"), ("always", "Always reorder"), ("fixed_s2",
                 ("four_base", "Reorder if $C \\ge 4$"))
 
 
+@type_scale(CHOICE_SCALE)
 def fig_choice():
     """(a) The event model's error on each development cell's original-to-composed ratio against that ratio, and
     (b) each choice rule's worst loss against the fastest measured choice.
@@ -635,7 +659,7 @@ def fig_choice():
     a.set_xscale("log", base=2)
     a.set_xticks([1, 1.25, 1.5, 2], ["1.0", "1.25", "1.5", "2.0"])
     a.minorticks_off()
-    a.set_xlabel("Measured TTFT speedup of the composed order", labelpad=1)
+    a.set_xlabel("Measured speedup of the composed order", labelpad=1)
     a.set_ylabel(r"Prediction error (\%)", labelpad=1)
     a.set_ylim(-24, 8)  # room below the band for the legend
     a.legend(loc="lower left", ncol=2, handletextpad=0.2, columnspacing=0.6, labelspacing=0.15)
@@ -646,7 +670,7 @@ def fig_choice():
         v = [c[key] for c in cells if c.get(key) is not None]
         worst = max(v)
         b.barh(i, worst, height=0.6, color=OURS if key == "opcord" else GRAY, edgecolor="none")
-        b.text(worst + 1.5, i, f"{worst:.1f}", ha="left", va="center", fontsize=FS_NOTE)
+        b.text(worst + 1.5, i, f"{worst:.1f}", ha="left", va="center", fontsize=note())
         labels.append(label)
     b.set_xlim(0, 110)
     b.set_xticks([0, 25, 50, 75, 100])
@@ -659,6 +683,49 @@ def fig_choice():
     plt.close(fig)
 
 
+@type_scale(VS_FLM_SCALE)
+def fig_vs_flm_by_length():
+    """Candidate form of fig_vs_flm: grouped by prompt length, the LLMs told apart by their markers in Figures 7 and 8,
+    AIR's original program in ink and OPCORD in our color, joined by a gray line."""
+    rows = json.loads((DATA / "absolute.json").read_text())["rows"]
+    fig, ax = plt.subplots(figsize=(COLUMN, 1.5))
+    order = ("Llama-3.2-1B", "LFM2-1.2B", "Qwen3-4B", "Gemma3-4B", "Llama-3.1-8B")
+    lengths = (1024, 4096, 16384)
+    step, gap = 1.0, 1.6
+    for g, n in enumerate(lengths):
+        for k, llm in enumerate(order):
+            r = next(r for r in rows if r["llm"] == llm and r.get("N") == n)
+            x = g * (len(order) * step + gap) + k * step
+            o, p = r["flm_ms"] / r["orig_s2_ms"], r["flm_ms"] / r["opcord_ms"]
+            marker, fill, _ = DECODE_STYLE[llm]
+            ax.plot([x, x], [o, p], color=GRAY, linewidth=0.6, zorder=1)
+            ax.plot(x, o, marker=marker, markersize=3.2, color=INK, markerfacecolor=INK if fill == "full" else "white",
+                    markeredgewidth=0.6, linestyle="none", zorder=2)
+            ax.plot(x, p, marker=marker, markersize=3.2, color=OURS, markerfacecolor=OURS if fill == "full" else "white",
+                    markeredgewidth=0.6, linestyle="none", zorder=3)
+    centers = [g * (len(order) * step + gap) + (len(order) - 1) * step / 2 for g in range(len(lengths))]
+    ax.set_xticks(centers, ["1K", "4K", "16K"])
+    ax.tick_params(axis="x", length=0, pad=2)
+    ax.set_xlim(-0.8, centers[-1] + (len(order) - 1) * step / 2 + 0.8)
+    ax.set_xlabel("Prompt length (tokens)", labelpad=1)
+    ax.axhline(1.0, color="black", linewidth=0.5)
+    ax.set_yscale("log", base=2)
+    ax.set_yticks([0.5, 1, 2], ["0.5", "1", "2"])
+    ax.minorticks_off()
+    ax.set_ylim(0.45, 2.6)
+    ax.set_ylabel("TTFT speedup", labelpad=1)
+    llm_h = [plt.Line2D([], [], marker=DECODE_STYLE[l][0], markersize=3.2, color=INK, linestyle="none",
+                        markerfacecolor=INK if DECODE_STYLE[l][1] == "full" else "white", markeredgewidth=0.6)
+             for l in order]
+    arm_h = [plt.Line2D([], [], marker="s", markersize=3.2, color=c, linestyle="none", markeredgewidth=0)
+             for c in (INK, OURS)]
+    ax.legend(llm_h + arm_h, list(order) + [r"AIR, $S_2$", "AIR with OPCORD"], loc="upper center",
+              bbox_to_anchor=(0.5, -0.27), ncol=3, handletextpad=0.2, columnspacing=0.8, labelspacing=0.2)
+    save(fig, "vs-flm-by-length.pdf")
+    plt.close(fig)
+
+
+@type_scale(VS_FLM_SCALE)
 def fig_vs_flm():
     """TTFT speedup over FLM's current release at 1K, 4K and 16K tokens: AIR's original program on its default
     configuration, and the same design under OPCORD. data/absolute.json (D1, one batch)."""
@@ -676,7 +743,7 @@ def fig_vs_flm():
             ticks.append(x)
             labels.append({1024: "1K", 4096: "4K", 16384: "16K"}[r["N"]])
             x += 1.2
-        ax.text((x0 + x - 1.2) / 2, 2.6, llm, ha="center", va="bottom", fontsize=FS_NOTE)
+        ax.text((x0 + x - 1.2) / 2, 2.6, llm, ha="center", va="bottom", fontsize=note())
         x += 0.8
     ax.axhline(1.0, color="black", linewidth=0.5)
     ax.set_yscale("log", base=2)

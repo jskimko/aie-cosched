@@ -226,15 +226,30 @@ def fig_framework():
     fs = FS
     top, bot = H - 0.02, 0.30  # the panels' common top and bottom; the probe rail runs beneath them
     # One grid for every panel: items inset `ins` from the panel's sides and `ins + 0.01` from its bottom; each item's
-    # content inset `pad` from its sides. The panels' widths follow their widest content (TeX widths at 6.5 pt), the
-    # output panel's centers its narrower content, and the gaps share what is left, with a 0.02 margin at either side.
+    # content inset `pad` from its sides. The panels' widths follow their widest content, measured as typeset, and the
+    # gaps share what is left, with a 0.02 margin at either side.
     ins, pad = 0.07, 0.06
-    lab = 0.031, 0.050  # a 6.5 pt label's TeX box above and below its anchor (va="center_baseline")
-    wi = 2 * (ins + pad) + 0.208 + 0.07 + 0.612  # icon column, gap, "Compiled design"
-    wa = 2 * (ins + pad) + 1.206  # the graph's left node to the legend's "Name"
-    wr = 2 * (ins + pad) + 1.522  # the checkmark to "Reorder across operators"
-    we = 2 * (ins + pad) + 0.645  # "per prompt length"
-    wo = 0.73
+    lab = 0.029, 0.046  # a 6 pt label's TeX box above and below its anchor (va="center_baseline")
+    renderer = fig._get_renderer()
+
+    def tw(*labels):  # the widest label's typeset width, in inches
+        def one(text):
+            t = ax.text(0, 0, text, fontsize=fs)
+            w = t.get_window_extent(renderer=renderer).width / fig.dpi
+            t.remove()
+            return w
+        return max(one(t) for t in labels)
+    ev_lines = ("Order and configuration", "per prompt length")
+    out_label = "Rewritten design"
+    rew = ((1.20, "Composer", "Reorder across operators"), (0.86, "Stream pass", "Reorder within a stream"),
+           (0.48, "Loop pass", "Rename into rings"))
+    what_x = 0.09 + tw(*(n for _, n, _ in rew)) + 0.10  # the description column, from the checkmark's center
+    wi = 2 * (ins + pad) + 0.208 + 0.07 + tw("Compiled design", "Host program", "Operator probes", "Prompt length")
+    wa = 2 * (ins + pad) + max(0.03 + 0.86 + 0.12 + tw("True", "Name", "Order"),
+                               tw("Dependence graph", "Legality conditions", "Bound per false dependence"))
+    wr = 2 * (ins + pad) + 0.04 + what_x + tw(*(w for _, _, w in rew))
+    we = 2 * (ins + pad) + max(0.36, tw(*ev_lines))  # the lanes are 0.36 wide
+    wo = 2 * (ins + pad) + max(0.367, tw(out_label, "Refusal"))  # the strip's ink is 0.367 wide
     gap = (W - 0.04 - wi - wa - wr - we - wo) / 4
     xi = 0.02
     xa = xi + wi + gap
@@ -295,39 +310,35 @@ def fig_framework():
     _stage(ax, xr, bot, wr, top - bot, "Checked rewrites")
     rx0, rw = xr + ins, wr - 2 * ins
     ck = rx0 + pad + 0.04  # the checkmark's center (its TeX box is 0.08 wide)
-    rew = ((1.20, "Composer", "Reorder across operators"), (0.86, "Stream pass", "Reorder within a stream"),
-           (0.48, "Loop pass", "Rename into rings"))
     for y, name, what in rew:
         _box(ax, rx0, y - 0.10, rw, 0.20, fc="white", lw=0.4, z=3)
         ax.text(ck, y, r"\checkmark", ha="center", va="center_baseline", fontsize=FS_TITLE, color=MAGENTA, zorder=5)
         ax.text(ck + 0.09, y, name, ha="left", va="center_baseline", fontsize=fs, fontweight="bold", zorder=5)
-        ax.text(ck + 0.59, y, what, ha="left", va="center_baseline", fontsize=fs, zorder=5)
+        ax.text(ck + what_x, y, what, ha="left", va="center_baseline", fontsize=fs, zorder=5)
     # ---- the event model, prefill only: one item, a priced schedule over its label, centered in the item
     be = 0.57
     _stage(ax, xe, be, we, top - be, "Event model")
     ey0 = be + ins + 0.01
     item(xe + ins, ey0, 1.30, we - 2 * ins)
     ex = xe + ins + pad
-    em = (1.30 - ey0 - (0.125 + 0.05 + 0.24 + sum(lab))) / 2  # lanes, a gap, three lines at 0.12
+    em = (1.30 - ey0 - (0.125 + 0.05 + 0.12 * (len(ev_lines) - 1) + sum(lab))) / 2  # lanes, a gap, lines at 0.12
     _lanes(ax, ex, 1.30 - em - 0.125)
-    for k, label in enumerate(("Order and", "configuration", "per prompt length")):
+    for k, label in enumerate(ev_lines):
         ax.text(ex, 1.30 - em - 0.175 - lab[0] - k * 0.12, label, ha="left", va="center_baseline", fontsize=fs,
                 zorder=6)
     # ---- output: a refusal, or the rewritten design, which both priced prefill and decode's rings reach; each item's
     # icon above its label, the column centered on the strip, the widest content
     _stage(ax, xo, bot, wo, top - bot, "Output", ours=False)
     oi, ow = xo + ins, wo - 2 * ins
-    oc = oi + (ow - 0.367) / 2  # the column's left: the strip's ink is 0.367 wide
+    oc = oi + pad  # the column's left
     item(oi, 1.02, 1.30, ow)
     om = (0.28 - (0.09 + 0.05 + sum(lab))) / 2
     _cross(ax, oc + 0.045, 1.30 - om - 0.045)
     ax.text(oc, 1.30 - om - 0.14 - lab[0], "Refusal", ha="left", va="center_baseline", fontsize=fs, zorder=6)
     item(oi, 0.38, 0.96, ow)
-    om = (0.58 - (0.09 + 0.05 + 0.12 + sum(lab))) / 2
+    om = (0.58 - (0.09 + 0.05 + sum(lab))) / 2
     _strip(ax, oc - 0.004, 0.96 - om - 0.09, "iiiss", cw=0.075, h=0.09)
-    for k, label in enumerate(("Rewritten", "design")):
-        ax.text(oc, 0.96 - om - 0.14 - lab[0] - k * 0.12, label, ha="left", va="center_baseline", fontsize=fs,
-                zorder=6)
+    ax.text(oc, 0.96 - om - 0.14 - lab[0], out_label, ha="left", va="center_baseline", fontsize=fs, zorder=6)
     # ---- flows
     _arrow(ax, (xi + wi, 1.0), (xa, 1.0))
     _arrow(ax, (xa + wa, 1.0), (xr, 1.0))
