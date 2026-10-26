@@ -58,49 +58,21 @@ At prompts of one to four chunks, where the groups have little work to overlap, 
 % SOURCE: figs/data/prefill-cells.json (figs/paper_numbers.py, amd-npu a6abaf19): 39 cells at 1,024-32,768 tokens, 1.097 (LFM2-1.2B 1,024, S1) to 1.625 [1.337, 1.632] (Llama-3.2-1B 16,384, S4); per LLM 1B 1.22-1.63, LFM2 1.10-1.49, Qwen 1.25-1.57, Gemma 1.18-1.30, 8B 1.11-1.56; peaks 1B 16K, LFM2 8K (16K 1.485), Qwen 16K, Gemma 8K, 8B 8K; prompts of 128-512 tokens 0.985-1.040 (LFM2-1.2B 256 0.985 [0.971, 0.999], Llama-3.1-8B 512 1.040). Pre-final: picks by choose() at opcord d6caf8b, the event model before its frozen form.
 
 % VALUE: absolute standing, as a snapshot of two releases: OPCORD on MLIR-AIR's designs reaches the first token sooner than FastFlowLM's current release on all five LLMs at every length compared, whereas the original program is slower than that engine at 16K on four of the five; in decode FastFlowLM stays faster on all five, most on the three whose decode designs differ in more than their order, and the loop pass brings the other two within a few percent
-In absolute terms, OPCORD on MLIR-AIR's designs reaches the first token sooner than FastFlowLM's current release, version 1.0.8, by its own prefill timer, on all five LLMs at every prompt length we compare, by \AbsGainLo--\AbsGainHi$\times$ at 1K to 16K tokens (Table~\ref{tab:absolute}).
+In absolute terms, OPCORD on MLIR-AIR's designs reaches the first token sooner than FastFlowLM's current release, version 1.0.8, by its own prefill timer, on all five LLMs at every prompt length we compare, by \AbsGainLo--\AbsGainHi$\times$ at 1K to 16K tokens (Figure~\ref{fig:vs-flm}).
 The original program on its default configuration, by contrast, is slower than that engine at 16K tokens on four of the five.
 Both comparisons are of two releases that their developers will keep improving.
 In decode, FastFlowLM's engine stays faster on all five LLMs, by the widest margins on LFM2-1.2B, Qwen3-4B, and Gemma3-4B, whose MLIR-AIR decode designs differ from FastFlowLM's in more than their order.
 The loop pass brings Llama-3.2-1B and Llama-3.1-8B within \AbsDecodeClosePct\% of that engine at 16K tokens.
 % SOURCE: D1 (amd-npu 45421aa3, 3c07fde9, ab/results/d1-2026-10-25; one batch 11:20-14:30 at pin 4c56faa, every gate passed): TTFT medians FastFlowLM (server prefill_duration_ttft) / original S2 / OPCORD's pick, ms, at 1K / 4K / 16K: Llama-3.2-1B 576.7 / 326.0 / 284.8, 1769.1 / 1909.9 / 1076.0, 10980.5 / 17999.2 / 6057.4; LFM2-1.2B 609.6 / 296.6 / 270.2, 1665.6 / 1386.7 / 1053.9, 7962.3 / 9421.2 / 4906.0; Qwen3-4B 1816.5 / 1076.9 / 860.6, 5858.0 / 6557.5 / 3742.7, 34669.4 / 62990.2 / 22142.0; Gemma3-4B 1597.4 / 874.2 / 735.8, 4601.8 / 3903.1 / 2996.2, 19484.0 / 18386.8 / 13926.9; Llama-3.1-8B 2445.6 / 1682.7 / 1528.4, 8004.0 / 8735.5 / 6212.5, 41822.5 / 67623.4 / 34033.5; at 128 tokens FastFlowLM 345-1176 ms against 55.4-251.6 ms. Decode ms per token at 16K, FastFlowLM / original / loop pass: 27.18 / 34.99 / 27.29 (1B), 20.80 / 45.40 / 37.48 (LFM2), 100.09 / 155.89 / 139.76 (Qwen3-4B), 65.84 / 147.89 / 144.42 (Gemma3-4B), 133.16 / 148.43 / 136.20 (8B). The two TTFT timers differ in definition (FastFlowLM's server timer against our prefill call to logits); some FastFlowLM decode reps ended early on EOS (NOTES).
 
-\begin{table}[t]
+\begin{figure}[t]
     \centering
-    \caption{Time to First Token. FastFlowLM 1.0.8 by its own prefill timer, the original program on its default split $S_2$, and OPCORD on the split it chooses.}
-    \label{tab:absolute}
-    % VALUE: TTFT of FastFlowLM's current release, the original program, and OPCORD on the five LLMs at three prompt lengths
-    % SOURCE: D1, the source line above (FastFlowLM by its server's prefill timer; the original program on $S_2$; OPCORD at its own pick).
-    \small
-    \begin{tabular*}{\linewidth}{@{}ll@{\extracolsep{\fill}}rrr@{}}
-        \toprule
-         & & \multicolumn{3}{c}{TTFT (ms)} \\
-        \cmidrule(l){3-5}
-         & & FastFlowLM & Original, & \\
-        LLM & Tokens & 1.0.8 & $S_2$ & OPCORD \\
-        \midrule
-        Llama-3.2-1B & 1K & 576.7 & 326.0 & 284.8 \\
-         & 4K & 1769.1 & 1909.9 & 1076.0 \\
-         & 16K & 10980.5 & 17999.2 & 6057.4 \\
-        \addlinespace
-        LFM2-1.2B & 1K & 609.6 & 296.6 & 270.2 \\
-         & 4K & 1665.6 & 1386.7 & 1053.9 \\
-         & 16K & 7962.3 & 9421.2 & 4906.0 \\
-        \addlinespace
-        Qwen3-4B & 1K & 1816.5 & 1076.9 & 860.6 \\
-         & 4K & 5858.0 & 6557.5 & 3742.7 \\
-         & 16K & 34669.4 & 62990.2 & 22142.0 \\
-        \addlinespace
-        Gemma3-4B & 1K & 1597.4 & 874.2 & 735.8 \\
-         & 4K & 4601.8 & 3903.1 & 2996.2 \\
-         & 16K & 19484.0 & 18386.8 & 13926.9 \\
-        \addlinespace
-        Llama-3.1-8B & 1K & 2445.6 & 1682.7 & 1528.4 \\
-         & 4K & 8004.0 & 8735.5 & 6212.5 \\
-         & 16K & 41822.5 & 67623.4 & 34033.5 \\
-        \bottomrule
-    \end{tabular*}
-\end{table}
+    % VALUE: absolute standing as a snapshot: FLM's TTFT over AIR's original program and over AIR with OPCORD, at three lengths on the five LLMs; OPCORD is faster than FLM everywhere, the original is slower at 16K on four of the five
+    % SOURCE: D1, the source line above (FLM by its server's prefill timer; the original program on $S_2$; OPCORD at its own pick); figs/make_figs.py fig_vs_flm from figs/data/absolute.json.
+    \includegraphics{fig/vs-flm.pdf}
+    \caption{TTFT speedup over FLM's current release, by its own prefill timer, of AIR's original program on its default configuration $S_2$ and of the same design under OPCORD on the configuration it chooses.}
+    \label{fig:vs-flm}
+\end{figure}
 
 \begin{figure}[t]
     \centering
@@ -146,7 +118,7 @@ This is because the shared score buffer still closes the loop's critical cycle, 
 \label{subsec:decision}
 
 % VALUE: the event model's own choice of order and split stays within a few percent of the best measured option on every cell, and every cell where it misses falls in the near-tie band that a short measurement settles, whereas each fixed rule loses badly somewhere: never reordering gives up the long-prompt gains, always reordering loses at one or two chunks, a fixed split loses where the balance moves, and even the rule that reorders from four chunks at the baseline's split loses where the composed order's best split differs
-The event model's own choice of order and configuration stays within \ChoiceOpcordMax\% of the measured minimum on every one of the \ChoiceCells{} cells and matches it on most (Table~\ref{tab:decision}).
+The event model's own choice of order and configuration stays within \ChoiceOpcordMax\% of the measured minimum on every one of the \ChoiceCells{} cells and matches it on most (Figure~\ref{fig:choice}b).
 These choices come from an earlier form of the event model with the same constants, and the accuracy below is that of the final form that Section~\ref{subsec:pricing} describes.
 The final form changes \FinalChanged{} of the \ChoiceCells{} choices, and on the \FinalMeasured{} cells where its exact choice was measured, it loses at most \FinalLossMax\%, at Llama-3.2-1B's 1K-token prompt.
 We compare its choice on every cell against the fastest order and configuration measured there, and against fixed rules.
@@ -157,34 +129,19 @@ Each fixed rule loses far more somewhere, since never reordering gives up the lo
 Reordering from four chunks loses up to \ChoiceFourSTwoMax\% on the default configuration, and even on the baseline's configuration it loses up to \ChoiceFourBaseMax\% where the composed order runs faster on another one.
 % SOURCE: figs/data/choice.json (figs/paper_numbers.py, amd-npu a6abaf19): per cell, the measured minimum over every split and order measured there (the original order as the faster of orig and identb); the picks are choose() at opcord d6caf8b, the event model before its frozen form, with no near-tie measurement; OPCORD max 4.3% at Gemma3-4B 512 (S2 ship against S2 comp), then Llama-3.2-1B 512 3.3%, Qwen3-4B 512 3.1%, Qwen3-4B 8192 2.7%; final form (choose() at opcord 4c56faa, amd-npu e4e3b209 choose-frozen-2026-10-26): 11 of 59 picks change (8 short-prompt cells from a shipped arm to comp at the same split; 1B and LFM2-1.2B 1,024 S1 -> S2; Gemma3-4B 32,768 S4 -> S2); scored where an A/B file ran the exact plan (split, depth, GEMM cap, packing), 42 cells, median 0.0%, max 6.7% (Llama-3.2-1B 1,024, S2 comp d4 284.8 ms against S1 comp 267.0 ms), figs/data/choice-final-form.json; all 14 cells with a nonzero loss of the earlier form are among the 36 cells whose top candidates fall in the near-tie band (amd-npu ab/sweep-cost/close-cost.txt, device time 1-276 s per cell, 1,144 s in total). Never reorder max 62.5% (Llama-3.2-1B 16,384); always reorder max 9.3% (Llama-3.2-1B 256); fixed S2 and four chunks on S2 max 97.1% (Qwen3-4B 32,768, comp-S2 against comp-S4 across batches); four chunks on the baseline's split max 32.5% (Llama-3.1-8B 8,192, paired comps4 1.325 [1.322, 1.326]) over the 53 cells where the composed order was measured on the baseline's split. The losses are lower bounds where a candidate was not measured.
 
-\begin{table}[t]
+\begin{figure*}[t]
     \centering
-    \caption{Loss against the Measured Minimum}
-    \label{tab:decision}
-    % VALUE: the event model's own choice against fixed rules, over every cell of the sweep
-    \begin{threeparttable}
-    \begin{tabular*}{\linewidth}{@{}l@{\extracolsep{\fill}}rr@{}}
-        \toprule
-        Choice & Median (\%) & Max.\ (\%) \\
-        \midrule
-        OPCORD & \ChoiceOpcordMed & \ChoiceOpcordMax \\
-        Never reorder & \ChoiceNeverMed & \ChoiceNeverMax \\
-        Always reorder & \ChoiceAlwaysMed & \ChoiceAlwaysMax \\
-        Fixed split $S_2$ & \ChoiceFixedSTwoMed & \ChoiceFixedSTwoMax \\
-        Four chunks, split $S_2$ & \ChoiceFourSTwoMed & \ChoiceFourSTwoMax \\
-        Four chunks, baseline's split\tnote{a} & \ChoiceFourBaseMed & \ChoiceFourBaseMax \\
-        \bottomrule
-    \end{tabular*}
-    \begin{tablenotes}\footnotesize
-    \item Over the \ChoiceCells{} cells of the sweep. \item[a] Over the \ChoiceFourBaseCells{} cells where this rule's choice was measured.
-    \end{tablenotes}
-    \end{threeparttable}
-\end{table}
+    % VALUE: (a) the event model's error per development cell stays within a few percent except where it underprices Llama-3.2-1B's largest gains; (b) the event model's own choice stays within a few percent of the fastest measured choice on every cell, whereas each fixed rule loses tens of percent somewhere
+    % SOURCE: (a) figs/data/accuracy-cells.json (the frozen form's 70 development cells); (b) figs/data/choice.json (59 cells; the four-chunk rule on the baseline's configuration over the 53 cells where its choice was measured); figs/make_figs.py fig_choice.
+    \includegraphics[width=\textwidth]{fig/choice.pdf}
+    \caption{(a) The event model's error on the ratio between the original and the composed order, against the measured ratio, on 70 cells, with a gray band at $\pm5\%$. (b) The loss of each choice rule against the fastest choice measured on each cell, one dot per cell and a bar at the median, on 59 cells, or on the 53 where the four-chunk rule's choice on the baseline's configuration was measured. Never reordering is not shown, since its loss is the composed order's gain forgone.}
+    \label{fig:choice}
+\end{figure*}
 
 \label{subsec:accuracy}
 
 % VALUE: the event model orders the original and composed orders correctly wherever they differ by more than a few percent, and its error on the difference between the two stays small against the gains, largest where it underprices a gain it still ranks first
-The event model orders the original and composed orders correctly on every cell where their measured times differ by more than \AccMisorderMax\%, and misorders only four ties at one chunk.
+The event model orders the original and composed orders correctly on every cell where their measured times differ by more than \AccMisorderMax\%, and misorders only four ties at one chunk (Figure~\ref{fig:choice}a).
 Its error on the ratio between the two orders has a median of \AccDiffMed\% across \AccCells{} cells, and \AccWithinFive{} of them lie within 5\%, against gains of up to about $2\times$.
 Across configurations, its error on the margin between two configurations of one order averages under 2\% on the five cells where both were measured.
 Its largest error, \AccDiffMax\%, prices Llama-3.2-1B's gain near 16K tokens on the default configuration too low, which leaves the composed order first.
