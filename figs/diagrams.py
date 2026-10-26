@@ -274,7 +274,7 @@ def fig_rewrites():
         for x, y0, y1 in waits:  # a dotted shaft with a solid head, from y0 to y1
             ax.plot([x, x], [y0, y1], color=INK, linewidth=0.6, linestyle=(0, (1, 1.2)), zorder=10)
             ax.add_patch(FancyArrowPatch((x, y1 + 0.05 * (y0 - y1)), (x, y1),
-                                         arrowstyle="-|>,head_length=2.0,head_width=1.1", color=INK, linewidth=0.6,
+                                         arrowstyle="-|>,head_length=1.2,head_width=0.65", color=INK, linewidth=0.6,
                                          shrinkA=0, shrinkB=0, zorder=10))
         ax.axvline(end, color="black", linewidth=0.5, linestyle=(0, (4, 2)))
         ax.set_yticks([1, 0], labels, fontsize=FS)

@@ -456,7 +456,7 @@ def fig_timeline():
         assert abs(overlap - a["both_outstanding_ms"]) < 1e-3, (arm, overlap, a["both_outstanding_ms"])
         ttft = a["ttft_ms"]
         ax.axvline(ttft / base, color="black", linewidth=0.6, linestyle=(0, (4, 2)))
-        ax.text(ttft / base + 0.008, 1.5, rf"TTFT {ttft / base:.2f}", ha="left", va="center", fontsize=6.5)
+        ax.text(ttft / base + 0.008, 1.5, rf"{ttft / base:.2f}", ha="left", va="center", fontsize=6.5)
         ax.set_title(name, fontsize=7, pad=2, loc="left")
         ax.set_yticks([2, 1], ["Attention", "GEMMs"], fontsize=6.5)
         ax.set_ylim(0.45, 2.55)
@@ -465,7 +465,7 @@ def fig_timeline():
             ax.spines[side].set_visible(False)
         ax.tick_params(axis="x", top=False)
     axes[-1].set_xlim(0, 1.12)
-    axes[-1].set_xlabel("Normalized prefill time", labelpad=1)
+    axes[-1].set_xlabel("Normalized time (original TTFT = 1)", labelpad=1)
     fig.tight_layout(pad=0.2, h_pad=0.3)
     fig.savefig(OUT / "timeline.pdf")
     plt.close(fig)
@@ -594,13 +594,12 @@ CHOICE_RULES = (("opcord", "OPCORD"), ("always", "Always reorder"), ("fixed_s2",
 
 def fig_choice():
     """(a) The event model's error on each development cell's original-to-composed ratio against that ratio, and
-    (b) each choice rule's loss against the fastest measured choice, one dot per cell with a loss, the cells with none as
-    one open marker at 0 with their count, the worst value printed.
+    (b) for each choice rule, the share of cells whose loss against the fastest measured choice is at most x.
 
     data/accuracy-cells.json (the frozen form's 70 development cells) and data/choice.json (the 59 priced cells).
     "Never reorder" is left out of (b): its loss is the headline gain forgone, which Figure 6 shows."""
     rows = json.loads((DATA / "accuracy-cells.json").read_text())
-    fig, (a, b) = plt.subplots(1, 2, figsize=(WIDE, 1.55), gridspec_kw=dict(width_ratios=[1.05, 1], wspace=0.32))
+    fig, (a, b) = plt.subplots(1, 2, figsize=(WIDE, 1.55), gridspec_kw=dict(width_ratios=[1.05, 1], wspace=0.28))
     a.axhspan(-5, 5, color="#EDEDED", zorder=0, linewidth=0)
     for key, llm in KEY_LLM.items():
         rs = [r for r in rows if r["model"].startswith(key)]
@@ -618,29 +617,26 @@ def fig_choice():
     a.legend(loc="lower left", fontsize=5.5, ncol=2, handletextpad=0.2, columnspacing=0.6, labelspacing=0.15)
     a.set_title("(a) Event model", fontsize=7, pad=3)
     cells = json.loads((DATA / "choice.json").read_text())["cells"]
-    b.axhspan(-0.5, 0.5, color=OURS_TINT, alpha=0.7, zorder=0, linewidth=0)
-    zero_counts = []
-    for i, (key, label) in enumerate(CHOICE_RULES):
+    styles = {"opcord": (OURS, (0, ()), 1.2), "always": (INK, (0, (4, 1.5)), 0.8), "fixed_s2": (INK, (0, (1, 1.2)), 0.8),
+              "four_base": (STONE, (0, ()), 0.8)}
+    for key, label in CHOICE_RULES:  # empirical CDF: the share of cells whose loss is at most x
         v = sorted(c[key] for c in cells if c.get(key) is not None)
-        color = OURS if key == "opcord" else INK
-        # cells where the rule picks the fastest choice (loss 0) are one marker with their count, not a stack
-        zeros, rest = sum(1 for x in v if x == 0), [x for x in v if x > 0]
-        b.plot([0], [i], linestyle="none", marker="o", markersize=3.2, color=color, markerfacecolor="white",
-               markeredgewidth=0.7, zorder=3)
-        zero_counts.append(zeros)
-        jitter = [((k * 0.6180339) % 1 - 0.5) * 0.5 for k in range(len(rest))]  # deterministic spread
-        b.plot(rest, [i + j for j in jitter], linestyle="none", marker="o", markersize=2.0, color=color, alpha=0.85,
-               markeredgewidth=0, zorder=2)
-        b.text(v[-1] * 1.25 + 0.3, i, f"{v[-1]:.1f}", ha="left", va="center", fontsize=6, color=color)
+        xs, ys = [0.0], [0.0]
+        for k, x in enumerate(v):
+            xs += [x, x]
+            ys += [ys[-1], (k + 1) / len(v)]
+        xs.append(150)
+        ys.append(1.0)
+        color, dash, lw = styles[key]
+        b.plot(xs, ys, color=color, linestyle=dash, linewidth=lw, label=label, drawstyle="default")
     b.set_xscale("symlog", linthresh=1, linscale=0.6)
-    b.set_xlim(-0.3, 260)
+    b.set_xlim(0, 150)
     b.set_xticks([0, 1, 10, 100], ["0", "1", "10", "100"])
-    b.set_ylim(len(CHOICE_RULES) - 0.5, -0.5)
-    b.set_yticks(range(len(CHOICE_RULES)), [f"{label} ({n})" for (_, label), n in zip(CHOICE_RULES, zero_counts)],
-                 fontsize=6)
-    b.tick_params(axis="y", length=0)
+    b.set_ylim(0, 1.02)
+    b.set_ylabel("Share of cells", labelpad=1)
     b.minorticks_off()
     b.set_xlabel(r"Loss against the fastest measured choice (\%)", labelpad=1)
+    b.legend(loc="lower right", fontsize=6, handlelength=1.8, labelspacing=0.2)
     b.set_title("(b) Choice of order and configuration", fontsize=7, pad=3)
     fig.savefig(OUT / "choice.pdf")
     plt.close(fig)
