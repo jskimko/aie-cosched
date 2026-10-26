@@ -177,17 +177,34 @@ def _doc(ax, x, y, w=0.12, h=0.16, z=5):
         ax.plot([x + 0.025, x + w - (0.025 if k else 0.05)], [ly, ly], color=INK, lw=0.4, zorder=z + 1)
 
 
-def _gauge(ax, cx, cy, r=0.075, z=5):
-    """A measurement: a dial with ticks and a needle; (cx, cy) is the dial's center, on its flat edge."""
-    ax.add_patch(Wedge((cx, cy), r, 0, 180, facecolor="white", edgecolor=INK, linewidth=0.45, zorder=z))
-    for a in (30, 60, 90, 120, 150):
-        t = np.radians(a)
-        ax.plot([cx + 0.72 * r * np.cos(t), cx + 0.92 * r * np.cos(t)],
-                [cy + 0.72 * r * np.sin(t), cy + 0.92 * r * np.sin(t)], color=INK, lw=0.35, zorder=z + 1)
-    t = np.radians(55)
-    ax.plot([cx, cx + 0.70 * r * np.cos(t)], [cy, cy + 0.70 * r * np.sin(t)], color=INK, lw=0.6,
-            solid_capstyle="round", zorder=z + 2)
-    ax.add_patch(plt.Circle((cx, cy), 0.012, facecolor=INK, edgecolor="none", zorder=z + 3))
+def _bars(ax, x, y, z=5):
+    """Operator probes: three bars of different heights on a baseline; (x, y) is the baseline's left end."""
+    for k, h in enumerate((0.07, 0.12, 0.05)):
+        ax.add_patch(Rectangle((x + k * 0.045, y), 0.032, h, facecolor=GRAY, edgecolor=INK, linewidth=0.35, zorder=z))
+    ax.plot([x - 0.01, x + 0.14], [y, y], color=INK, lw=0.45, zorder=z + 1)
+
+
+def _tokens(ax, x, y, n=5, z=5):
+    """A prompt: a row of token squares; (x, y) is the row's lower left."""
+    for k in range(n):
+        ax.add_patch(Rectangle((x + k * 0.032, y), 0.026, 0.026 * 1.6, facecolor="white", edgecolor=INK,
+                               linewidth=0.35, zorder=z))
+
+
+def _lanes(ax, x, y, z=5):
+    """A priced schedule: two lanes of bars over time; (x, y) is the lower lane's left end."""
+    for lane, bars in ((0.0, ((0.0, 0.10), (0.12, 0.14))), (0.075, ((0.0, 0.17), (0.19, 0.06)))):
+        for x0, w in bars:
+            ax.add_patch(Rectangle((x + x0, y + lane), w, 0.05, facecolor=GRAY, edgecolor=INK, linewidth=0.35,
+                                   zorder=z))
+
+
+def _cross(ax, cx, cy, r=0.045, z=5):
+    """A refusal: a cross in a circle; (cx, cy) is its center."""
+    ax.add_patch(plt.Circle((cx, cy), r, facecolor="white", edgecolor=INK, linewidth=0.45, zorder=z))
+    d = r * 0.5
+    for sgn in (1, -1):
+        ax.plot([cx - d, cx + d], [cy - sgn * d, cy + sgn * d], color=INK, lw=0.6, zorder=z + 1)
 
 
 def fig_framework():
@@ -223,8 +240,9 @@ def fig_framework():
     ax.text(tx, 0.88, "Host program", ha="left", va="center_baseline", fontsize=fs, zorder=6)
     gy0 = 0.38  # the probes group's bottom, where the rail to the event model starts
     item(bx, gy0, 0.74, bw)
-    _gauge(ax, ix + 0.10, 0.525)
-    for y, label in ((0.635, "Operator probes"), (0.475, "Prompt length")):
+    _bars(ax, ix + 0.02, 0.61)
+    _tokens(ax, ix + 0.02, 0.45)
+    for y, label in ((0.645, "Operator probes"), (0.475, "Prompt length")):
         ax.text(tx, y, label, ha="left", va="center_baseline", fontsize=fs, zorder=6)
     # ---- the analysis: dependence graph, legality, bound
     xa, wa = 1.34, 1.44
@@ -264,27 +282,33 @@ def fig_framework():
                 zorder=5)
         ax.text(xr + 0.26, y, name, ha="left", va="center_baseline", fontsize=fs, fontweight="bold", zorder=5)
         ax.text(xr + 0.76, y, what, ha="left", va="center_baseline", fontsize=fs, zorder=5)
-    # ---- the event model, prefill only
+    # ---- the event model, prefill only: one item, a priced schedule
     xe, we, be = 4.94, 0.88, 0.57
     _stage(ax, xe, be, we, top - be, "Event model")
+    item(xe + 0.06, 0.64, 1.30, we - 0.12)
+    _lanes(ax, xe + 0.13, 1.10)
     for k, label in enumerate(("Order and", "configuration", "per prompt length")):
-        ax.text(xe + 0.08, 1.12 - k * 0.12, label, ha="left", va="center_baseline", fontsize=fs)
-    # ---- output
+        ax.text(xe + 0.12, 0.98 - k * 0.12, label, ha="left", va="center_baseline", fontsize=fs, zorder=6)
+    # ---- output: a refusal, or the rewritten design, which both priced prefill and decode's rings reach
     xo = 5.98
     wo = W - xo
     _stage(ax, xo, bot, wo, top - bot, "Output", ours=False)
-    _strip(ax, xo + 0.07, 1.16, "iiiss", cw=0.075, h=0.09)
-    for k, label in enumerate(("Rewritten design", "or refusal")):
-        ax.text(xo + 0.07, 0.98 - k * 0.12, label, ha="left", va="center_baseline", fontsize=fs)
+    item(xo + 0.06, 1.02, 1.30, wo - 0.12)
+    _cross(ax, xo + 0.16, 1.16)
+    ax.text(xo + 0.26, 1.16, "Refusal", ha="left", va="center_baseline", fontsize=fs, zorder=6)
+    item(xo + 0.06, 0.38, 0.96, wo - 0.12)
+    _strip(ax, xo + 0.12, 0.80, "iiiss", cw=0.075, h=0.09)
+    for k, label in enumerate(("Rewritten", "design")):
+        ax.text(xo + 0.12, 0.66 - k * 0.12, label, ha="left", va="center_baseline", fontsize=fs, zorder=6)
     # ---- flows
     _arrow(ax, (xi + wi, 1.0), (xa, 1.0))
     _arrow(ax, (xa + wa, 1.0), (xr, 1.0))
     for y, _, _ in rew[:2]:
         _arrow(ax, (xr + wr - 0.08, y), (xe, y))
-    _arrow(ax, (xe + we, 1.10), (xo, 1.10))
+    _arrow(ax, (xe + we, 0.80), (xo + 0.06, 0.80))
     # decode: the loop pass's rings go straight to the output, passing under the probe rail with a break, so the
     # two do not read as joined
-    _arrow(ax, (xr + wr - 0.08, rew[2][0]), (xo, rew[2][0]), z=3)
+    _arrow(ax, (xr + wr - 0.08, rew[2][0]), (xo + 0.06, rew[2][0]), z=3)
     # the probes and the prompt length feed the event model along a rail beneath the panels, from their own group
     ry, rx, gx = 0.15, xe + we / 2, ix + 0.10
     ax.add_patch(Rectangle((rx - 0.04, rew[2][0] - 0.02), 0.08, 0.04, facecolor="white", edgecolor="none", zorder=4))
@@ -320,6 +344,7 @@ def fig_rewrites():
                                          arrowstyle="-|>,head_length=1.2,head_width=0.65", color=INK, linewidth=0.6,
                                          shrinkA=0, shrinkB=0, zorder=10))
         ax.axvline(end, color="black", linewidth=0.5, linestyle=(0, (4, 2)))
+        ax.set_xlim(0, end * 1.04)  # the bars start at the axis
         ax.set_yticks([1, 0], labels, fontsize=FS)
         ax.set_ylim(-0.55, 1.55)
         ax.tick_params(left=False, right=False, top=False, bottom=False)

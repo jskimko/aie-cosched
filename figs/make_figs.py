@@ -465,7 +465,8 @@ def fig_timeline():
             ax.spines[side].set_visible(False)
         ax.tick_params(axis="x", top=False)
     axes[-1].set_xlim(0, 1.12)
-    axes[-1].set_xlabel("Normalized time (original TTFT = 1)", labelpad=1)
+    axes[-1].set_xlabel("Normalized time (original TTFT = 1)", labelpad=1, fontsize=7)
+    axes[-1].tick_params(axis="x", labelsize=6.5)
     fig.tight_layout(pad=0.2, h_pad=0.3)
     fig.savefig(OUT / "timeline.pdf")
     plt.close(fig)
@@ -594,12 +595,12 @@ CHOICE_RULES = (("opcord", "OPCORD"), ("always", "Always reorder"), ("fixed_s2",
 
 def fig_choice():
     """(a) The event model's error on each development cell's original-to-composed ratio against that ratio, and
-    (b) for each choice rule, the share of cells whose loss against the fastest measured choice is at most x.
+    (b) each choice rule's worst loss against the fastest measured choice, and the cells where it picks the fastest.
 
     data/accuracy-cells.json (the frozen form's 70 development cells) and data/choice.json (the 59 priced cells).
     "Never reorder" is left out of (b): its loss is the headline gain forgone, which Figure 6 shows."""
     rows = json.loads((DATA / "accuracy-cells.json").read_text())
-    fig, (a, b) = plt.subplots(1, 2, figsize=(WIDE, 1.55), gridspec_kw=dict(width_ratios=[1.05, 1], wspace=0.28))
+    fig, (a, b) = plt.subplots(1, 2, figsize=(WIDE, 1.55), gridspec_kw=dict(width_ratios=[1.0, 0.8], wspace=0.62))
     a.axhspan(-5, 5, color="#EDEDED", zorder=0, linewidth=0)
     for key, llm in KEY_LLM.items():
         rs = [r for r in rows if r["model"].startswith(key)]
@@ -611,32 +612,25 @@ def fig_choice():
     a.set_xscale("log", base=2)
     a.set_xticks([1, 1.25, 1.5, 2], ["1.0", "1.25", "1.5", "2.0"])
     a.minorticks_off()
-    a.set_xlabel("Measured speedup of the composed order", labelpad=1)
+    a.set_xlabel("Measured TTFT speedup of the composed order", labelpad=1)
     a.set_ylabel(r"Prediction error (\%)", labelpad=1)
     a.set_ylim(-16, 8)
     a.legend(loc="lower left", fontsize=5.5, ncol=2, handletextpad=0.2, columnspacing=0.6, labelspacing=0.15)
     a.set_title("(a) Event model", fontsize=7, pad=3)
     cells = json.loads((DATA / "choice.json").read_text())["cells"]
-    styles = {"opcord": (OURS, (0, ()), 1.2), "always": (INK, (0, (4, 1.5)), 0.8), "fixed_s2": (INK, (0, (1, 1.2)), 0.8),
-              "four_base": (STONE, (0, ()), 0.8)}
-    for key, label in CHOICE_RULES:  # empirical CDF: the share of cells whose loss is at most x
-        v = sorted(c[key] for c in cells if c.get(key) is not None)
-        xs, ys = [0.0], [0.0]
-        for k, x in enumerate(v):
-            xs += [x, x]
-            ys += [ys[-1], (k + 1) / len(v)]
-        xs.append(150)
-        ys.append(1.0)
-        color, dash, lw = styles[key]
-        b.plot(xs, ys, color=color, linestyle=dash, linewidth=lw, label=label, drawstyle="default")
-    b.set_xscale("symlog", linthresh=1, linscale=0.6)
-    b.set_xlim(0, 150)
-    b.set_xticks([0, 1, 10, 100], ["0", "1", "10", "100"])
-    b.set_ylim(0, 1.02)
-    b.set_ylabel("Share of cells", labelpad=1)
-    b.minorticks_off()
-    b.set_xlabel(r"Loss against the fastest measured choice (\%)", labelpad=1)
-    b.legend(loc="lower right", fontsize=6, handlelength=1.8, labelspacing=0.2)
+    labels = []
+    for i, (key, label) in enumerate(CHOICE_RULES):  # each rule's worst loss, and how often it picks the fastest
+        v = [c[key] for c in cells if c.get(key) is not None]
+        worst, exact = max(v), sum(1 for x in v if x == 0)
+        b.barh(i, worst, height=0.6, color=OURS if key == "opcord" else GRAY, edgecolor="none")
+        b.text(worst + 1.5, i, f"{worst:.1f}", ha="left", va="center", fontsize=6)
+        labels.append(f"{label} ({exact}/{len(v)})")
+    b.set_xlim(0, 110)
+    b.set_xticks([0, 25, 50, 75, 100])
+    b.set_ylim(len(CHOICE_RULES) - 0.5, -0.5)
+    b.set_yticks(range(len(CHOICE_RULES)), labels, fontsize=6)
+    b.tick_params(axis="y", length=0)
+    b.set_xlabel(r"Worst loss (\%)", labelpad=1)
     b.set_title("(b) Choice of order and configuration", fontsize=7, pad=3)
     fig.savefig(OUT / "choice.pdf")
     plt.close(fig)
@@ -668,7 +662,7 @@ def fig_vs_flm():
     ax.set_ylim(0.45, 3.4)
     ax.set_xticks(ticks, labels, fontsize=5.5)
     ax.tick_params(axis="x", length=0, pad=1.5)
-    ax.set_ylabel("Speedup", labelpad=1)
+    ax.set_ylabel("TTFT speedup", labelpad=1)
     handles = [plt.Line2D([], [], marker="s", markersize=2.8, color=INK, markerfacecolor="white", linestyle="none",
                           markeredgewidth=0.6),
                plt.Line2D([], [], marker="o", markersize=3, color=OURS, linestyle="none", markeredgewidth=0)]
