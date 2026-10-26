@@ -6,12 +6,13 @@
 % DECISION: the dependence classes, renaming, critical-cycle analysis, and the critical-path condition are cited where §4 and §5 define or use them, never claimed, and are not argued again here (outline v9 section 2, "Not contributions"; contract, Fixed).
 
 % VALUE: one representative per class of work a reviewer may name, against the capabilities that distinguish OPCORD; every mark is what that work's own text states (evidence in the vault's related-work table notes)
-Table~\ref{tab:relwork} sets OPCORD beside one representative of each class of work that this section discusses.
+Table~\ref{tab:relwork} sets OPCORD beside one representative of each class of work that this section discusses, from scheduling a given program to working on emitted artifacts.
 
 \begin{table*}[t]
     \centering
     \caption{OPCORD Beside Prior Work}
     \label{tab:relwork}
+    % DECISION: rows run from work that schedules a program or graph it is given (CUDA Graphs, Rammer, XLA, NanoFlow), through prediction from traces (Daydream) and synchronization placed while lowering (AscendNPU-IR), to work on emitted artifacts (BOLT, LATTICE), the closest last; the stacks OPCORD rewrites or reads (AIR, IRON, FLM) are inputs, not rows (author, 2026-10-26).
     % SOURCE: per-cell quotes from each work's own text (vault paper-cosched-relwork-table-evidence, Revision 2); column 6 is "predicts or bounds what a candidate change is worth before running that change on the target", applied to every row.
     \small
     \begin{threeparttable}
@@ -20,15 +21,14 @@ Table~\ref{tab:relwork} sets OPCORD beside one representative of each class of w
          & Compiled & Closed & No trace & Reorders & Renames & Predicts & Order per \\
          & artifact & binaries & of a run & for overlap & buffers & gain first & input \\
         \midrule
+        CUDA Graphs~\citep{nvidia-cudagraphs} & \xmark & \xmark & \cmark & \pmark & \xmark & \xmark & \xmark \\
         Rammer~\citep{ma2020rammer} & \xmark & \xmark & \xmark & \cmark & \xmark & \xmark & \xmark \\
         XLA's scheduler~\citep{jax-pgle} & \xmark & \xmark & \cmark & \cmark & \xmark & \cmark & \xmark \\
         NanoFlow~\citep{zhu2025nanoflow} & \xmark & \xmark & \xmark & \cmark & \xmark & \cmark & \xmark \\
-        AIR~\citep{wang2026mlirair} & \xmark & \xmark & \cmark & \cmark & \cmark & \xmark & \xmark \\
-        AscendNPU-IR~\citep{ascend-autosync} & \xmark & \xmark & \cmark & \pmark & \xmark & \xmark & \xmark \\
-        LATTICE~\citep{liu2026lattice} & \pmark & \xmark & \xmark & \cmark & \xmark & \cmark & \xmark \\
-        BOLT~\citep{panchenko2019bolt} & \cmark & \cmark & \xmark & \xmark & \xmark & \xmark & \xmark \\
         Daydream~\citep{zhu2020daydream} & \xmark & \xmark & \xmark & \xmark & \xmark & \cmark & \xmark \\
-        CUDA Graphs~\citep{nvidia-cudagraphs} & \xmark & \xmark & \cmark & \pmark & \xmark & \xmark & \xmark \\
+        AscendNPU-IR~\citep{ascend-autosync} & \xmark & \xmark & \cmark & \pmark & \xmark & \xmark & \xmark \\
+        BOLT~\citep{panchenko2019bolt} & \cmark & \cmark & \xmark & \xmark & \xmark & \xmark & \xmark \\
+        LATTICE~\citep{liu2026lattice} & \pmark & \xmark & \xmark & \cmark & \xmark & \cmark & \xmark \\
         \midrule
         OPCORD & \cmark & \pmark & \cmark & \cmark & \cmark & \cmark & \cmark \\
         \bottomrule
