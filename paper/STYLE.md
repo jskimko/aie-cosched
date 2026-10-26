@@ -442,6 +442,12 @@ FCCM'26 (`~/docs/FCCM26__When_Systolic_Arrays_Meet_AI_Engines/`, the IEEE templa
   release appears once as an absolute comparison, marked as a snapshot (author, 2026-10-25). Appends and agent
   turns are an extension and stay out of the body. The text before this rewrite is archived verbatim in the vault
   (`archive-tex-2026-10-24`).
+- **Captions and cross-references (author, 2026-10-26; supersedes the Title Case table caption above):** MLSys'26 practice,
+  counted on 135 papers (paper workspace tmp/r1/mlsys-conv): figure captions median 23 words (middle half 12-41), so ours aim
+  at about 20-40, a multi-panel figure at most a little above; table captions in sentence case (about 86% of MLSys tables;
+  the template's sample is a sentence), with a closing period, as "The census by design class."; in prose "Figure",
+  "Table" and "Section" written out (112, 117 and 75 papers against "Fig.", "Tab." and "\S"). Table notes are
+  marked by symbols (*, then dagger), with the general note first and unmarked.
 - **Contribution list** (author, 2026-10-24; supersedes the noun-phrase item form and the contribution items above
   where they differ): three items, in MLSys form ("We + verb" clauses), with the characterization first. (1) We identify
   that fused designs serialize independent work through their compiled command order, and characterize when removing

@@ -9,7 +9,7 @@
     % VALUE: the headline at a glance: OPCORD's TTFT gain over the baseline on every LLM across the prompt sweep, with the split it runs on
     % SOURCE: figs/make_figs.py fig_headline over figs/data/prefill-cells.json (figs/paper_numbers.py at amd-npu a6abaf19): the amendment-1 batch's registered analysis on its 38 cells (paired, or chained through orig-S2 where the baseline split differs from the pick's), the grid or split cells' paired ratio elsewhere, unpaired (no whisker) for LFM2-1.2B at 2K and Gemma3-4B at 1K; picks by choose() at opcord d6caf8b; Llama-3.2-1B at 32,768 unpriced (chunk 160 outside its probed chunks, n1 NOTES).
     \includegraphics[width=\textwidth]{fig/headline.pdf}
-    \caption{TTFT speedup of OPCORD over AIR's original program on its fastest supported configuration that we measure, as ratios of medians with 95\% intervals. A dagger marks a ratio across batches, which has no interval, and fills give the configuration that OPCORD chooses.}
+    \caption{TTFT speedup of OPCORD over AIR's original program on its fastest supported configuration that we measure, as ratios of medians with 95\% intervals. Fills give OPCORD's chosen configuration, and a dagger marks a ratio across batches, which has no interval.}
     \label{fig:headline}
 \end{figure*}
 
@@ -123,7 +123,7 @@ The event model's own choice of order and configuration stays within \ChoiceOpco
 These choices come from an earlier form of the event model with the same constants, and the accuracy below is that of the final form that Section~\ref{subsec:pricing} describes.
 The final form changes \FinalChanged{} of the \ChoiceCells{} choices, and on the \FinalMeasured{} cells where its exact choice was measured, it loses at most \FinalLossMax\%, at Llama-3.2-1B's 1K-token prompt.
 We compare its choice on every cell against the fastest order and configuration measured there, and against fixed rules.
-Always reordering composes on the configuration that OPCORD chooses, always running $S_2$ takes the faster order on that configuration, and reordering from $C \ge 4$ chunks composes from 512 tokens on, on the baseline's configuration, and keeps the original order below.
+Always reordering composes on the configuration that OPCORD chooses, always running $S_2$ takes the faster order on that configuration, and reordering from $C \ge 4$ chunks of 128 tokens composes from 512 tokens on, on the baseline's configuration, and keeps the original order below.
 Every cell where the choice misses the minimum falls inside the band in which the composer settles a near-tie by a short measurement (Section~\ref{subsec:pricing}), which these runs do not use.
 Where the candidates of a cell ran in different batches, the comparison crosses batches, so a loss of a few percent lies within the drift between them.
 Each fixed rule loses far more somewhere, since never reordering, which Figure~\ref{fig:choice}b omits, gives up the long prompts' gains, always reordering loses at one or two chunks (Section~\ref{subsec:shape-eval}), and a fixed configuration loses where the balance between the groups moves.
@@ -135,7 +135,7 @@ Reordering from four chunks, even on the baseline's configuration, loses up to \
     % VALUE: (a) the event model's error per development cell stays within a few percent except where it underprices Llama-3.2-1B's largest gains; (b) the event model's own choice stays within a few percent of the fastest measured choice on every cell, whereas each fixed rule loses tens of percent somewhere
     % SOURCE: (a) figs/data/accuracy-cells.json (the frozen form's 70 development cells); (b) figs/data/choice.json (59 cells; the four-chunk rule on the baseline's configuration over the 53 cells where its choice was measured); figs/make_figs.py fig_choice.
     \includegraphics[width=\linewidth]{fig/choice.pdf}
-    \caption{(a) The event model's error on the composed order's speedup over the original order, on \AccCells{} cells, with a gray band at $\pm5\%$ that holds \AccWithinFive{} of them. (b) The worst loss of OPCORD's choice and three fixed rules against each cell's measured minimum TTFT, over \ChoiceCells{} cells. The last rule reorders from $C \ge 4$ chunks of 128 tokens on the baseline's configuration and covers \ChoiceFourBaseCells{} cells.}
+    \caption{(a) The event model's error on the composed order's speedup over the original order on \AccCells{} cells, with \AccWithinFive{} inside the gray $\pm5\%$ band. (b) The worst loss of each choice against each cell's measured minimum TTFT, over \ChoiceCells{} cells, or \ChoiceFourBaseCells{} for the last rule.}
     \label{fig:choice}
 \end{figure}
 
@@ -272,7 +272,7 @@ Their 32 streams, at an exposure of zero and with their transfers already issued
 
 \begin{table}[t]
     \centering
-    \caption{The Census by Design Class}
+    \caption{The census by design class.}
     \label{tab:census}
     % VALUE: each design class read from its artifacts against the two clauses of the condition, grouped by how its work is packaged: only the classes where both clauses hold gain (AIR's prefill and decode, and a two-group fused design of ours written with IRON's interface, marked as ours with a note); every other class is bounded at or near 1x
     % SOURCE: AIR prefill bound against measured, 185 of 187 cells, and decode at 99-100% of the bound on Llama-3.2-1B (Section 4.6's SOURCE lines); FLM flash prefill B 1.000, joint bound over every order 1.04-1.09, at most 1.13 with merges, merge replays 2.9-3.3% (terms4, terms5, replay stage 1, Section 4.6-4.7's SOURCE lines); FLM per-operator prefill 99.6-100% of consecutive dispatches share a column (first clause fails; the bound follows from the rule in Section 3.2); FLM decode 1.000 inside dispatches, at most 1.009 between steps (e679463); IRON's 32 LLM streams and 3 non-LLM builds (mobilenet, resnet, bottleneck) at 1.000 (aie-cosched 1a87bc6).
@@ -321,7 +321,7 @@ Only the event model prices the exposed host time at few chunks and the incomple
     \centering
     % VALUE: the shape over prompt length on a controlled design: the composed order ties at one chunk, loses at two and four, and gains from eight chunks on, on three builds that vary the GEMMs' work at fixed attention; at 32 chunks the build nearest balance gains least
     \includegraphics[width=\linewidth]{fig/synthetic.pdf}
-    \caption{TTFT speedup of the composed order over the original order, as ratios of medians, on a synthetic two-layer prefill built like AIR's. Its three builds keep Llama-3.2-1B's attention and vary the GEMMs' work through the hidden size and feed-forward width. Most 95\% intervals lie within the markers.}
+    \caption{TTFT speedup of the composed order over the original order, as ratios of medians, on a synthetic two-layer prefill built like AIR's, whose three builds keep Llama-3.2-1B's attention and vary the GEMMs' work. Most 95\% intervals lie within the markers.}
     \label{fig:synthetic}
 \end{figure}
 

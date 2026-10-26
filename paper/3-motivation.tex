@@ -16,7 +16,7 @@ Nor does a second hardware context, because the driver gives every context all e
     \centering
     % VALUE: OPCORD's three rewrites, each before and after, in one vocabulary: (a) the composer issues both groups' work in one dispatch instead of the GEMMs waiting for attention; (b) the stream pass alternates attention's two columns within its stream; (c) the loop pass renames decode attention's buffers into two-slot rings; each dotted arrow is a false dependence
     \includegraphics[width=\textwidth]{fig/rewrites.pdf}
-    \caption{OPCORD's three rewrites and the false dependences they remove, where (a) the GEMMs wait for attention whether or not they share its dispatch, (b) column~7 waits behind the CP's synchronizations on column~0 in attention's stream, and (c) each block's key and value transfer in decode attention's loop waits for the previous block's compute to release a single buffer. Each arrow points to the work that waits, and dashed lines mark where the work finishes before the rewrite.}
+    \caption{OPCORD's three rewrites, which remove (a) the GEMMs' wait for attention, in its dispatch or the next, (b) column~7's wait behind the CP's synchronizations on column~0, and (c) decode's wait for compute to free a single buffer before the next block's transfer. Arrows point to the waiting work, and dashed lines mark where the work finished before.}
     \label{fig:rewrites}
 \end{figure*}
 % DECISION: one schematic for the three rewrites (author, 2026-10-26), replacing the CP-order schematic and the decode-ring figure; it sits here because it explains why packing creates no overlap, which the paired measurements show but do not explain, and the rewrites' subsections refer to its panels.
