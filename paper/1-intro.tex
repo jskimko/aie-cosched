@@ -67,7 +67,8 @@ Third, a composer reorders issue across commands, a stream pass within one opera
 Because OPCORD rewrites designs it did not compile, each stands behind a checker that refuses any rewrite it cannot show legal, with kernels, driver, and firmware unchanged.
 
 % VALUE: the evidence in brief: headline gains against the baseline, the absolute standing, choice quality, exactness and legality, and the condition's scope across the census
-Against the original program on its fastest supported split that we measure, OPCORD shortens TTFT across five LLMs by \PrefillGainLo--\PrefillGainHi$\times$ at prompts of 1K to 32K tokens, and its loop pass shortens decode by \DecodeGainLo--\DecodeGainHi$\times$ at contexts of about 30K tokens against the unmodified decode design, both with bit-identical outputs.
+Against the original program on its fastest supported split that we measure, OPCORD shortens TTFT across five LLMs by \PrefillGainLo--\PrefillGainHi$\times$ at prompts of 1K to 32K tokens, with bit-identical outputs.
+Against the unmodified decode design, its loop pass shortens decode by \DecodeGainLo--\DecodeGainHi$\times$ at contexts of about 30K tokens, again with bit-identical outputs.
 On MLIR-AIR's designs, OPCORD also reaches the first token sooner than FastFlowLM's current release, on every LLM and prompt length we compare.
 Its choice of order and split stays within \ChoiceOpcordMax\% of the measured minimum on every LLM and prompt length it prices, whereas each fixed rule we test loses \ChoiceAlwaysMax--\ChoiceFourSTwoMax\% on some of them.
 Its analysis re-emits every stream we read from three stacks byte for byte, and its checkers refuse every illegal rewrite we inject.
