@@ -596,6 +596,7 @@ def fig_decode():
     ax.set_xticks([0, 8, 16, 24, 32])
     ax.set_xlim(0, 32)
     ax.set_ylim(0.95, 1.5)
+    ax.set_yticks([1.0, 1.1, 1.2, 1.3, 1.4])
     ax.legend(loc="upper left", ncol=2, handlelength=1.6, columnspacing=0.8, labelspacing=0.2)
     save(fig, "decode.pdf")
     plt.close(fig)
@@ -663,7 +664,7 @@ def fig_choice():
     a.set_ylabel(r"Prediction error (\%)", labelpad=1)
     a.set_ylim(-24, 8)  # room below the band for the legend
     a.legend(loc="lower left", ncol=2, handletextpad=0.2, columnspacing=0.6, labelspacing=0.15)
-    a.set_title("(a) Event model", pad=3)
+    a.set_title("(a) Event model", pad=4)
     cells = json.loads((DATA / "choice.json").read_text())["cells"]
     labels = []
     for i, (key, label) in enumerate(CHOICE_RULES):  # each rule's worst loss
@@ -678,7 +679,7 @@ def fig_choice():
     b.set_yticks(range(len(CHOICE_RULES)), labels)
     b.tick_params(axis="y", length=0)
     b.set_xlabel(r"Worst loss (\%)", labelpad=1)
-    b.set_title("(b) Choice of order and configuration", pad=3)
+    b.set_title("(b) Choice of order and configuration", pad=4)
     save(fig, "choice.pdf")
     plt.close(fig)
 
@@ -711,7 +712,7 @@ def fig_vs_flm():
     ax.set_xticks(ticks, labels)
     ax.set_xticks([g * len(lengths) - 0.5 for g in range(1, len(LLMS))], minor=True)
     ax.set_yticks([], minor=True)
-    ax.tick_params(axis="x", which="major", length=0, pad=1.5)
+    ax.tick_params(axis="x", which="major", length=0, pad=2.5)  # clear of the boundary ticks
     ax.tick_params(axis="x", which="minor", length=4, direction="inout", width=0.5)
     ax.set_ylabel("TTFT speedup", labelpad=1)
     handles = [plt.Line2D([], [], marker="s", markersize=2.8, color=INK, markerfacecolor="white", linestyle="none",
