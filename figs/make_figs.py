@@ -60,6 +60,7 @@ COLUMN = 3.25  # MLSys column width, inches
 OURS, OURS_TINT = "#714CA6", "#F3EFFB"  # OKLCH (0.50, 0.14, 300); the tint fills our stages in the overview
 ATTN, ATTN_FILL = "#DBB970", "#E2CFA8"  # OKLCH (0.80, 0.10, 85), fill at L 0.86
 GEMM, GEMM_FILL = "#4E9397", "#B5D9DB"  # OKLCH (0.62, 0.07, 200), fill at L 0.86
+ATTN_BAR, GEMM_BAR = "#DDC084", "#83BDC0"  # between the fill and the line step, for the measured timeline's bars
 STONE = "#707070"  # neutral mid gray: both groups busy
 BLUE, MAGENTA, ORANGE = GEMM, OURS, ATTN  # the names the older figure functions use
 PURPLE, GOLD = "#8770E0", "#F0B840"  # used only by figures outside the paper
@@ -439,7 +440,7 @@ def fig_timeline():
     against the reader's own both-outstanding total."""
     d = json.loads((DATA / "fig1-intervals-1b.json").read_text())["arms"]
     arms = (("ship", "Original"), ("comp", "OPCORD"))
-    rows = (("A", "Attention", ATTN_FILL), ("G", "GEMMs", GEMM_FILL))
+    rows = (("A", "Attention", ATTN_BAR), ("G", "GEMMs", GEMM_BAR))
     fig, axes = plt.subplots(2, 1, figsize=(COLUMN, 1.45), sharex=True)
     base = d["ship"]["ttft_ms"]  # time is drawn relative to the original's TTFT
 
@@ -522,8 +523,7 @@ def fig_headline():
     plt.close(fig)
 
 
-# One neutral ink per LLM, told apart by marker and line style, since the palette's hues mean attention, GEMMs and
-# OPCORD in the other figures.
+# Our color for every LLM's gain from OPCORD, the LLMs told apart by marker and line style.
 DECODE_STYLE = {"Llama-3.2-1B": ("o", "full", (0, ())), "LFM2-1.2B": ("s", "none", (0, ())),
                 "Qwen3-4B": ("^", "full", (0, (4, 1.5))), "Llama-3.1-8B": ("D", "none", (0, (4, 1.5))),
                 "Gemma3-4B": ("v", "full", (0, (1, 1.2)))}
@@ -543,8 +543,8 @@ def fig_decode():
         xs, ys = [p / 1024 for p, _ in pts], [c["gain"] for _, c in pts]
         ax.errorbar(xs, ys, yerr=[[c["gain"] - c["lo"] for _, c in pts], [c["hi"] - c["gain"] for _, c in pts]],
                     fmt="none", ecolor=INK, elinewidth=0.5, capsize=1.0)
-        ax.plot(xs, ys, color=INK, marker=marker, markersize=2.6, linestyle=dash, linewidth=0.7,
-                markerfacecolor=INK if fill == "full" else "white", markeredgewidth=0.6, label=llm)
+        ax.plot(xs, ys, color=OURS, marker=marker, markersize=2.6, linestyle=dash, linewidth=0.7,
+                markerfacecolor=OURS if fill == "full" else "white", markeredgewidth=0.6, label=llm)
     ax.axhline(1.0, color="black", linewidth=0.5)
     ax.set_xlabel("Cached context (K tokens)", labelpad=1)
     ax.set_ylabel("Decode speedup", labelpad=2)
@@ -556,7 +556,7 @@ def fig_decode():
     plt.close(fig)
 
 
-# Three synthetic builds told apart by marker, in the decode figure's neutral ink.
+# Three synthetic builds told apart by marker, in our color as in the decode figure.
 SYNTH_STYLE = {"synth_ag_d1024_i768": ("Light GEMMs", "o", "full", (0, ())),
                "synth_ag_d2048_i2304": ("Medium GEMMs", "s", "none", (0, (4, 1.5))),
                "synth_ag_d2048_i12288": ("Heavy GEMMs", "^", "full", (0, (1, 1.2)))}
@@ -574,8 +574,8 @@ def fig_synthetic():
         med, lo, hi = ([r[k] for _, r in pts] for k in range(3))
         ax.errorbar(xs, med, yerr=[[m - l for m, l in zip(med, lo)], [h - m for m, h in zip(med, hi)]], fmt="none",
                     ecolor=INK, elinewidth=0.5, capsize=1.0)
-        ax.plot(xs, med, color=INK, marker=marker, markersize=2.6, linestyle=dash, linewidth=0.7,
-                markerfacecolor=INK if fill == "full" else "white", markeredgewidth=0.6, label=label)
+        ax.plot(xs, med, color=OURS, marker=marker, markersize=2.6, linestyle=dash, linewidth=0.7,
+                markerfacecolor=OURS if fill == "full" else "white", markeredgewidth=0.6, label=label)
     ax.axhline(1.0, color="black", linewidth=0.5)
     ax.set_xscale("log", base=2)
     ax.set_xticks([1, 2, 4, 8, 16, 32], ["1", "2", "4", "8", "16", "32"])
@@ -596,7 +596,7 @@ CHOICE_RULES = (("opcord", "OPCORD"), ("always", "Always reorder"), ("fixed_s2",
 
 def fig_choice():
     """(a) The event model's error on each development cell's original-to-composed ratio against that ratio, and
-    (b) each choice rule's loss against the fastest measured choice per cell, one dot per cell, the bar at the median.
+    (b) each choice rule's worst loss against the fastest measured choice over the cells (the median is 0 for every rule shown).
 
     data/accuracy-cells.json (the frozen form's 70 development cells) and data/choice.json (the 59 priced cells).
     "Never reorder" is left out of (b): its loss is the headline gain forgone, which Figure 6 shows."""
@@ -617,23 +617,19 @@ def fig_choice():
     a.set_ylabel(r"Prediction error (\%)", labelpad=1)
     a.set_ylim(-16, 8)
     a.legend(loc="lower left", fontsize=5.5, ncol=2, handletextpad=0.2, columnspacing=0.6, labelspacing=0.15)
-    a.set_title("(a)", fontsize=7, pad=3)
+    a.set_title("(a) Event model", fontsize=7, pad=3)
     cells = json.loads((DATA / "choice.json").read_text())["cells"]
     for i, (key, label) in enumerate(CHOICE_RULES):
-        v = sorted(c[key] for c in cells if c.get(key) is not None)
-        jitter = [((k * 0.6180339) % 1 - 0.5) * 0.44 for k in range(len(v))]  # deterministic spread
-        color = OURS if key == "opcord" else INK
-        b.plot(v, [i + j for j in jitter], linestyle="none", marker="o", markersize=1.8, color=color, alpha=0.85,
-               markeredgewidth=0)
-        b.plot([v[len(v) // 2]] * 2, [i - 0.36, i + 0.36], color=color, linewidth=1.0)
-    b.set_xscale("symlog", linthresh=1, linscale=0.6)
-    b.set_xlim(-0.3, 150)
-    b.set_xticks([0, 1, 10, 100], ["0", "1", "10", "100"])
+        worst = max(c[key] for c in cells if c.get(key) is not None)
+        b.barh(i, worst, height=0.6, color=OURS if key == "opcord" else GRAY, edgecolor="none")
+        b.text(worst + 1.5, i, f"{worst:.1f}", ha="left", va="center", fontsize=6)
+    b.set_xlim(0, 112)
+    b.set_xticks([0, 25, 50, 75, 100])
     b.set_yticks(range(len(CHOICE_RULES)), [label for _, label in CHOICE_RULES], fontsize=6)
     b.invert_yaxis()
-    b.minorticks_off()
-    b.set_xlabel(r"Loss against the fastest measured choice (\%)", labelpad=1)
-    b.set_title("(b)", fontsize=7, pad=3)
+    b.tick_params(axis="y", length=0)
+    b.set_xlabel(r"Worst loss against the fastest measured choice (\%)", labelpad=1)
+    b.set_title("(b) Choice of order and configuration", fontsize=7, pad=3)
     fig.savefig(OUT / "choice.pdf")
     plt.close(fig)
 
@@ -668,7 +664,7 @@ def fig_vs_flm():
     handles = [plt.Line2D([], [], marker="s", markersize=2.8, color=INK, markerfacecolor="white", linestyle="none",
                           markeredgewidth=0.6),
                plt.Line2D([], [], marker="o", markersize=3, color=OURS, linestyle="none", markeredgewidth=0)]
-    ax.legend(handles, [r"AIR, original on $S_2$", "AIR with OPCORD"], loc="upper center", bbox_to_anchor=(0.5, -0.13),
+    ax.legend(handles, [r"AIR, $S_2$", "AIR with OPCORD"], loc="upper center", bbox_to_anchor=(0.5, -0.13),
               fontsize=6, handletextpad=0.2, ncol=2)
     fig.savefig(OUT / "vs-flm.pdf")
     plt.close(fig)
