@@ -49,7 +49,8 @@ In the current releases of a closed production stack, FastFlowLM (FLM)~\citep{fa
 Its flash designs run each layer's attention once over the whole prompt, so every GEMM feeds or reads it.
 
 % VALUE: why the order must be priced per prompt length: the original program's chunks make the balance between the groups move with the prompt, and the split moves with it
-The original program, by contrast, runs fixed-size chunks, in which attention's work grows with the chunk's position while the GEMMs' work stays fixed, so the balance between the groups, and with it whether the overlap repays a new order's per-dispatch costs, shifts with the prompt.
+The original program, by contrast, runs fixed-size chunks, in which attention's work grows with the chunk's position while the GEMMs' work stays fixed.
+The balance between the groups, and with it whether the overlap repays a new order's per-dispatch costs, therefore shifts with the prompt.
 The order and the configuration, namely the split of the columns between attention and the GEMMs, must therefore be priced per length (Section~\ref{subsec:question}).
 
 % VALUE: (4) this work: OPCORD, one sentence per part with what it is and why: the analysis reads compiled artifacts across every agent and decides legality from them; the event model, analytical in form with microbenchmark constants, prices orders and splits per prompt length, and a bound limits what each false dependence can gain; the composer, the stream pass and the loop pass remove the false dependences the price clears, under checkers; headline results against the original program on its best supported split, and the event model's choice quality

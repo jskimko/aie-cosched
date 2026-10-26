@@ -57,7 +57,7 @@ Running both groups at once makes a group that reads at the shared DRAM read cap
 
 % VALUE: within one operator's stream, the stream pass (an MLIR-AIE pass on the runtime sequence, compiled or lifted) applies the same reorder: column 7's work waits behind the CP's synchronization on column 0 although it reads none of its results; the pass orders the segments by their index within their column, alternating the columns, so the opening segments come first and so each column's work is issued before the CP waits on another; its checker tests every inverted pair and leaves the stream unchanged on a finding; it is the rule by which Section 2.5's columns were alternated, and it emits that alternation byte for byte rather than discovering it
 Our \emph{stream pass} applies the same reorder within one operator's stream, so that column~7's work in attention no longer waits behind the CP's synchronizations on column~0, whose results it does not read (Figure~\ref{fig:rewrites}b).
-The stream pass works on the runtime sequence as an MLIR-AIE pass, whether compiled or lifted from a recording.
+The stream pass works as an MLIR-AIE pass on the runtime sequence, whether compiled or lifted from a recording.
 The pass orders the segments by their index within their column and alternates the columns at each index, so the opening segments of all columns come first and each column's work is issued before the CP waits on another.
 Its checker tests every pair of instructions that the new order inverts (Section~\ref{subsec:legality}) and leaves the stream unchanged on any finding.
 This is the rule by which we alternated attention's columns in Section~\ref{subsec:losses}, and the pass emits that alternation byte for byte on all 42 streams we alternated by hand.

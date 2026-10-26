@@ -61,7 +61,7 @@ A modular design runs its operators in turn whatever their order, because a hard
 % SOURCE: every hardware context is allocated all eight columns per the driver's source, and a one-column design on two contexts takes 1.97x one alone (Section 3); a hardware context holds its configurations one at a time (FastFlowLM's per-operator engine and IRON's operator sequences, Section subsec:census).
 Fusing has its own cost, because the dataflows of every resident operator must then fit together into the tiles, DMA channels, buffers, and routes of one configuration.
 The operators of a fused design also run from one hardware context, whose dispatches queue on one CP.
-A second cut splits a fused design's work into dispatches, each with one operator or several, over one chunk of the prompt or all of it, and decides which waits the CP's order places between operators.
+A second cut splits a fused design's work into dispatches, each with one operator or column group or several, over one chunk of the prompt or all of it, and decides which waits the CP's order places between operators.
 A third decides whether each role in a loop keeps one buffer or several, and so which waits the loop places between its blocks.
 IRON, a close-to-metal Python interface to MLIR-AIE~\citep{hunhoff2025iron} that can also express fused designs, composes an LLM as a sequence of operators that each reconfigure the whole array.
 AIR and Stream~\citep{symons2025stream} instead generate fused designs, and FLM ships fused flash designs and a modular per-operator engine as binaries with the runtime that issues them.
