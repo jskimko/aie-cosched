@@ -7,7 +7,8 @@
 \label{subsec:compose}
 % DECISION: subsec:compose names the composer's part of the reorder and resolves to this subsection; the conditions the former composing subsection stated are in Section~\ref{sec:order}.
 A synchronization on one group holds back every later issue to the others (Section~\ref{subsec:platform}), which is an order dependence wherever that work does not read the awaited result.
-Where the original program runs a layer stage by stage, so that the CP issues no GEMM beside attention (Section~\ref{subsec:losses}), our \emph{composer} list-schedules the producer-consumer order between the host program's operators chunk by chunk, from the design's per-operator streams and probes, and emits dispatches whose order we call the \emph{composed order} (Algorithm~\ref{alg:compose}).
+Across operators, the original program runs a layer stage by stage, so the CP issues no GEMM beside attention (Section~\ref{subsec:losses}).
+Our \emph{composer} instead list-schedules the producer-consumer order between the host program's operators chunk by chunk, from the design's per-operator streams and probes, and emits dispatches whose order we call the \emph{composed order} (Algorithm~\ref{alg:compose}).
 The composer thus changes the design's cut into dispatches (Section~\ref{subsec:spectrum}) while keeping its configuration.
 A dispatch concatenates its operators' segments under the conditions of Section~\ref{subsec:legality}, so composing changes when work is issued and awaited, never what the work is.
 % SOURCE: merged.plan (amd-npu a0ee2ed prefill-overlap/merged.py, now opcord/compose/merged.py at aie-cosched opcord-runtime 446fa1c): qkv(L, c) after down(L-1, c); attn(L, c) after qkv(L, 0..c); o after attn; gate and up after o; down after gate and up; GEMMs added in the same order until their estimated work reaches the attention operator's; an optional cap on the GEMMs per attention command.
@@ -56,7 +57,7 @@ Running both groups at once makes a group that reads at the shared DRAM read cap
 
 % VALUE: within one operator's stream, the stream pass (an MLIR-AIE pass on the runtime sequence, compiled or lifted) applies the same reorder: column 7's work waits behind the CP's synchronization on column 0 although it reads none of its results; the pass orders the segments by their index within their column, alternating the columns, so the opening segments come first and so each column's work is issued before the CP waits on another; its checker tests every inverted pair and leaves the stream unchanged on a finding; it is the rule by which Section 2.5's columns were alternated, and it emits that alternation byte for byte rather than discovering it
 Our \emph{stream pass} applies the same reorder within one operator's stream, so that column~7's work in attention no longer waits behind the CP's synchronizations on column~0, whose results it does not read (Figure~\ref{fig:rewrites}b).
-It runs as an MLIR-AIE pass on the runtime sequence, whether compiled or lifted from a recording.
+The stream pass works on the runtime sequence as an MLIR-AIE pass, whether compiled or lifted from a recording.
 The pass orders the segments by their index within their column and alternates the columns at each index, so the opening segments of all columns come first and each column's work is issued before the CP waits on another.
 Its checker tests every pair of instructions that the new order inverts (Section~\ref{subsec:legality}) and leaves the stream unchanged on any finding.
 This is the rule by which we alternated attention's columns in Section~\ref{subsec:losses}, and the pass emits that alternation byte for byte on all 42 streams we alternated by hand.
@@ -67,7 +68,8 @@ This is the rule by which we alternated attention's columns in Section~\ref{subs
 \label{subsec:rings}
 
 % VALUE: decode attention's keys, values, and scores each sit in one buffer, so each block's transfer waits for the previous block's compute, a name dependence; only the running maximum and accumulator carry; the loop pass renames every other buffer into a two-slot ring: a second slot on the same tile, the free lock's initial count raised to two, each BD chain and core loop alternating the slots; it classes buffers by their conflicts across iterations and leaves the carried state, which is why the compiler's transformation declines the loop and ours does not
-Decode attention's loop keeps one buffer per role, so each block's transfer waits for the previous block's compute, whose results it does not read (Section~\ref{subsec:losses}, Figure~\ref{fig:rewrites}c), yet only the running maximum and the accumulator carry data across blocks.
+Decode attention's loop keeps one buffer per role, so each block's transfer waits until the previous block's compute releases the buffer, although it reads none of that compute's results (Section~\ref{subsec:losses}, Figure~\ref{fig:rewrites}c).
+Only the running maximum and the accumulator carry data across blocks.
 Our \emph{loop pass} therefore renames each of the others, namely the keys, the values, and the scores passed between the two cores, into a \emph{ring} of two slots.
 Whereas AIR's double-buffering transformation declines the whole loop for its carried state, our pass classes every buffer of the lowered loop by its conflicts across iterations and leaves the carried state in place.
 For each buffer it renames, the pass adds a second slot on the same tile, raises the initial count of the lock that marks a slot free from one to two, and alternates the two slots in every BD chain and core loop that uses the buffer.
