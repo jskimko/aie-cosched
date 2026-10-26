@@ -332,9 +332,8 @@ def fig_framework():
     oi, ow = xo + ins, wo - 2 * ins
     oc = oi + pad  # the column's left
     item(oi, 1.02, 1.30, ow)
-    om = (0.28 - (0.09 + 0.05 + sum(lab))) / 2
-    _cross(ax, oc + 0.045, 1.30 - om - 0.045)
-    ax.text(oc, 1.30 - om - 0.14 - lab[0], "Refusal", ha="left", va="center_baseline", fontsize=fs, zorder=6)
+    _cross(ax, oc + 0.045, 1.16)  # the glyph and its label on one line, centered in the item
+    ax.text(oc + 0.13, 1.16, "Refusal", ha="left", va="center_baseline", fontsize=fs, zorder=6)
     item(oi, 0.38, 0.96, ow)
     om = (0.58 - (0.09 + 0.05 + sum(lab))) / 2
     _strip(ax, oc - 0.004, 0.96 - om - 0.09, "iiiss", cw=0.075, h=0.09)

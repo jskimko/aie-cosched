@@ -63,6 +63,7 @@ plt.rcParams.update({
     "ytick.major.size": 2.5,
     "legend.frameon": False,
     "legend.fontsize": FS_TICK,
+    "hatch.linewidth": 0.5,
     "savefig.bbox": "tight",
     "savefig.pad_inches": 0.01,
 })
@@ -521,9 +522,17 @@ def fig_timeline():
     plt.close(fig)
 
 
-# light steps of OURS, so the near-black error bars stay visible on every bar
-SPLIT_COLOR = {"S1": "#E8DFFD", "S2": "#CEBEEF", "S4": "#AE97D9"}
+# a light step of OURS for S4's filled bars, so the near-black error bars stay visible on them
+S4_FILL = "#AE97D9"
 LLMS = ("Llama-3.2-1B", "LFM2-1.2B", "Qwen3-4B", "Gemma3-4B", "Llama-3.1-8B")
+
+
+def split_style(split):
+    """How a bar shows the configuration OPCORD runs on, by fill type so it reads in grayscale: S1 outlined, S2
+    hatched, S4 filled, each edged in our color."""
+    edge = dict(edgecolor=OURS, linewidth=0.6)
+    return {"S1": dict(facecolor="white", **edge), "S2": dict(facecolor="white", hatch="////", **edge),
+            "S4": dict(facecolor=S4_FILL, **edge)}[split]
 
 
 def fig_headline():
@@ -542,10 +551,9 @@ def fig_headline():
             c = at.get(n)
             if c is None or c.get("unpriced"):
                 continue
-            ax.bar(i, c["gain"] - 1.0, bottom=1.0, width=0.72, color=SPLIT_COLOR[c["pick_split"]], edgecolor="none",
-                   zorder=2)
+            ax.bar(i, c["gain"] - 1.0, bottom=1.0, width=0.72, zorder=2, **split_style(c["pick_split"]))
             # a cap at the value, so a pick that keeps the original order (exactly 1) still shows its split
-            ax.plot([i - 0.36, i + 0.36], [c["gain"]] * 2, color=SPLIT_COLOR[c["pick_split"]], linewidth=1.4,
+            ax.plot([i - 0.36, i + 0.36], [c["gain"]] * 2, color=OURS, linewidth=1.4,
                     solid_capstyle="butt", zorder=2)
             if c.get("lo") is None:
                 # the baseline and the pick ran in different batches with no shared version: no interval
@@ -560,7 +568,7 @@ def fig_headline():
         ax.set_title(llm, pad=3)
     axes[0].set_ylabel("TTFT speedup", labelpad=2)
     axes[0].set_ylim(0.9, 1.72)
-    handles = [plt.Rectangle((0, 0), 1, 1, color=SPLIT_COLOR[s]) for s in ("S1", "S2", "S4")]
+    handles = [plt.Rectangle((0, 0), 1, 1, **split_style(s)) for s in ("S1", "S2", "S4")]
     axes[0].legend(handles, ["$S_1$", "$S_2$", "$S_4$"], title="Configuration", loc="upper left", handlelength=0.9,
                    handletextpad=0.4, borderaxespad=0.2, labelspacing=0.2)
     fig.supxlabel("Prompt length (tokens)", y=-0.02)
@@ -686,43 +694,43 @@ def fig_choice():
 
 @type_scale(VS_FLM_SCALE)
 def fig_vs_flm():
-    """TTFT speedup over FLM's current release at 1K, 4K and 16K tokens: AIR's original program on its default
-    configuration, and the same design under OPCORD. data/absolute.json (D1, one batch)."""
+    """TTFT speedup over FLM's current release at 1K, 4K and 16K tokens, grouped by prompt length: AIR's original
+    program on its default configuration in ink and the same design under OPCORD in our color, joined by a gray line;
+    the LLMs keep their markers from the decode and choice figures. data/absolute.json (D1, one batch)."""
     rows = json.loads((DATA / "absolute.json").read_text())["rows"]
-    fig, ax = plt.subplots(figsize=(COLUMN, 1.25))
-    # the points evenly spaced, three per LLM; a tick at each boundary between LLMs separates the groups
-    lengths = {1024: "1K", 4096: "4K", 16384: "16K"}
-    ticks, labels = [], []
-    for g, llm in enumerate(LLMS):
-        rs = sorted((r for r in rows if r["llm"] == llm and r.get("N") in lengths), key=lambda r: r["N"])
-        for k, r in enumerate(rs):
-            x = g * len(lengths) + k
+    fig, ax = plt.subplots(figsize=(COLUMN, 1.45))
+    lengths = (1024, 4096, 16384)
+    step, gap = 1.0, 1.6
+    for g, n in enumerate(lengths):
+        for k, llm in enumerate(LLMS):
+            r = next(r for r in rows if r["llm"] == llm and r.get("N") == n)
+            x = g * (len(LLMS) * step + gap) + k * step
             o, p = r["flm_ms"] / r["orig_s2_ms"], r["flm_ms"] / r["opcord_ms"]
+            marker, fill, _ = DECODE_STYLE[llm]
             ax.plot([x, x], [o, p], color=GRAY, linewidth=0.6, zorder=1)
-            ax.plot(x, o, marker="s", markersize=2.8, color=INK, markerfacecolor="white", markeredgewidth=0.6, zorder=2)
-            ax.plot(x, p, marker="o", markersize=3.0, color=OURS, markeredgewidth=0, zorder=3)
-            ticks.append(x)
-            labels.append(lengths[r["N"]])
-        ax.text(g * len(lengths) + (len(lengths) - 1) / 2, 2.6, llm, ha="center", va="bottom", fontsize=note())
+            for v, c, z in ((o, INK, 2), (p, OURS, 3)):
+                ax.plot(x, v, marker=marker, markersize=3.2, color=c, markerfacecolor=c if fill == "full" else "white",
+                        markeredgewidth=0.6, linestyle="none", zorder=z)
+    centers = [g * (len(LLMS) * step + gap) + (len(LLMS) - 1) * step / 2 for g in range(len(lengths))]
+    ax.set_xticks(centers, ["1K", "4K", "16K"])
+    ax.tick_params(axis="x", length=0, pad=2)
+    ax.set_xlim(-0.8, centers[-1] + (len(LLMS) - 1) * step / 2 + 0.8)
+    ax.set_xlabel("Prompt length (tokens)", labelpad=1)
     ax.axhline(1.0, color="black", linewidth=0.5)
     ax.set_yscale("log", base=2)
     ax.set_yticks([0.5, 1, 2], ["0.5", "1", "2"])
-    ax.set_ylim(0.45, 3.4)
-    ax.set_xlim(-0.5, len(LLMS) * len(lengths) - 0.5)
-    ax.set_xticks(ticks, labels)
-    ax.set_xticks([g * len(lengths) - 0.5 for g in range(1, len(LLMS))], minor=True)
-    ax.set_yticks([], minor=True)
-    ax.tick_params(axis="x", which="major", length=0, pad=2.5)  # clear of the boundary ticks
-    ax.tick_params(axis="x", which="minor", length=4, direction="inout", width=0.5)
+    ax.minorticks_off()
+    ax.set_ylim(0.45, 2.6)
     ax.set_ylabel("TTFT speedup", labelpad=1)
-    handles = [plt.Line2D([], [], marker="s", markersize=2.8, color=INK, markerfacecolor="white", linestyle="none",
-                          markeredgewidth=0.6),
-               plt.Line2D([], [], marker="o", markersize=3, color=OURS, linestyle="none", markeredgewidth=0)]
-    ax.legend(handles, [r"AIR, $S_2$", "AIR with OPCORD"], loc="upper center", bbox_to_anchor=(0.5, -0.13),
-              handletextpad=0.2, ncol=2)
+    llm_h = [plt.Line2D([], [], marker=DECODE_STYLE[m][0], markersize=3.2, color=INK, linestyle="none",
+                        markerfacecolor=INK if DECODE_STYLE[m][1] == "full" else "white", markeredgewidth=0.6)
+             for m in LLMS]
+    arm_h = [plt.Rectangle((0, 0), 1, 1, color=c) for c in (INK, OURS)]
+    ax.legend(llm_h + arm_h, list(LLMS) + [r"AIR, $S_2$", "AIR with OPCORD"], loc="upper center",
+              bbox_to_anchor=(0.5, -0.23), ncol=3, handlelength=0.8, handletextpad=0.3, columnspacing=0.8,
+              labelspacing=0.2)
     save(fig, "vs-flm.pdf")
     plt.close(fig)
-
 
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)

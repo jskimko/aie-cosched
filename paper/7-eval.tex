@@ -9,7 +9,7 @@
     % VALUE: the headline at a glance: OPCORD's TTFT gain over the baseline on every LLM across the prompt sweep, with the split it runs on
     % SOURCE: figs/make_figs.py fig_headline over figs/data/prefill-cells.json (figs/paper_numbers.py at amd-npu a6abaf19): the amendment-1 batch's registered analysis on its 38 cells (paired, or chained through orig-S2 where the baseline split differs from the pick's), the grid or split cells' paired ratio elsewhere, unpaired (no whisker) for LFM2-1.2B at 2K and Gemma3-4B at 1K; picks by choose() at opcord d6caf8b; Llama-3.2-1B at 32,768 unpriced (chunk 160 outside its probed chunks, n1 NOTES).
     \includegraphics[width=\textwidth]{fig/headline.pdf}
-    \caption{TTFT speedup of OPCORD over AIR's original program on its fastest supported configuration that we measure, as ratios of medians with 95\% intervals. A dagger marks a ratio across batches, which has no interval, and shades give the configuration that OPCORD chooses.}
+    \caption{TTFT speedup of OPCORD over AIR's original program on its fastest supported configuration that we measure, as ratios of medians with 95\% intervals. A dagger marks a ratio across batches, which has no interval, and fills give the configuration that OPCORD chooses.}
     \label{fig:headline}
 \end{figure*}
 
