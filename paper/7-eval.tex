@@ -145,7 +145,7 @@ This is because the shared score buffer still closes the loop's critical cycle, 
 
 % VALUE: the event model's own choice of order and split stays within a few percent of the best measured option on every cell, and every cell where it misses falls in the near-tie band that a short measurement settles, whereas each fixed rule loses badly somewhere: never reordering gives up the long-prompt gains, always reordering loses at one or two chunks, a fixed split loses where the balance moves, and even the rule that reorders from four chunks at the baseline's split loses where the composed order's best split differs
 The event model's own choice of order and split stays within \ChoiceOpcordMax\% of the measured minimum on every one of the \ChoiceCells{} cells and matches it on most (Table~\ref{tab:decision}).
-These choices come from the event model before its constants were final, and the accuracy below is that of its final form.
+These choices come from an earlier form of the event model with the same constants, and the accuracy below is that of the final form that Section~\ref{subsec:pricing} describes.
 We compare its choice on every cell against the fastest order and split measured there, and against fixed rules.
 Always reordering composes on the split that OPCORD chooses, a fixed split runs the faster order on $S_2$, and the four-chunk rules compose from 512 tokens on, on $S_2$ or on the baseline's split, and keep the original order below.
 Every cell where the choice misses the minimum falls inside the band in which the composer settles a near-tie by a short measurement (Section~\ref{subsec:pricing}), which these runs do not use.
