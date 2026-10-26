@@ -6,7 +6,7 @@
 Neural processing units (NPUs) such as those in AMD Ryzen\texttrademark{} AI processors bring large language model (LLM) inference to client machines~\citep{rico2024xdna}, and Microsoft's Copilot+ PCs require an NPU of at least 40 trillion operations per second~\citep{copilotplus-reqs}.
 % SOURCE: the Copilot+ PC hardware requirement of 40+ TOPS for the NPU (copilotplus-reqs).
 AMD's XDNA~2 NPU is a spatial dataflow array, on which a design runs each LLM operator as a flow on its own group of tiles, laid out in today's designs as whole columns, which we call a column group.
-Yet one in-order command processor (CP) issues the work of every group, so the order of issues and waits compiled into the dispatches is the schedule that the array runs.
+Yet one in-order command processor (CP) issues the work of every group, in the order of issues and waits compiled into its dispatches.
 In the fused prefill of MLIR-AIR (AIR)~\citep{wang2026mlirair}, attention's columns and those of the matrix multiplications (GEMMs) take turns (Figure~\ref{fig:timeline}, top, for Llama-3.2-1B), although attention on one 128-token chunk neither feeds nor reads the GEMMs of later chunks.
 We call this design with its host program the \emph{original program}.
 The measure a developer can compute, which divides the operators' summed time by the wall time, still reads the device as busy for 92--97\% of the time to first token (TTFT).
@@ -49,9 +49,7 @@ In the current releases of a closed production stack, FastFlowLM (FLM)~\citep{fa
 Its flash designs run each layer's attention once over the whole prompt, so every GEMM feeds or reads it.
 
 % VALUE: why the order must be priced per prompt length: the original program's chunks make the balance between the groups move with the prompt, and the split moves with it
-The original program, by contrast, runs fixed-size chunks, in which attention's work grows with the chunk's position while the GEMMs' work stays fixed.
-The balance between the groups therefore shifts with the prompt length, and with it whether the overlap repays a new order's per-dispatch costs.
-The issue order that pays therefore changes with the prompt and must be priced per length rather than fixed, as must the configuration, whose split of the columns between attention and the GEMMs moves with the same balance because more attention columns shorten attention but lengthen every GEMM.
+The original program, by contrast, runs fixed-size chunks, in which attention's work grows with the chunk's position while the GEMMs' work stays fixed, so the order and the configuration that pay change with the prompt and must be priced per length (Section~\ref{subsec:question}).
 
 % VALUE: (4) this work: OPCORD, one sentence per part with what it is and why: the analysis reads compiled artifacts across every agent and decides legality from them; the event model, analytical in form with microbenchmark constants, prices orders and splits per prompt length, and a bound limits what each false dependence can gain; the composer, the stream pass and the loop pass remove the false dependences the price clears, under checkers; headline results against the original program on its best supported split, and the event model's choice quality
 % DECISION: the general benefit (author, 2026-10-25; core rule): OPCORD serves any developer of this hardware; the stacks demonstrate it.
