@@ -8,7 +8,7 @@ Fused designs avoid reconfiguring the array between operators but can inherit an
 Removing such a false order frees overlap only under a condition checkable from the artifacts, in an amount set by how the design cuts its work and by the prompt length.
 OPCORD therefore reads compiled designs, bounds each false order, prices the order and the column split per prompt length, and rewrites only what its checkers show legal.
 Against the existing program on the supported split that minimizes its time to first token, OPCORD shortens the time to first token by \E{X--Y}$\times$ on five LLMs at prompts of 1K to 32K tokens.
-Against the unmodified decode design, its loop pass, which renames decode attention's buffers into rings, shortens decode by \E{X--Y}$\times$ at 16K-token contexts, and both keep the outputs bit-identical.
+Against the unmodified decode design, its loop pass, which renames decode attention's buffers into rings, shortens decode by \E{X--Y}$\times$ at contexts of about 30K tokens, and both keep the outputs bit-identical.
 Across the designs we read from three stacks, every overlap gain we measure falls where the condition says one can arise, and a closed production stack leaves almost no overlap to recover in either of its prefill engines.
 One runs each layer's attention once over the whole prompt, so that every GEMM feeds or reads it, and the other runs each operator alone on the whole array.
 What the composed order still pays is the price of overlap under the shared DRAM read cap and the command processor's and the host's work that the schedule does not hide.

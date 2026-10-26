@@ -25,7 +25,7 @@ We rewrite MLIR-AIR's fused prefill and fused decode~\citep{wang2026mlirair}, co
 % DECISION: the BIOS power mode cannot be read from the OS; add it once the author records it.
 
 % VALUE: the workloads: prompts from 128 to 32,768 tokens in powers of two plus lengths one token past a power of two, which fill no chunk; decode at contexts up to 32K; MLPerf Client's tasks marked on the sweep
-Prompts run from 128 to 32{,}768 tokens in powers of two and one token past each, whose last chunk holds a single token, and decode runs at cached contexts of 2{,}048 to 30{,}208 tokens.
+Prompts run from 128 to 32{,}768 tokens in powers of two and one token past each, whose last chunk holds a single token, and decode runs at cached contexts of 2{,}048 to 30{,}208 tokens, or 28{,}800 on Qwen3-4B.
 The sweep thus spans the prompts of every MLPerf Client task and the contexts of all but its experimental agent~\citep{mlcommons2026mlperfclient}.
 % SOURCE: MLPerf Client v2.0 tasks (mlcommons.org/benchmarks/client, read 2026-10-25; release 2026-08-18): input tokens 128 (content generation), 512 (creative writing), 830 (structured text), 1,856 (code analysis), 3,906 (summarization ~4K), 7,631 (summarization ~8K, extended, unscored); SWE agent ~27K in / ~1K out; data-analyst agent (experimental) ~29K in / ~2K out, reaching ~31K, past the 30,208 decode context; its harness is not run.
 
@@ -112,7 +112,7 @@ The loop pass brings Llama-3.2-1B and Llama-3.1-8B within \E{3}\% of that engine
 % VALUE: decode: renaming the KV loop lowers time per token against the unmodified decode design by a factor that grows with the context and with the ratio of serialized compute to transfer per position
 \label{subsec:decode-eval}
 Because our loop pass lets each block's transfer overlap the compute on the previous block, the decode gain grows with the context, as attention's share of each token does (Figure~\ref{fig:decode}).
-At 16{,}384 tokens, the renamed design lowers the time per token against the unmodified decode design by \E{X--Y}$\times$ across the five LLMs, and by up to \E{Z}$\times$ at 30{,}208 tokens.
+At 30{,}208 tokens, or 28{,}800 on Qwen3-4B, the renamed design lowers the time per token against the unmodified decode design by \E{X--Y}$\times$ across the five LLMs, and by \E{U--V}$\times$ at 16{,}384 tokens.
 The gain is smaller where an LLM's serialized compute per position is a smaller share of its transfer, 0.34 on Qwen3-4B against 0.71 on Llama-3.2-1B.
 Gemma3-4B's decode design reads back its whole 30{,}720-key window at every token whatever the context, and on 29 of its 34 layers it computes only on the last 1{,}024 keys.
 Its time per token and the loop pass's gain of \E{3}\% therefore stay flat with the context.
