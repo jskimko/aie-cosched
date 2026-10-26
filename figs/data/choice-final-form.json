@@ -1,0 +1,480 @@
+{
+ "source": {
+  "picks": "e4e3b209",
+  "measured": "a6abaf19"
+ },
+ "cells": [
+  {
+   "cell": "8b 128",
+   "pick": "S2 comp d2 b1",
+   "changed": true,
+   "measured_ms": 251.6224924911512,
+   "loss": 1.0982710388096395,
+   "gain": 0.9996960963353487
+  },
+  {
+   "cell": "8b 129",
+   "pick": "S2 shipar dNone bNone",
+   "changed": false,
+   "measured_ms": 401.304840001103,
+   "loss": 0.0,
+   "gain": 1.0080295231543748
+  },
+  {
+   "cell": "8b 256",
+   "pick": "S2 shipar dNone bNone",
+   "changed": false,
+   "measured_ms": 413.4503664972726,
+   "loss": 0.0,
+   "gain": 1.009933091925661
+  },
+  {
+   "cell": "8b 512",
+   "pick": "S2 comp d2 b1",
+   "changed": false,
+   "measured_ms": 777.4948475052952,
+   "loss": 0.0,
+   "gain": 1.0403633452970946
+  },
+  {
+   "cell": "8b 1024",
+   "pick": "S2 comp d2 b1",
+   "changed": false,
+   "measured_ms": 1514.381577493623,
+   "loss": 0.0,
+   "gain": 1.1128945610879335
+  },
+  {
+   "cell": "8b 2048",
+   "pick": "S2 comp d4 b1",
+   "changed": false,
+   "measured_ms": null,
+   "loss": null,
+   "gain": null
+  },
+  {
+   "cell": "8b 2049",
+   "pick": "S2 comp d2 b4",
+   "changed": false,
+   "measured_ms": 3179.3294030067045,
+   "loss": 0.0,
+   "gain": 1.2494905626142436
+  },
+  {
+   "cell": "8b 4096",
+   "pick": "S2 comp d2 b1",
+   "changed": false,
+   "measured_ms": 6209.508251493389,
+   "loss": 0.0,
+   "gain": 1.4095235822241319
+  },
+  {
+   "cell": "8b 8192",
+   "pick": "S2 comp d4 b4",
+   "changed": false,
+   "measured_ms": null,
+   "loss": null,
+   "gain": null
+  },
+  {
+   "cell": "8b 16384",
+   "pick": "S2 comp d4 b4",
+   "changed": false,
+   "measured_ms": 34033.453039999586,
+   "loss": -0.07383439131500857,
+   "gain": 1.3856454690205768
+  },
+  {
+   "cell": "8b 16385",
+   "pick": "S2 comp d4 b4",
+   "changed": false,
+   "measured_ms": null,
+   "loss": null,
+   "gain": null
+  },
+  {
+   "cell": "8b 32768",
+   "pick": "S4 comp d4 b4",
+   "changed": false,
+   "measured_ms": null,
+   "loss": null,
+   "gain": null
+  },
+  {
+   "cell": "1b 128",
+   "pick": "S1 comp d2 b1",
+   "changed": true,
+   "measured_ms": 62.28869400365511,
+   "loss": 1.4987759935693123,
+   "gain": 0.9852335559823473
+  },
+  {
+   "cell": "1b 129",
+   "pick": "S1 ship dNone bNone",
+   "changed": false,
+   "measured_ms": 82.40083349664928,
+   "loss": 0.0,
+   "gain": 1.0
+  },
+  {
+   "cell": "1b 256",
+   "pick": "S1 ship dNone bNone",
+   "changed": false,
+   "measured_ms": 87.1685649981373,
+   "loss": 1.8389077534050058,
+   "gain": 1.0
+  },
+  {
+   "cell": "1b 512",
+   "pick": "S2 comp d2 b1",
+   "changed": true,
+   "measured_ms": null,
+   "loss": null,
+   "gain": null
+  },
+  {
+   "cell": "1b 1024",
+   "pick": "S2 comp d4 b1",
+   "changed": true,
+   "measured_ms": 284.8223790060729,
+   "loss": 6.666089562561628,
+   "gain": 1.143039260605291
+  },
+  {
+   "cell": "1b 2048",
+   "pick": "S2 comp d4 b4",
+   "changed": false,
+   "measured_ms": 533.4632769991003,
+   "loss": -0.9181180293709179,
+   "gain": 1.3928575368373293
+  },
+  {
+   "cell": "1b 2049",
+   "pick": "S2 comp d2 b4",
+   "changed": false,
+   "measured_ms": null,
+   "loss": null,
+   "gain": null
+  },
+  {
+   "cell": "1b 4096",
+   "pick": "S2 comp d2 b4",
+   "changed": false,
+   "measured_ms": 1075.9628190135118,
+   "loss": -1.2878147694025954,
+   "gain": 1.4978212736733625
+  },
+  {
+   "cell": "1b 8192",
+   "pick": "S4 comp d2 b4",
+   "changed": false,
+   "measured_ms": null,
+   "loss": null,
+   "gain": null
+  },
+  {
+   "cell": "1b 16384",
+   "pick": "S4 comp d4 b1",
+   "changed": false,
+   "measured_ms": 6057.386456988752,
+   "loss": -0.006144318966461171,
+   "gain": 1.6254827511687924
+  },
+  {
+   "cell": "1b 16385",
+   "pick": "S4 comp d4 b1",
+   "changed": false,
+   "measured_ms": null,
+   "loss": null,
+   "gain": null
+  },
+  {
+   "cell": "qwen 128",
+   "pick": "S1 comp d2 b1",
+   "changed": true,
+   "measured_ms": 173.74958349682856,
+   "loss": 1.0350282802268795,
+   "gain": 0.9935595069228815
+  },
+  {
+   "cell": "qwen 129",
+   "pick": "S1 ship dNone bNone",
+   "changed": false,
+   "measured_ms": 244.97309049911564,
+   "loss": 0.055557559203545104,
+   "gain": 1.0
+  },
+  {
+   "cell": "qwen 256",
+   "pick": "S1 ship dNone bNone",
+   "changed": false,
+   "measured_ms": 259.1050265036756,
+   "loss": 0.8563723235190057,
+   "gain": 1.0
+  },
+  {
+   "cell": "qwen 512",
+   "pick": "S2 comp d2 b1",
+   "changed": true,
+   "measured_ms": 474.2341845048941,
+   "loss": 0.0,
+   "gain": 1.0506332046202218
+  },
+  {
+   "cell": "qwen 1024",
+   "pick": "S1 comp d2 b4",
+   "changed": false,
+   "measured_ms": 860.6377719843294,
+   "loss": -0.5711943445572909,
+   "gain": 1.2535004825757734
+  },
+  {
+   "cell": "qwen 2048",
+   "pick": "S2 comp d4 b4",
+   "changed": false,
+   "measured_ms": null,
+   "loss": null,
+   "gain": null
+  },
+  {
+   "cell": "qwen 2049",
+   "pick": "S2 comp d2 b4",
+   "changed": false,
+   "measured_ms": null,
+   "loss": null,
+   "gain": null
+  },
+  {
+   "cell": "qwen 4096",
+   "pick": "S2 comp d2 b4",
+   "changed": false,
+   "measured_ms": 3739.2348650028,
+   "loss": -0.2232131229907175,
+   "gain": 1.4938350228492048
+  },
+  {
+   "cell": "qwen 8192",
+   "pick": "S4 comp d8 b4",
+   "changed": false,
+   "measured_ms": null,
+   "loss": null,
+   "gain": null
+  },
+  {
+   "cell": "qwen 16384",
+   "pick": "S4 comp d8 b4",
+   "changed": false,
+   "measured_ms": 22142.035591008607,
+   "loss": 0.3028144348847128,
+   "gain": 1.5589555083640056
+  },
+  {
+   "cell": "qwen 16385",
+   "pick": "S4 comp d4 b4",
+   "changed": false,
+   "measured_ms": null,
+   "loss": null,
+   "gain": null
+  },
+  {
+   "cell": "qwen 32768",
+   "pick": "S4 comp d8 b4",
+   "changed": false,
+   "measured_ms": null,
+   "loss": null,
+   "gain": null
+  },
+  {
+   "cell": "lfm2 128",
+   "pick": "S1 comp d2 b1",
+   "changed": true,
+   "measured_ms": 55.37634949723724,
+   "loss": -0.1521923016891802,
+   "gain": 1.0074936323402215
+  },
+  {
+   "cell": "lfm2 129",
+   "pick": "S1 shipar dNone bNone",
+   "changed": false,
+   "measured_ms": 76.58593000087421,
+   "loss": 0.7097680757654157,
+   "gain": 0.9929523412740715
+  },
+  {
+   "cell": "lfm2 256",
+   "pick": "S1 shipar dNone bNone",
+   "changed": false,
+   "measured_ms": 80.92932149884291,
+   "loss": 1.4722291839422308,
+   "gain": 0.9854913093387013
+  },
+  {
+   "cell": "lfm2 512",
+   "pick": "S1 ship dNone bNone",
+   "changed": false,
+   "measured_ms": 149.35952000087127,
+   "loss": 2.1890415580478217,
+   "gain": 1.0
+  },
+  {
+   "cell": "lfm2 1024",
+   "pick": "S2 comp d4 b1",
+   "changed": true,
+   "measured_ms": 270.04618600039976,
+   "loss": 2.144904206573073,
+   "gain": 1.073546661770304
+  },
+  {
+   "cell": "lfm2 2048",
+   "pick": "S1 comp d2 b4",
+   "changed": false,
+   "measured_ms": null,
+   "loss": null,
+   "gain": null
+  },
+  {
+   "cell": "lfm2 2049",
+   "pick": "S1 comp d2 b4",
+   "changed": false,
+   "measured_ms": 529.6235544956289,
+   "loss": 0.0,
+   "gain": 1.2348448486563017
+  },
+  {
+   "cell": "lfm2 4096",
+   "pick": "S2 comp d4 b1",
+   "changed": false,
+   "measured_ms": 1053.8542680151295,
+   "loss": -0.20354374612813197,
+   "gain": 1.3217582499500997
+  },
+  {
+   "cell": "lfm2 8192",
+   "pick": "S2 comp d2 b4",
+   "changed": false,
+   "measured_ms": 2090.8537704963237,
+   "loss": -0.08822236840808628,
+   "gain": 1.4990527047981863
+  },
+  {
+   "cell": "lfm2 16384",
+   "pick": "S2 comp d4 b1",
+   "changed": false,
+   "measured_ms": 4905.966173013439,
+   "loss": 1.5812111357760283,
+   "gain": 1.4506418815416697
+  },
+  {
+   "cell": "lfm2 16385",
+   "pick": "S2 comp d2 b4",
+   "changed": false,
+   "measured_ms": 4882.839839003282,
+   "loss": 0.0,
+   "gain": 1.5057488671406414
+  },
+  {
+   "cell": "lfm2 32768",
+   "pick": "S4 comp d4 b1",
+   "changed": false,
+   "measured_ms": null,
+   "loss": null,
+   "gain": null
+  },
+  {
+   "cell": "gemma 128",
+   "pick": "S1 comp d2 b1",
+   "changed": true,
+   "measured_ms": 146.87721450900426,
+   "loss": 0.2374529007739934,
+   "gain": 0.9976310960234688
+  },
+  {
+   "cell": "gemma 129",
+   "pick": "S1 ship dNone bNone",
+   "changed": false,
+   "measured_ms": 211.93058550124988,
+   "loss": 0.061602422663398215,
+   "gain": 1.0
+  },
+  {
+   "cell": "gemma 256",
+   "pick": "S1 ship dNone bNone",
+   "changed": false,
+   "measured_ms": 221.38834699580912,
+   "loss": 1.1082585040268045,
+   "gain": 0.9994917302897427
+  },
+  {
+   "cell": "gemma 512",
+   "pick": "S2 comp d2 b1",
+   "changed": true,
+   "measured_ms": 410.10445800202433,
+   "loss": 0.0,
+   "gain": 1.0429973758145887
+  },
+  {
+   "cell": "gemma 1024",
+   "pick": "S1 comp d2 b4",
+   "changed": false,
+   "measured_ms": 729.7949670028174,
+   "loss": 0.0,
+   "gain": 1.2006077722009325
+  },
+  {
+   "cell": "gemma 2048",
+   "pick": "S2 comp d2 b4",
+   "changed": false,
+   "measured_ms": 1520.8641464996617,
+   "loss": 0.0,
+   "gain": 1.2205095545670344
+  },
+  {
+   "cell": "gemma 2049",
+   "pick": "S2 comp d2 b4",
+   "changed": false,
+   "measured_ms": null,
+   "loss": null,
+   "gain": null
+  },
+  {
+   "cell": "gemma 4096",
+   "pick": "S2 comp d2 b4",
+   "changed": false,
+   "measured_ms": 2996.223545022076,
+   "loss": -4.090279747969006,
+   "gain": 1.3028059091197752
+  },
+  {
+   "cell": "gemma 8192",
+   "pick": "S2 comp d4 b1",
+   "changed": false,
+   "measured_ms": 6399.398909998126,
+   "loss": 0.0,
+   "gain": 1.2963682212446714
+  },
+  {
+   "cell": "gemma 16384",
+   "pick": "S2 comp d4 b1",
+   "changed": false,
+   "measured_ms": 13926.91000099876,
+   "loss": -2.7546038379756888,
+   "gain": 1.319556921253833
+  },
+  {
+   "cell": "gemma 16385",
+   "pick": "S2 comp d8 b1",
+   "changed": false,
+   "measured_ms": null,
+   "loss": null,
+   "gain": null
+  },
+  {
+   "cell": "gemma 32768",
+   "pick": "S2 comp d4 b1",
+   "changed": true,
+   "measured_ms": 35078.24280699424,
+   "loss": 0.0,
+   "gain": 1.194358666524995
+  }
+ ]
+}
