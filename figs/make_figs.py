@@ -441,7 +441,7 @@ def fig_timeline():
     d = json.loads((DATA / "fig1-intervals-1b.json").read_text())["arms"]
     arms = (("ship", "Original"), ("comp", "OPCORD"))
     rows = (("A", "Attention", ATTN_BAR), ("G", "GEMMs", GEMM_BAR))
-    fig, axes = plt.subplots(2, 1, figsize=(COLUMN, 1.45), sharex=True)
+    fig, axes = plt.subplots(2, 1, figsize=(COLUMN, 1.15), sharex=True)
     base = d["ship"]["ttft_ms"]  # time is drawn relative to the original's TTFT
 
     def rel(spans):
@@ -449,25 +449,23 @@ def fig_timeline():
     for ax, (arm, name) in zip(axes, arms):
         a = d[arm]
         groups = {g: _merge(a["outstanding"][g]) for g, _, _ in rows}
-        for y, (g, label, color) in zip((3, 2), rows):
+        for y, (g, label, color) in zip((2, 1), rows):
             ax.broken_barh(rel(groups[g]), (y - 0.32, 0.64), facecolors=color, edgecolor="none")
-        both = _intersect(groups["A"], groups["G"])
-        ax.broken_barh(rel(both), (1 - 0.32, 0.64), facecolors=STONE, edgecolor="none")
+        both = _intersect(groups["A"], groups["G"])  # checked against the record, not drawn
         overlap = sum(e - s for s, e in both)
         assert abs(overlap - a["both_outstanding_ms"]) < 1e-3, (arm, overlap, a["both_outstanding_ms"])
         ttft = a["ttft_ms"]
         ax.axvline(ttft / base, color="black", linewidth=0.6, linestyle=(0, (4, 2)))
-        ax.text(ttft / base + 0.008, 2.5, rf"TTFT {ttft / base:.2f}", ha="left", va="center", fontsize=6.5)
-        ax.text(ttft / base + 0.008, 1, rf"{overlap / base:.2f}", ha="left", va="center", fontsize=6.5)
+        ax.text(ttft / base + 0.008, 1.5, rf"TTFT {ttft / base:.2f}", ha="left", va="center", fontsize=6.5)
         ax.set_title(name, fontsize=7, pad=2, loc="left")
-        ax.set_yticks([3, 2, 1], ["Attention", "GEMMs", "Both"], fontsize=6.5)
-        ax.set_ylim(0.45, 3.55)
+        ax.set_yticks([2, 1], ["Attention", "GEMMs"], fontsize=6.5)
+        ax.set_ylim(0.45, 2.55)
         ax.tick_params(axis="y", length=0, left=False, right=False)
         for side in ("top", "right", "left"):
             ax.spines[side].set_visible(False)
         ax.tick_params(axis="x", top=False)
     axes[-1].set_xlim(0, 1.12)
-    axes[-1].set_xlabel("Normalized time into the prefill (original TTFT = 1)", labelpad=1)
+    axes[-1].set_xlabel("Normalized prefill time", labelpad=1)
     fig.tight_layout(pad=0.2, h_pad=0.3)
     fig.savefig(OUT / "timeline.pdf")
     plt.close(fig)
@@ -590,13 +588,13 @@ def fig_synthetic():
 
 KEY_LLM = {"llama32_1b": "Llama-3.2-1B", "lfm2_1_2b": "LFM2-1.2B", "qwen3_4b": "Qwen3-4B", "gemma3_4b": "Gemma3-4B",
            "llama31_8b": "Llama-3.1-8B"}
-CHOICE_RULES = (("opcord", "OPCORD"), ("always", "Always reorder"), ("fixed_s2", "Fixed $S_2$"),
-                ("four_s2", "Four chunks, $S_2$"), ("four_base", "Four chunks, its split"))
+CHOICE_RULES = (("opcord", "OPCORD"), ("always", "Always reorder"), ("fixed_s2", "Always $S_2$"),
+                ("four_base", "Reorder if $C \\ge 4$"))
 
 
 def fig_choice():
     """(a) The event model's error on each development cell's original-to-composed ratio against that ratio, and
-    (b) each choice rule's worst loss against the fastest measured choice over the cells (the median is 0 for every rule shown).
+    (b) each choice rule's loss against the fastest measured choice, one dot per cell, its worst value printed.
 
     data/accuracy-cells.json (the frozen form's 70 development cells) and data/choice.json (the 59 priced cells).
     "Never reorder" is left out of (b): its loss is the headline gain forgone, which Figure 6 shows."""
@@ -619,16 +617,22 @@ def fig_choice():
     a.legend(loc="lower left", fontsize=5.5, ncol=2, handletextpad=0.2, columnspacing=0.6, labelspacing=0.15)
     a.set_title("(a) Event model", fontsize=7, pad=3)
     cells = json.loads((DATA / "choice.json").read_text())["cells"]
+    b.axhspan(-0.5, 0.5, color=OURS_TINT, alpha=0.7, zorder=0, linewidth=0)
     for i, (key, label) in enumerate(CHOICE_RULES):
-        worst = max(c[key] for c in cells if c.get(key) is not None)
-        b.barh(i, worst, height=0.6, color=OURS if key == "opcord" else GRAY, edgecolor="none")
-        b.text(worst + 1.5, i, f"{worst:.1f}", ha="left", va="center", fontsize=6)
-    b.set_xlim(0, 112)
-    b.set_xticks([0, 25, 50, 75, 100])
+        v = sorted(c[key] for c in cells if c.get(key) is not None)
+        jitter = [((k * 0.6180339) % 1 - 0.5) * 0.5 for k in range(len(v))]  # deterministic spread
+        color = OURS if key == "opcord" else INK
+        b.plot(v, [i + j for j in jitter], linestyle="none", marker="o", markersize=2.0, color=color, alpha=0.85,
+               markeredgewidth=0, zorder=2)
+        b.text(v[-1] * 1.25 + 0.3, i, f"{v[-1]:.1f}", ha="left", va="center", fontsize=6, color=color)
+    b.set_xscale("symlog", linthresh=1, linscale=0.6)
+    b.set_xlim(-0.3, 260)
+    b.set_xticks([0, 1, 10, 100], ["0", "1", "10", "100"])
+    b.set_ylim(len(CHOICE_RULES) - 0.5, -0.5)
     b.set_yticks(range(len(CHOICE_RULES)), [label for _, label in CHOICE_RULES], fontsize=6)
-    b.invert_yaxis()
     b.tick_params(axis="y", length=0)
-    b.set_xlabel(r"Worst loss against the fastest measured choice (\%)", labelpad=1)
+    b.minorticks_off()
+    b.set_xlabel(r"Loss against the fastest measured choice (\%)", labelpad=1)
     b.set_title("(b) Choice of order and configuration", fontsize=7, pad=3)
     fig.savefig(OUT / "choice.pdf")
     plt.close(fig)

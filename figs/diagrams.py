@@ -51,8 +51,8 @@ def fig_arch():
     order: an issue pushes a BD into a shim DMA's task queue and returns at once, a synchronization blocks the CP until
     a transfer completes. The array runs data-driven: each compute tile's DMA follows a chain of BDs, and locks hand
     each buffer between its producer and its consumer. The compute tiles are tinted by the column group that the
-    original prefill's default configuration gives them: attention on columns 0 and 7, the GEMMs on columns 1-6. The two
-    outlined tiles of column 7 are drawn larger at the right."""
+    original prefill's default configuration gives them: attention on columns 0 and 7, the GEMMs on columns 1-6. One
+    compute tile and the shim tile of column 7 are drawn larger at the right."""
     W, H = COLUMN - 0.04, 1.88
     fig, ax = _canvas(W, H)
     # ---- the submission path along the top: host -> hardware context -> CP -> its instruction stream
@@ -64,9 +64,13 @@ def fig_arch():
     _arrow(ax, (1.14, ty + th / 2), (1.26, ty + th / 2))
     kinds = "iisiiis"  # issue, issue, synchronize, ...
     cw, sx = 0.085, 1.66
-    for k, kind in enumerate(kinds):  # equal, separate cells, so each instruction reads as one unit
-        ax.add_patch(Rectangle((sx + k * cw + 0.006, ty + 0.02), cw - 0.012, th - 0.04,
-                               facecolor=INK if kind == "i" else MIST, edgecolor=INK, linewidth=0.3, zorder=3))
+    for k, kind in enumerate(kinds):  # contiguous equal cells; a mid-gray rule between every pair, on dark and light alike
+        ax.add_patch(Rectangle((sx + k * cw, ty + 0.02), cw, th - 0.04, facecolor=INK if kind == "i" else MIST,
+                               edgecolor="none", zorder=3))
+    for k in range(1, len(kinds)):
+        ax.plot([sx + k * cw] * 2, [ty + 0.02, ty + th - 0.02], color=STONE, lw=0.5, zorder=4)
+    ax.add_patch(Rectangle((sx, ty + 0.02), len(kinds) * cw, th - 0.04, fill=False, edgecolor=INK, linewidth=0.4,
+                           zorder=5))
     _arrow(ax, (1.56, ty + th / 2), (sx, ty + th / 2))
     lx = sx + len(kinds) * cw + 0.08
     for y, fc, label in ((ty + 0.145, INK, "Issue, returns"), (ty + 0.055, MIST, "Synchronization, blocks")):
@@ -81,8 +85,6 @@ def fig_arch():
         group = ATTN_PASTEL if c in (0, 7) else GEMM_PASTEL
         for r, y in enumerate(ys):
             _box(ax, x, y, t, t, fc=fills[r] if r < 2 else group, lw=0.4)
-    for r in (0, 4):  # the two tiles drawn larger at the right
-        ax.add_patch(Rectangle((xs[-1], ys[r]), t, t, fill=False, edgecolor=INK, linewidth=1.0, zorder=4))
     # the default configuration's column groups, labelled above the array, the GEMMs' span clear of the tiles
     top = ys[5] + t
     gy = top + 0.085
@@ -102,20 +104,22 @@ def fig_arch():
                                      arrowstyle="<|-|>,head_length=1.8,head_width=1.0", color=INK, linewidth=0.4,
                                      shrinkA=0, shrinkB=0))
     # an issue pushes a BD into a shim DMA's task queue: from the stream's second issue down beside the array
-    vx = xs[-1] + t + 0.085
-    ix = sx + 1.5 * cw
-    ax.plot([ix, ix, vx, vx], [ty + 0.02, 1.48, 1.48, ys[0] + t / 2], color=INK, lw=0.6, solid_joinstyle="miter",
-            zorder=9)
-    _arrow(ax, (vx, ys[0] + t / 2), (xs[-1] + t, ys[0] + t / 2))
+    ix = sx + 1.5 * cw  # the stream's second issue, which lies clear of the array's right edge
+    vx = ix
+    ax.plot([vx, vx, xs[-1] + t + 0.03], [ty + 0.02, ys[0] + t / 2, ys[0] + t / 2], color=INK, lw=0.6,
+            solid_capstyle="butt", solid_joinstyle="miter", zorder=9)  # one path, so the corner is mitred
+    _arrow(ax, (xs[-1] + t + 0.04, ys[0] + t / 2), (xs[-1] + t, ys[0] + t / 2))
     ax.text(ix + 0.05, 1.52, "Issue: push a BD to a shim task queue", ha="left", va="center_baseline",
             fontsize=FS)
     # ---- the two outlined tiles of column 7, drawn larger
     cx0, cx1 = vx + 0.10, W - 0.01
-    panels = (("Compute tile", 0.78, 1.38), ("Shim tile", 0.30, 0.66))
-    for name, py0, py1 in panels:
+    panels = (("Compute tile", ys[4], 0.78, 1.38), ("Shim tile", ys[0], 0.30, 0.66))
+    for name, ty0, py0, py1 in panels:
         _box(ax, cx0, py0, cx1 - cx0, py1 - py0, fc="white", lw=0.5, z=4)
         ax.text(cx0 + 0.05, py1 - 0.07, name, ha="left", va="center_baseline", fontsize=FS, zorder=6,
                 fontweight="bold")
+        for yy, py in ((ty0 + t, py1), (ty0, py0)):  # zoom lines from the tile's corners to the panel's
+            ax.plot([xs[-1] + t, cx0], [yy, py], color=STONE, lw=0.35, linestyle=(0, (1, 1.2)), zorder=1)
     px, bx = cx0 + 0.06, cx0 + 0.50
     # compute tile: the core reads and writes buffers in local memory, each guarded by a lock
     _box(ax, px, 1.04, 0.30, 0.16, "Core", z=5)
@@ -179,7 +183,7 @@ def fig_framework():
     _stage(ax, xi, bot, wi, top - bot, "Inputs", ours=False)
     for k, kinds in enumerate(("iisiis", "isiiis", "iiisis")):
         _strip(ax, xi + 0.08, 1.20 - k * 0.13, kinds, cw=0.048, h=0.09)
-    ax.text(xi + 0.08 + 6 * 0.048 + 0.04, 1.11, "Compiled design,\nopen or closed", ha="left", va="center", fontsize=fs,
+    ax.text(xi + 0.08 + 6 * 0.048 + 0.04, 1.11, "Compiled design", ha="left", va="center", fontsize=fs,
             linespacing=1.1)
     rows_in = ((0.80, "Host program"), (0.60, "Operator probes"), (0.42, "Prompt length"))
     for y, label in rows_in:
@@ -204,12 +208,12 @@ def fig_framework():
         lx, ly = ox + 0.92, 1.24 - k * 0.11
         ax.plot([lx, lx + 0.09], [ly, ly], lw=0.7, zorder=3, **style[kind])
         ax.text(lx + 0.12, ly, label, ha="left", va="center_baseline", fontsize=fs - 0.5)
-    for y, label in ((0.70, "Dependence graph over every agent"), (0.56, "Legality conditions"),
-                     (0.42, "A bound per false dependence")):
+    for y, label in ((0.70, "Dependence graph"), (0.56, "Legality conditions"),
+                     (0.42, "Bound per false dependence")):
         ax.text(xa + 0.10, y, label, ha="left", va="center_baseline", fontsize=fs)
     # ---- the rewrites, each behind its checker
     xr, wr = 2.96, 1.80
-    _stage(ax, xr, bot, wr, top - bot, "Rewrites, each behind a checker")
+    _stage(ax, xr, bot, wr, top - bot, "Checked rewrites")
     rew = ((1.16, "Composer", "Reorder across operators"), (0.86, "Stream pass", "Reorder within a stream"),
            (0.50, "Loop pass", "Rename into rings"))
     for y, name, what in rew:
@@ -221,17 +225,14 @@ def fig_framework():
     # ---- the event model, prefill only
     xe, we, be = 4.94, 0.88, 0.57
     _stage(ax, xe, be, we, top - be, "Event model")
-    for lane, bars in ((1.17, ((xe + 0.08, 0.20), (xe + 0.32, 0.28))), (1.02, ((xe + 0.08, 0.36), (xe + 0.48, 0.16)))):
-        for x0, w in bars:
-            ax.add_patch(Rectangle((x0, lane), w, 0.09, facecolor=GRAY, edgecolor="white", linewidth=0.5, zorder=3))
     for k, label in enumerate(("Order and", "configuration", "per prompt length")):
-        ax.text(xe + 0.08, 0.91 - k * 0.12, label, ha="left", va="center_baseline", fontsize=fs)
+        ax.text(xe + 0.08, 1.12 - k * 0.12, label, ha="left", va="center_baseline", fontsize=fs)
     # ---- output
     xo = 5.98
     wo = W - xo
     _stage(ax, xo, bot, wo, top - bot, "Output", ours=False)
     _strip(ax, xo + 0.07, 1.16, "iiiss", cw=0.075, h=0.09)
-    for k, label in enumerate(("Rewritten design", "on its own", "hardware context,", "or a refusal", "with its reason")):
+    for k, label in enumerate(("Rewritten design", "or refusal")):
         ax.text(xo + 0.07, 0.98 - k * 0.12, label, ha="left", va="center_baseline", fontsize=fs)
     # ---- flows
     _arrow(ax, (xi + wi, 1.0), (xa, 1.0))
@@ -239,12 +240,14 @@ def fig_framework():
     for y, _, _ in rew[:2]:
         _arrow(ax, (xr + wr - 0.08, y), (xe, y))
     _arrow(ax, (xe + we, 1.10), (xo, 1.10))
-    _arrow(ax, (xr + wr - 0.08, rew[2][0]), (xo, rew[2][0]))  # decode: the loop pass's rings go straight to the output
+    # decode: the loop pass's rings go straight to the output, passing under the probe rail with a break, so the
+    # two do not read as joined
+    _arrow(ax, (xr + wr - 0.08, rew[2][0]), (xo, rew[2][0]), z=3)
     # the probes and the prompt length feed the event model along a rail beneath the panels
     ry, rx = 0.15, xe + we / 2
+    ax.add_patch(Rectangle((rx - 0.04, rew[2][0] - 0.02), 0.08, 0.04, facecolor="white", edgecolor="none", zorder=4))
     ax.plot([xi + wi / 2, xi + wi / 2, rx], [bot, ry, ry], color=INK, lw=0.6, solid_joinstyle="miter", zorder=2)
     _arrow(ax, (rx, ry), (rx, be))
-    ax.text(xa + 0.10, ry + 0.06, "Probes, prompt length", ha="left", va="center_baseline", fontsize=fs - 0.5)
     fig.savefig(OUT / "framework.pdf", metadata={"CreationDate": None})
     plt.close(fig)
 
