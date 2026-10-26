@@ -487,7 +487,10 @@ def fig_headline():
             # a cap at the value, so a pick that keeps the original order (exactly 1) still shows its split
             ax.plot([i - 0.36, i + 0.36], [c["gain"]] * 2, color=SPLIT_COLOR[c["pick_split"]], linewidth=1.4,
                     solid_capstyle="butt", zorder=2)
-            if c.get("lo") is not None and c["hi"] - c["lo"] > 0.004:
+            if c.get("lo") is None:
+                # the baseline and the pick ran in different batches with no shared version: no interval
+                ax.text(i, c["gain"] + 0.01, r"$\dagger$", ha="center", va="bottom", fontsize=6)
+            elif c["hi"] > c["lo"]:
                 ax.errorbar(i, c["gain"], yerr=[[c["gain"] - c["lo"]], [c["hi"] - c["gain"]]], fmt="none",
                             ecolor=INK, elinewidth=0.5, capsize=1.0, zorder=3)
         ax.axhline(1.0, color="black", linewidth=0.5, zorder=4)
