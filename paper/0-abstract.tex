@@ -12,6 +12,6 @@ We present OPCORD, which reads compiled NPU programs, open or closed, as depende
 It reorders instructions and renames buffers under checkers that reject any rewrite they cannot prove legal, and it chooses the order and the configuration for each prompt length with an event model of the device and its host.
 Across five LLMs, OPCORD shortens the time to first token (TTFT) by \E{X--Y}$\times$ at 1K- to 32K-token prompts against each design's original program on the configuration that minimizes its TTFT.
 It shortens decoding by \E{X--Y}$\times$ at contexts of about 30K tokens, and both keep the outputs unchanged.
-On open-source designs, it also reaches the first token sooner than the current release of a closed production engine on every LLM and prompt length we compare, and our analysis explains why that engine's designs leave almost no overlap to recover.
+On open-source designs, it also reaches the first token sooner than the current release of a closed production engine on every LLM and prompt length we compare, and our analysis explains why that engine's designs leave little overlap to recover.
 
 \end{abstract}

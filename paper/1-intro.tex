@@ -64,7 +64,7 @@ Against the existing program on the supported split that minimizes its TTFT, OPC
 On MLIR-AIR's designs, OPCORD also reaches the first token sooner than FastFlowLM's current release, on every LLM and prompt length we compare.
 Its choice of order and split stays within \E{X}\% of the measured minimum on every LLM and prompt length we measure, where every fixed rule we test loses up to \E{Y}\% somewhere.
 Its analysis re-emits every stream we read from three stacks byte for byte, and its checkers refuse every illegal rewrite we inject.
-Across the designs we read, every overlap gain we measure falls where the condition says one can arise, and FastFlowLM's two prefill engines leave almost no overlap to recover, as the condition predicts.
+Across the designs we read, every overlap gain we measure falls where the condition says one can arise, and FastFlowLM's two prefill engines leave little overlap to recover, as the condition predicts.
 % DECISION: the census's counts are stated once, in Section 6.6, as distinct designs read (author, 2026-10-25: accurate, and not repeated everywhere).
 % COMMENT: this sentence states the decision-quality outcome; reword to what the table shows once the amendment-1 batch and the final sweep are in (if a fixed rule ties, state the regret bound instead).
 
