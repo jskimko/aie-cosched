@@ -43,6 +43,10 @@ Four further files are not byte copies but extracts, each recording its own sour
 designs (three builds that keep attention fixed and vary the GEMMs' work), the original against the composed order at 1-32
 chunks, the repeat-position ratio as median with its 95% interval (`repeat`); the `predicted` field is not plotted.
 
+`data/accuracy-cells.json` is a byte copy of `amd-npu` `277cefce` `ab/results/comps4-2026-10-24/formA2_seventy.json`: per
+development cell, the measured original-to-composed TTFT ratio (`measured`) and the event model's prediction over it (`dev`,
+the frozen form; the other two columns are forms not adopted).
+
 The labs that record how each was measured are in the author's notes (`lab-prefill-device`, `lab-prefill-overlap`,
 `lab-split-sweep`, `lab-agent-step`, `lab-decode-long-context`).
 Where a pair was measured in more than one batch, the figures keep its first measurement.

@@ -8,19 +8,19 @@ Outputs:
                  model, output
   arch.pdf  the XDNA 2 NPU as the paper uses it: host, hardware context, the CP's in-order instruction stream, the
             array of shim, memory and compute tiles over DRAM, and one compute tile and one shim tile magnified
-  rewrites.pdf  what the loop pass does: its two-slot ring on decode attention's block loop, against one buffer per role
+  rewrites.pdf  OPCORD's three rewrites (composer, stream pass, loop pass), each before and after, full width
 """
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import make_figs as _m  # noqa: E402  (style, palette, OUT)
-from make_figs import COLUMN, GRAY, INK, ORANGE, OUT, plt  # noqa: E402
+from make_figs import ATTN, ATTN_FILL, COLUMN, GEMM, GEMM_FILL, GRAY, INK, OURS, OURS_TINT, OUT, plt  # noqa: E402
 from matplotlib.patches import FancyArrowPatch, Rectangle  # noqa: E402
 
 MIST, STONE = "#E4E4E4", "#707070"
-# pastel steps of make_figs' ORANGE (attention) and BLUE (GEMMs), for the column groups of the default split
-ATTN_PASTEL, GEMM_PASTEL = "#F5BC9C", "#B6CAF7"
+# the fill steps of attention and the GEMMs, for the column groups of the default configuration
+ATTN_PASTEL, GEMM_PASTEL = ATTN_FILL, GEMM_FILL
 FS = 6  # label size, pt
 
 
@@ -142,7 +142,7 @@ def fig_arch():
     plt.close(fig)
 
 
-MAGENTA = "#D04A8A"  # ours, as in the data figures
+MAGENTA = OURS  # ours, as in the data figures
 
 
 def _strip(ax, x, y, kinds, cw=0.075, h=0.10, z=5):
@@ -155,7 +155,7 @@ def _strip(ax, x, y, kinds, cw=0.075, h=0.10, z=5):
 
 
 def _stage(ax, x, y, w, h, title, ours=True):
-    ax.add_patch(Rectangle((x, y), w, h, facecolor="#FBF1F6" if ours else "white", edgecolor=MAGENTA if ours else INK,
+    ax.add_patch(Rectangle((x, y), w, h, facecolor=OURS_TINT if ours else "white", edgecolor=MAGENTA if ours else INK,
                            linewidth=0.7 if ours else 0.5, zorder=1))
     ax.text(x + w / 2, y + h - 0.075, title, ha="center", va="center_baseline", fontsize=FS, zorder=6)
 
@@ -247,48 +247,61 @@ def fig_framework():
     plt.close(fig)
 
 
-def fig_rewrites():
-    """What the loop pass does to decode attention's block loop, in fig_order's vocabulary, with illustrative durations:
-    with one buffer per role, block i+1's transfer waits until block i's compute releases the buffer; with a two-slot
-    ring, block i+1's transfer fills the other slot while block i computes. A dotted arrow marks each such wait, a false
-    order. Attention's transfers are drawn in the pastel step of its compute's ORANGE, as in the architecture figure."""
-    T, C, NB = 1.0, 0.71, 3  # a block's transfer and compute (compute is 0.71 of the transfer, as measured in decode), blocks
-    loop = {
-        "ex": dict(tr=[(k * (T + C), T) for k in range(NB)], co=[(k * (T + C) + T, C) for k in range(NB)],
-                   end=NB * (T + C)),
-        "rw": dict(tr=[(k * T, T) for k in range(NB)], co=[((k + 1) * T, C) for k in range(NB)], end=NB * T + C),
-    }
-    fig, axes = plt.subplots(1, 2, figsize=(COLUMN, 0.98), sharex=True, sharey=True, gridspec_kw=dict(wspace=0.06))
+ATTN_LIGHT = "#F1E7D3"  # attention's lightest step (OKLCH L 0.93), for decode's transfers beside its compute
 
-    def wait(ax, x, y0, y1):  # a dotted shaft with a solid head, vertical from y0 to y1
-        ax.plot([x, x], [y0, y1], color=INK, linewidth=0.6, linestyle=(0, (1, 1.2)), zorder=10)
-        ax.add_patch(FancyArrowPatch((x, y1 + 0.02 * (y0 - y1)), (x, y1), arrowstyle="-|>,head_length=2.2,head_width=1.2",
-                                     color=INK, linewidth=0.6, shrinkA=0, shrinkB=0, zorder=10))
-    labels = (r"$i$", r"$i{+}1$", r"$i{+}2$")
-    for col, (key, title) in enumerate((("ex", "One buffer per role"), ("rw", "Loop pass, two-slot ring"))):
-        ax, d = axes[col], loop[key]
-        for k, (t0, w) in enumerate(d["tr"]):
-            ax.broken_barh([(t0, w)], (1.0 - 0.32, 0.64), facecolors=ATTN_PASTEL, edgecolor=INK, linewidth=0.4)
-            ax.text(t0 + w / 2, 1.0, labels[k], ha="center", va="center_baseline", fontsize=FS)
-            if key == "rw":
-                ax.text(t0 + w / 2, 1.0 + 0.52, f"slot {k % 2}", ha="center", va="center_baseline", fontsize=FS - 0.5)
-        for k, (t0, w) in enumerate(d["co"]):
-            ax.broken_barh([(t0, w)], (-0.32, 0.64), facecolors=ORANGE, edgecolor=INK, linewidth=0.4)
-            ax.text(t0 + w / 2, 0.0, labels[k], ha="center", va="center_baseline", fontsize=FS)
-            if key == "ex" and k + 1 < NB:  # block k's compute releases the buffer block k+1's transfer fills
-                wait(ax, t0 + w, 0.32, 1.0 - 0.32)
-        ax.set_yticks([1.0, 0.0], ("Transfer", "Compute"))
-        ax.set_ylim(-0.6, 1.75)
-        ax.axvline(d["end"] + 0.06, color="black", linewidth=0.5, linestyle=(0, (4, 2)))  # clear of the last box
-        ax.set_xlim(-0.1, max(v["end"] for v in loop.values()) + 0.25)
-        ax.set_title(title, fontsize=7, pad=2, loc="left")
-        ax.tick_params(left=False, right=False, top=False, bottom=False, labelleft=col == 0)
+
+def fig_rewrites():
+    """OPCORD's three rewrites, each before and after, with illustrative durations; a dotted arrow marks each false
+    dependence, which ends where work waits on work whose results it does not use.
+    (a) Composer: two dispatches in turn (the GEMMs wait for attention's dispatch to finish), then one dispatch that
+        issues both groups' work before any wait.
+    (b) Stream pass: inside attention's stream, column 7's segment waits behind the CP's synchronization on column 0,
+        then the columns' segments alternate so both run at once.
+    (c) Loop pass: with one buffer per role, block i+1's transfer waits for block i's compute to release the buffer;
+        with a two-slot ring it fills the other slot (compute is 0.71 of the transfer, as measured in decode)."""
+    fig, axes = plt.subplots(2, 3, figsize=(_m.WIDE, 1.38), sharex="col", gridspec_kw=dict(wspace=0.42, hspace=0.5))
+
+    def lanes(ax, rows, labels, end, waits=()):
+        for y, bars, color in rows:
+            for t0, d, text in bars:
+                ax.broken_barh([(t0, d)], (y - 0.32, 0.64), facecolors=color, edgecolor=INK, linewidth=0.4)
+                if text:
+                    ax.text(t0 + d / 2, y, text, ha="center", va="center_baseline", fontsize=FS - 0.5)
+        for x, y0, y1 in waits:  # a dotted shaft with a solid head, from y0 to y1
+            ax.plot([x, x], [y0, y1], color=INK, linewidth=0.6, linestyle=(0, (1, 1.2)), zorder=10)
+            ax.add_patch(FancyArrowPatch((x, y1 + 0.05 * (y0 - y1)), (x, y1),
+                                         arrowstyle="-|>,head_length=2.0,head_width=1.1", color=INK, linewidth=0.6,
+                                         shrinkA=0, shrinkB=0, zorder=10))
+        ax.axvline(end, color="black", linewidth=0.5, linestyle=(0, (4, 2)))
+        ax.set_yticks([1, 0], labels, fontsize=FS)
+        ax.set_ylim(-0.55, 1.55)
+        ax.tick_params(left=False, right=False, top=False, bottom=False)
         ax.set_xticks([])
         for side in ("top", "right", "bottom"):
             ax.spines[side].set_visible(False)
+    a, g = 3.0, 2.6  # (a) attention and the GEMMs
+    lanes(axes[0, 0], [(1, [(0, a, "")], ATTN_FILL), (0, [(a, g, "")], GEMM_FILL)], ["Attention", "GEMMs"], a + g,
+          [(a, 0.68, 0.32)])
+    lanes(axes[1, 0], [(1, [(0, a, "")], ATTN_FILL), (0, [(0, g, "")], GEMM_FILL)], ["Attention", "GEMMs"], a + g)
+    s = 1.2  # (b) one segment per column
+    lanes(axes[0, 1], [(1, [(0, s, "1"), (2 * s, s, "2")], ATTN_FILL), (0, [(s, s, "1"), (3 * s, s, "2")], ATTN_FILL)],
+          ["Column 0", "Column 7"], 4 * s, [(s, 0.68, 0.32), (3 * s, 0.68, 0.32)])
+    lanes(axes[1, 1], [(1, [(0, s, "1"), (s, s, "2")], ATTN_FILL), (0, [(0, s, "1"), (s, s, "2")], ATTN_FILL)],
+          ["Column 0", "Column 7"], 4 * s)
+    t, c = 1.0, 0.71  # (c) a block's transfer and compute
+    lanes(axes[0, 2], [(1, [(k * (t + c), t, f"{k}") for k in range(3)], ATTN_LIGHT),
+                       (0, [(k * (t + c) + t, c, f"{k}") for k in range(3)], ATTN_FILL)],
+          ["Transfer", "Compute"], 3 * (t + c), [(k * (t + c) + t + c, 0.32, 0.68) for k in range(2)])
+    lanes(axes[1, 2], [(1, [(k * t, t, f"{k}") for k in range(3)], ATTN_LIGHT),
+                       (0, [((k + 1) * t, c, f"{k}") for k in range(3)], ATTN_FILL)], ["Transfer", "Compute"], 3 * (t + c))
+    for j, title in enumerate(("(a) Composer", "(b) Stream pass", "(c) Loop pass")):
+        axes[0, j].set_title(title, fontsize=7, pad=9, loc="left")
+    for j in range(3):
+        for i, label in enumerate(("Before", "After")):
+            axes[i, j].text(0.0, 1.03, label, transform=axes[i, j].transAxes, fontsize=FS, va="bottom")
     handles = [plt.Line2D([], [], color=INK, linewidth=0.6, linestyle=(0, (1, 1.2)))]
-    fig.legend(handles, ["false dependence"], loc="lower right", bbox_to_anchor=(0.99, -0.13), handlelength=1.2)
-    fig.supxlabel("Time (illustrative)", fontsize=8, y=-0.06)
+    fig.legend(handles, ["False dependence"], loc="lower right", bbox_to_anchor=(0.99, -0.07), handlelength=1.2)
+    fig.supxlabel("Time (illustrative)", fontsize=7, y=-0.05)
     fig.savefig(OUT / "rewrites.pdf", metadata={"CreationDate": None})
     plt.close(fig)
 

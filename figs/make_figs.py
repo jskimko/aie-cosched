@@ -10,6 +10,8 @@ Outputs (into FIGS_OUT, default paper/fig):
   decode.pdf       decode time per token against the cached context, baseline against our loop pass
   timeline.pdf     Figure 1: per column group, work outstanding and the CP blocked, existing against OPCORD
   schedules.pdf    TTFT by split for the three schedules, one panel per model
+  choice.pdf       (a) the event model's error per development cell, (b) each choice rule's loss per cell
+  vs-flm.pdf       TTFT speedup over FLM's current release, AIR's original and AIR with OPCORD
   synthetic.pdf    the composed order's speedup over the original on three synthetic builds, against the chunks
   params-rows.tex  rows of the event model's parameter table
 """
@@ -52,8 +54,15 @@ plt.rcParams.update({
 })
 COLUMN = 3.25  # MLSys column width, inches
 
-# IBM's color-blind-safe palette, softened; each series keeps its color and marker in every figure.
-BLUE, PURPLE, MAGENTA, ORANGE, GOLD = "#6E95F0", "#8770E0", "#D04A8A", "#EB7A3A", "#F0B840"
+# The paper's own palette, built in OKLCH and checked under deuteranopia, protanopia and tritanopia (the pairs that
+# share a figure stay apart): ours violet; attention sand and the GEMMs teal, each with a pastel fill step for areas.
+# Each series keeps its color and marker in every figure.
+OURS, OURS_TINT = "#714CA6", "#F3EFFB"  # OKLCH (0.50, 0.14, 300); the tint fills our stages in the overview
+ATTN, ATTN_FILL = "#DBB970", "#E2CFA8"  # OKLCH (0.80, 0.10, 85), fill at L 0.86
+GEMM, GEMM_FILL = "#4E9397", "#B5D9DB"  # OKLCH (0.62, 0.07, 200), fill at L 0.86
+STONE = "#707070"  # neutral mid gray: both groups busy
+BLUE, MAGENTA, ORANGE = GEMM, OURS, ATTN  # the names the older figure functions use
+PURPLE, GOLD = "#8770E0", "#F0B840"  # used only by figures outside the paper
 GRAY = "#B0B0B0"
 MIST = "#E4E4E4"  # synchronizations, as in the architecture figure (diagrams.py)
 INK = "#262626"  # original schedules: near-black
@@ -430,7 +439,7 @@ def fig_timeline():
     against the reader's own both-outstanding total."""
     d = json.loads((DATA / "fig1-intervals-1b.json").read_text())["arms"]
     arms = (("ship", "Original"), ("comp", "OPCORD"))
-    rows = (("A", "Attention", ORANGE), ("G", "GEMMs", BLUE))
+    rows = (("A", "Attention", ATTN_FILL), ("G", "GEMMs", GEMM_FILL))
     fig, axes = plt.subplots(2, 1, figsize=(COLUMN, 1.45), sharex=True)
     base = d["ship"]["ttft_ms"]  # time is drawn relative to the original's TTFT
 
@@ -442,7 +451,7 @@ def fig_timeline():
         for y, (g, label, color) in zip((3, 2), rows):
             ax.broken_barh(rel(groups[g]), (y - 0.32, 0.64), facecolors=color, edgecolor="none")
         both = _intersect(groups["A"], groups["G"])
-        ax.broken_barh(rel(both), (1 - 0.32, 0.64), facecolors=INK, edgecolor="none")
+        ax.broken_barh(rel(both), (1 - 0.32, 0.64), facecolors=STONE, edgecolor="none")
         overlap = sum(e - s for s, e in both)
         assert abs(overlap - a["both_outstanding_ms"]) < 1e-3, (arm, overlap, a["both_outstanding_ms"])
         ttft = a["ttft_ms"]
@@ -464,10 +473,8 @@ def fig_timeline():
 
 
 WIDE = 6.75  # MLSys two-column width, inches
-MAGENTA_PASTEL = "#EBA8C8"  # pastel step of MAGENTA
-MAGENTA_DARK = "#8A2259"  # dark step of MAGENTA
-# light steps of MAGENTA, so the near-black error bars stay visible on every bar
-SPLIT_COLOR = {"S1": "#F7DCE9", "S2": "#EBA8C8", "S4": "#D77AAA"}
+# light steps of OURS, so the near-black error bars stay visible on every bar
+SPLIT_COLOR = {"S1": "#E8DFFD", "S2": "#CEBEEF", "S4": "#AE97D9"}
 LLMS = ("Llama-3.2-1B", "LFM2-1.2B", "Qwen3-4B", "Gemma3-4B", "Llama-3.1-8B")
 
 
@@ -581,6 +588,92 @@ def fig_synthetic():
     plt.close(fig)
 
 
+KEY_LLM = {"llama32_1b": "Llama-3.2-1B", "lfm2_1_2b": "LFM2-1.2B", "qwen3_4b": "Qwen3-4B", "gemma3_4b": "Gemma3-4B",
+           "llama31_8b": "Llama-3.1-8B"}
+CHOICE_RULES = (("opcord", "OPCORD"), ("always", "Always reorder"), ("fixed_s2", "Fixed $S_2$"),
+                ("four_s2", "Four chunks, $S_2$"), ("four_base", "Four chunks, its split"))
+
+
+def fig_choice():
+    """(a) The event model's error on each development cell's original-to-composed ratio against that ratio, and
+    (b) each choice rule's loss against the fastest measured choice per cell, one dot per cell, the bar at the median.
+
+    data/accuracy-cells.json (the frozen form's 70 development cells) and data/choice.json (the 59 priced cells).
+    "Never reorder" is left out of (b): its loss is the headline gain forgone, which Figure 6 shows."""
+    rows = json.loads((DATA / "accuracy-cells.json").read_text())
+    fig, (a, b) = plt.subplots(1, 2, figsize=(WIDE, 1.55), gridspec_kw=dict(width_ratios=[1.05, 1], wspace=0.32))
+    a.axhspan(-5, 5, color="#EDEDED", zorder=0, linewidth=0)
+    for key, llm in KEY_LLM.items():
+        rs = [r for r in rows if r["model"].startswith(key)]
+        marker, fill, _ = DECODE_STYLE[llm]
+        a.plot([r["measured"] for r in rs], [(r["dev"] - 1) * 100 for r in rs], linestyle="none", marker=marker,
+               markersize=2.8, color=INK, markerfacecolor=INK if fill == "full" else "white", markeredgewidth=0.6,
+               label=llm)
+    a.axhline(0, color="black", linewidth=0.5)
+    a.set_xscale("log", base=2)
+    a.set_xticks([1, 1.25, 1.5, 2], ["1.0", "1.25", "1.5", "2.0"])
+    a.minorticks_off()
+    a.set_xlabel("Measured speedup of the composed order", labelpad=1)
+    a.set_ylabel(r"Prediction error (\%)", labelpad=1)
+    a.set_ylim(-16, 8)
+    a.legend(loc="lower left", fontsize=5.5, ncol=2, handletextpad=0.2, columnspacing=0.6, labelspacing=0.15)
+    a.set_title("(a)", fontsize=7, pad=3)
+    cells = json.loads((DATA / "choice.json").read_text())["cells"]
+    for i, (key, label) in enumerate(CHOICE_RULES):
+        v = sorted(c[key] for c in cells if c.get(key) is not None)
+        jitter = [((k * 0.6180339) % 1 - 0.5) * 0.44 for k in range(len(v))]  # deterministic spread
+        color = OURS if key == "opcord" else INK
+        b.plot(v, [i + j for j in jitter], linestyle="none", marker="o", markersize=1.8, color=color, alpha=0.85,
+               markeredgewidth=0)
+        b.plot([v[len(v) // 2]] * 2, [i - 0.36, i + 0.36], color=color, linewidth=1.0)
+    b.set_xscale("symlog", linthresh=1, linscale=0.6)
+    b.set_xlim(-0.3, 150)
+    b.set_xticks([0, 1, 10, 100], ["0", "1", "10", "100"])
+    b.set_yticks(range(len(CHOICE_RULES)), [label for _, label in CHOICE_RULES], fontsize=6)
+    b.invert_yaxis()
+    b.minorticks_off()
+    b.set_xlabel(r"Loss against the fastest measured choice (\%)", labelpad=1)
+    b.set_title("(b)", fontsize=7, pad=3)
+    fig.savefig(OUT / "choice.pdf")
+    plt.close(fig)
+
+
+def fig_vs_flm():
+    """TTFT speedup over FLM's current release at 1K, 4K and 16K tokens: AIR's original program on its default
+    configuration, and the same design under OPCORD. data/absolute.json (D1, one batch)."""
+    rows = json.loads((DATA / "absolute.json").read_text())["rows"]
+    fig, ax = plt.subplots(figsize=(COLUMN + 0.37, 1.5))
+    x, ticks, labels = 0.0, [], []
+    for llm in LLMS:
+        rs = sorted((r for r in rows if r["llm"] == llm and r.get("N") in (1024, 4096, 16384)), key=lambda r: r["N"])
+        x0 = x
+        for r in rs:
+            o, p = r["flm_ms"] / r["orig_s2_ms"], r["flm_ms"] / r["opcord_ms"]
+            ax.plot([x, x], [o, p], color=GRAY, linewidth=0.6, zorder=1)
+            ax.plot(x, o, marker="s", markersize=2.8, color=INK, markerfacecolor="white", markeredgewidth=0.6, zorder=2)
+            ax.plot(x, p, marker="o", markersize=3.0, color=OURS, markeredgewidth=0, zorder=3)
+            ticks.append(x)
+            labels.append({1024: "1K", 4096: "4K", 16384: "16K"}[r["N"]])
+            x += 1
+        ax.text((x0 + x - 1) / 2, 2.95, llm, ha="center", va="bottom", fontsize=5.5)
+        x += 0.8
+    ax.axhline(1.0, color="black", linewidth=0.5)
+    ax.set_yscale("log", base=2)
+    ax.set_yticks([0.5, 1, 2], ["0.5", "1", "2"])
+    ax.minorticks_off()
+    ax.set_ylim(0.45, 3.4)
+    ax.set_xticks(ticks, labels, fontsize=5.5)
+    ax.tick_params(axis="x", length=0, pad=1.5)
+    ax.set_ylabel("Speedup", labelpad=1)
+    handles = [plt.Line2D([], [], marker="s", markersize=2.8, color=INK, markerfacecolor="white", linestyle="none",
+                          markeredgewidth=0.6),
+               plt.Line2D([], [], marker="o", markersize=3, color=OURS, linestyle="none", markeredgewidth=0)]
+    ax.legend(handles, [r"AIR, original on $S_2$", "AIR with OPCORD"], loc="upper center", bbox_to_anchor=(0.5, -0.13),
+              fontsize=6, handletextpad=0.2, ncol=2)
+    fig.savefig(OUT / "vs-flm.pdf")
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     fig_busy()
@@ -595,4 +688,6 @@ if __name__ == "__main__":
     fig_timeline()
     fig_headline()
     fig_synthetic()
+    fig_choice()
+    fig_vs_flm()
     params_rows()
