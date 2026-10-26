@@ -8,40 +8,36 @@
 % VALUE: one representative per class of work a reviewer may name, against the capabilities that distinguish OPCORD; every mark is what that work's own text states (evidence in the vault's related-work table notes)
 Table~\ref{tab:relwork} sets OPCORD beside one representative of each class of work that this section discusses.
 
-\begin{table}[t]
+\begin{table*}[t]
     \centering
     \caption{OPCORD Beside Prior Work}
     \label{tab:relwork}
     % SOURCE: per-cell quotes from each work's own text (vault paper-cosched-relwork-table-evidence, Revision 2); column 6 is "predicts or bounds what a candidate change is worth before running that change on the target", applied to every row.
-    \footnotesize
-    \setlength{\tabcolsep}{1.9pt}
+    \small
     \begin{threeparttable}
-    \begin{tabular}{@{}lccccccc@{}}
+    \begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}ccccccc@{}}
         \toprule
-         & \rotatebox{90}{Binary in} & \rotatebox{90}{Closed} & \rotatebox{90}{No trace} & \rotatebox{90}{Reorder} & \rotatebox{90}{Rename} & \rotatebox{90}{Gain first} & \rotatebox{90}{Per input} \\
+         & Compiled & Closed & No trace & Reorders & Renames & Predicts & Order per \\
+         & artifact & binaries & of a run & for overlap & buffers & gain first & input \\
         \midrule
         Rammer~\citep{ma2020rammer} & \xmark & \xmark & \xmark & \cmark & \xmark & \xmark & \xmark \\
-        XLA~\citep{jax-pgle} & \xmark & \xmark & \cmark & \cmark & \xmark & \cmark & \xmark \\
+        XLA's scheduler~\citep{jax-pgle} & \xmark & \xmark & \cmark & \cmark & \xmark & \cmark & \xmark \\
         NanoFlow~\citep{zhu2025nanoflow} & \xmark & \xmark & \xmark & \cmark & \xmark & \cmark & \xmark \\
         AIR~\citep{wang2026mlirair} & \xmark & \xmark & \cmark & \cmark & \cmark & \xmark & \xmark \\
-        AscendNPU-IR~\citep{ascend-autosync} & \xmark & \xmark & \cmark & \pmark\tnote{b} & \xmark & \xmark & \xmark \\
-        LATTICE~\citep{liu2026lattice} & \pmark\tnote{a} & \xmark & \xmark & \cmark & \xmark & \cmark & \xmark \\
+        AscendNPU-IR~\citep{ascend-autosync} & \xmark & \xmark & \cmark & \pmark & \xmark & \xmark & \xmark \\
+        LATTICE~\citep{liu2026lattice} & \pmark & \xmark & \xmark & \cmark & \xmark & \cmark & \xmark \\
         BOLT~\citep{panchenko2019bolt} & \cmark & \cmark & \xmark & \xmark & \xmark & \xmark & \xmark \\
         Daydream~\citep{zhu2020daydream} & \xmark & \xmark & \xmark & \xmark & \xmark & \cmark & \xmark \\
-        CUDA Graphs & \xmark & \xmark & \cmark & \pmark\tnote{c} & \xmark & \xmark & \xmark \\
+        CUDA Graphs~\citep{nvidia-cudagraphs} & \xmark & \xmark & \cmark & \pmark & \xmark & \xmark & \xmark \\
         \midrule
-        OPCORD & \cmark & \pmark\tnote{d} & \cmark & \cmark & \cmark & \cmark & \cmark \\
+        OPCORD & \cmark & \pmark & \cmark & \cmark & \cmark & \cmark & \cmark \\
         \bottomrule
-    \end{tabular}
+    \end{tabular*}
     \begin{tablenotes}\footnotesize
-    \item XLA is its latency-hiding scheduler; CUDA Graphs are as NVIDIA documents them~\citep{nvidia-cudagraphs}. Columns: the input is an artifact a toolchain has already emitted; it can be a closed binary; no trace of a run is needed; it reorders emitted work so that independent work overlaps; it adds buffer instances so that a write need not wait for a read; it predicts or bounds a change's worth before running it on the target; and it deploys a different order per input size without compiling or searching again. \pmark{}: in part.
-    \item[a] A lowered command graph from traces, held fixed.
-    \item[b] It moves synchronization, not the work.
-    \item[c] It runs independent nodes concurrently, with the dependences the program gives it.
-    \item[d] It reads and bounds closed binaries; its deployed rewrites are on open designs.
+    \item \pmark{} in part: LATTICE takes a command graph lowered from traces; AscendNPU-IR moves synchronization rather than work; CUDA Graphs run the dependences the program states; OPCORD reads and bounds closed binaries but deploys rewrites on open designs.
     \end{tablenotes}
     \end{threeparttable}
-\end{table}
+\end{table*}
 
 \textbf{NPU and AI Engine Compilers.}
 % VALUE: compilers and mapping frameworks decide what a design computes and where it runs, and one places a kernel's synchronization while lowering it, with the fewest events; each generates a design from a program, and reconfiguration work serves the modular end of the spectrum, whereas we take fused designs as compiled, closed ones included, and remove false dependences, which cost time even where no synchronization is redundant
