@@ -118,7 +118,7 @@ def fig_arch():
     panels = (("Compute tile", ys[4], 0.78, 1.38), ("Shim tile", ys[0], 0.30, 0.66))
     for name, ty0, py0, py1 in panels:
         _box(ax, cx0, py0, cx1 - cx0, py1 - py0, fc="white", lw=0.5, z=4)
-        ax.text(cx0 + 0.05, py1 - 0.07, name, ha="left", va="center_baseline", fontsize=FS, zorder=6,
+        ax.text(cx0 + 0.05, py1 - 0.07, name, ha="left", va="center_baseline", fontsize=FS_TITLE, zorder=6,
                 fontweight="bold")
         for yy, py in ((ty0 + t, py1), (ty0, py0)):  # zoom lines from the tile's corners to the panel's
             ax.plot([xs[-1] + t, cx0], [yy, py], color=STONE, lw=0.35, linestyle=(0, (1, 1.2)), zorder=1)

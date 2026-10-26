@@ -37,7 +37,7 @@ OUT = Path(os.environ.get("FIGS_OUT", ROOT.parent / "paper" / "fig"))
 FS_LABEL, FS_TICK, FS_NOTE = 8, 7, 6
 # Figures 6 and 8 take the scale uniformly larger (type_scale).
 CHOICE_SCALE = float(os.environ.get("CHOICE_SCALE", 1.15))
-VS_FLM_SCALE = float(os.environ.get("VS_FLM_SCALE", 1.0))
+VS_FLM_SCALE = float(os.environ.get("VS_FLM_SCALE", 1.15))
 
 # The MLSys template sets Times; the figures use Times through LaTeX as well.
 plt.rcParams.update({
@@ -557,14 +557,14 @@ def fig_headline():
         ax.set_xticks(range(len(lengths)), [lb if k % 2 == 0 else "" for k, lb in enumerate(labels)])
         ax.set_xlim(-0.6, len(lengths) - 0.4)
         ax.tick_params(axis="x", length=0, pad=1.5)
-        ax.set_title(llm, pad=2)
+        ax.set_title(llm, pad=3)
     axes[0].set_ylabel("TTFT speedup", labelpad=2)
     axes[0].set_ylim(0.9, 1.72)
     handles = [plt.Rectangle((0, 0), 1, 1, color=SPLIT_COLOR[s]) for s in ("S1", "S2", "S4")]
     axes[0].legend(handles, ["$S_1$", "$S_2$", "$S_4$"], title="Configuration", loc="upper left", handlelength=0.9,
                    handletextpad=0.4, borderaxespad=0.2, labelspacing=0.2)
     fig.supxlabel("Prompt length (tokens)", y=-0.02)
-    save(fig, "headline.pdf", width=WIDE, relayout=lambda: fig.tight_layout(pad=0.2, w_pad=0.3))
+    save(fig, "headline.pdf", width=WIDE, relayout=lambda: fig.tight_layout(pad=0.2, w_pad=0.8))
     plt.close(fig)
 
 
@@ -595,7 +595,7 @@ def fig_decode():
     ax.set_ylabel("Decode speedup", labelpad=2)
     ax.set_xticks([0, 8, 16, 24, 32])
     ax.set_xlim(0, 32)
-    ax.set_ylim(0.95, 1.45)
+    ax.set_ylim(0.95, 1.5)
     ax.legend(loc="upper left", ncol=2, handlelength=1.6, columnspacing=0.8, labelspacing=0.2)
     save(fig, "decode.pdf")
     plt.close(fig)
@@ -684,74 +684,35 @@ def fig_choice():
 
 
 @type_scale(VS_FLM_SCALE)
-def fig_vs_flm_by_length():
-    """Candidate form of fig_vs_flm: grouped by prompt length, the LLMs told apart by their markers in Figures 7 and 8,
-    AIR's original program in ink and OPCORD in our color, joined by a gray line."""
-    rows = json.loads((DATA / "absolute.json").read_text())["rows"]
-    fig, ax = plt.subplots(figsize=(COLUMN, 1.5))
-    order = ("Llama-3.2-1B", "LFM2-1.2B", "Qwen3-4B", "Gemma3-4B", "Llama-3.1-8B")
-    lengths = (1024, 4096, 16384)
-    step, gap = 1.0, 1.6
-    for g, n in enumerate(lengths):
-        for k, llm in enumerate(order):
-            r = next(r for r in rows if r["llm"] == llm and r.get("N") == n)
-            x = g * (len(order) * step + gap) + k * step
-            o, p = r["flm_ms"] / r["orig_s2_ms"], r["flm_ms"] / r["opcord_ms"]
-            marker, fill, _ = DECODE_STYLE[llm]
-            ax.plot([x, x], [o, p], color=GRAY, linewidth=0.6, zorder=1)
-            ax.plot(x, o, marker=marker, markersize=3.2, color=INK, markerfacecolor=INK if fill == "full" else "white",
-                    markeredgewidth=0.6, linestyle="none", zorder=2)
-            ax.plot(x, p, marker=marker, markersize=3.2, color=OURS, markerfacecolor=OURS if fill == "full" else "white",
-                    markeredgewidth=0.6, linestyle="none", zorder=3)
-    centers = [g * (len(order) * step + gap) + (len(order) - 1) * step / 2 for g in range(len(lengths))]
-    ax.set_xticks(centers, ["1K", "4K", "16K"])
-    ax.tick_params(axis="x", length=0, pad=2)
-    ax.set_xlim(-0.8, centers[-1] + (len(order) - 1) * step / 2 + 0.8)
-    ax.set_xlabel("Prompt length (tokens)", labelpad=1)
-    ax.axhline(1.0, color="black", linewidth=0.5)
-    ax.set_yscale("log", base=2)
-    ax.set_yticks([0.5, 1, 2], ["0.5", "1", "2"])
-    ax.minorticks_off()
-    ax.set_ylim(0.45, 2.6)
-    ax.set_ylabel("TTFT speedup", labelpad=1)
-    llm_h = [plt.Line2D([], [], marker=DECODE_STYLE[l][0], markersize=3.2, color=INK, linestyle="none",
-                        markerfacecolor=INK if DECODE_STYLE[l][1] == "full" else "white", markeredgewidth=0.6)
-             for l in order]
-    arm_h = [plt.Line2D([], [], marker="s", markersize=3.2, color=c, linestyle="none", markeredgewidth=0)
-             for c in (INK, OURS)]
-    ax.legend(llm_h + arm_h, list(order) + [r"AIR, $S_2$", "AIR with OPCORD"], loc="upper center",
-              bbox_to_anchor=(0.5, -0.27), ncol=3, handletextpad=0.2, columnspacing=0.8, labelspacing=0.2)
-    save(fig, "vs-flm-by-length.pdf")
-    plt.close(fig)
-
-
-@type_scale(VS_FLM_SCALE)
 def fig_vs_flm():
     """TTFT speedup over FLM's current release at 1K, 4K and 16K tokens: AIR's original program on its default
     configuration, and the same design under OPCORD. data/absolute.json (D1, one batch)."""
     rows = json.loads((DATA / "absolute.json").read_text())["rows"]
     fig, ax = plt.subplots(figsize=(COLUMN, 1.25))
-    x, ticks, labels = 0.0, [], []
-    for llm in LLMS:
-        rs = sorted((r for r in rows if r["llm"] == llm and r.get("N") in (1024, 4096, 16384)), key=lambda r: r["N"])
-        x0 = x
-        for r in rs:
+    # the points evenly spaced, three per LLM; a tick at each boundary between LLMs separates the groups
+    lengths = {1024: "1K", 4096: "4K", 16384: "16K"}
+    ticks, labels = [], []
+    for g, llm in enumerate(LLMS):
+        rs = sorted((r for r in rows if r["llm"] == llm and r.get("N") in lengths), key=lambda r: r["N"])
+        for k, r in enumerate(rs):
+            x = g * len(lengths) + k
             o, p = r["flm_ms"] / r["orig_s2_ms"], r["flm_ms"] / r["opcord_ms"]
             ax.plot([x, x], [o, p], color=GRAY, linewidth=0.6, zorder=1)
             ax.plot(x, o, marker="s", markersize=2.8, color=INK, markerfacecolor="white", markeredgewidth=0.6, zorder=2)
             ax.plot(x, p, marker="o", markersize=3.0, color=OURS, markeredgewidth=0, zorder=3)
             ticks.append(x)
-            labels.append({1024: "1K", 4096: "4K", 16384: "16K"}[r["N"]])
-            x += 1.2
-        ax.text((x0 + x - 1.2) / 2, 2.6, llm, ha="center", va="bottom", fontsize=note())
-        x += 0.8
+            labels.append(lengths[r["N"]])
+        ax.text(g * len(lengths) + (len(lengths) - 1) / 2, 2.6, llm, ha="center", va="bottom", fontsize=note())
     ax.axhline(1.0, color="black", linewidth=0.5)
     ax.set_yscale("log", base=2)
     ax.set_yticks([0.5, 1, 2], ["0.5", "1", "2"])
-    ax.minorticks_off()
     ax.set_ylim(0.45, 3.4)
+    ax.set_xlim(-0.5, len(LLMS) * len(lengths) - 0.5)
     ax.set_xticks(ticks, labels)
-    ax.tick_params(axis="x", length=0, pad=1.5)
+    ax.set_xticks([g * len(lengths) - 0.5 for g in range(1, len(LLMS))], minor=True)
+    ax.set_yticks([], minor=True)
+    ax.tick_params(axis="x", which="major", length=0, pad=1.5)
+    ax.tick_params(axis="x", which="minor", length=4, direction="inout", width=0.5)
     ax.set_ylabel("TTFT speedup", labelpad=1)
     handles = [plt.Line2D([], [], marker="s", markersize=2.8, color=INK, markerfacecolor="white", linestyle="none",
                           markeredgewidth=0.6),
