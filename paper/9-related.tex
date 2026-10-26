@@ -21,7 +21,7 @@ IOS and Nimble run independent operators concurrently on GPU streams~\citep{ding
 DietCode generates tensor programs from which its runtime selects one per input shape, within each operator~\citep{zheng2022dietcode}.
 LATTICE reorders NPU command graphs taken from traces jointly with memory planning and reports a modeled makespan~\citep{liu2026lattice}, taking the graph's dependences as given.
 Our analysis instead derives them, with their classes and the legality of each reorder, from the compiled binaries.
-DynaFlow decouples a model's operators from their execution schedule through a programmable scheduling interface, XLA's latency-hiding scheduler orders operations from profiled latencies, and SambaNova's compiler overlaps work across kernel calls~\citep{pan2026dynaflow,jax-pgle,gandhi2026dataflow}.
+DynaFlow~\citep{pan2026dynaflow} decouples a model's operators from their execution schedule through a programmable scheduling interface, XLA's latency-hiding scheduler~\citep{jax-pgle} orders operations from profiled latencies, and SambaNova's compiler~\citep{gandhi2026dataflow} overlaps work across kernel calls.
 Unlike these systems, which construct a schedule from a program or a traced graph, we start from the schedule that already exists as the command processor's order in compiled binaries, closed ones included.
 We then price which of its false orders to remove per prompt length.
 % SOURCE: LATTICE (arXiv 2607.17422v3, abstract read 2026-10-22): three stages, the last recovering pipeline parallelism; six command traces from a DaVinci NPU; reports peak memory, extra DDR traffic, spill count and modeled makespan (vault src-lattice).
@@ -29,7 +29,7 @@ We then price which of its false orders to remove per prompt length.
 \textbf{Binary Analysis and Rewriting.}
 % VALUE: analysis and rewriting after compilation exist for CPUs and GPUs (Kotha et al. analyse binaries; BOLT lays out code from profiles; CuAsmRL reorders a compiled GPU kernel's schedule by a measured search); each works on one processor's instruction stream, whereas we analyse and rewrite the command streams that coordinate several kinds of engines, with legality decided from every agent's access sets
 Analysis and rewriting after compilation are established for CPUs and GPUs.
-There, binaries are analysed and parallelized without their source, code layout is optimized from profiles, and a compiled GPU kernel's instruction schedule is reordered by a search over measured candidates~\citep{kotha2010automatic,panchenko2019bolt,he2025cuasmrl}.
+There, binaries are analysed and parallelized without their source~\citep{kotha2010automatic}, code layout is optimized from profiles~\citep{panchenko2019bolt}, and a compiled GPU kernel's instruction schedule is reordered by a search over measured candidates~\citep{he2025cuasmrl}.
 Each of these works on one processor's instruction stream, whereas we analyse and rewrite the command streams that coordinate several kinds of engines, and decide legality from the access sets of every agent that touches state.
 
 \textbf{Performance Analysis and Models.}

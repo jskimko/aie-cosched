@@ -3,17 +3,18 @@
 
 % VALUE: (1) stakes and symptom: client NPUs are standard equipment and run LLMs; a spatial dataflow NPU runs each operator's flow on a group of tiles while one in-order CP issues every group's work, so the order in the compiled commands is the schedule the array runs; in the original prefill the groups take turns while the measure a developer can compute reads busy; issued in another order the same operators run together (Figure 1); gap: issue order through the CP has received far less attention than what each operator computes and where
 % DECISION: the symptom is "the measure a developer can compute reads 92-97% busy", never "invisible to every metric".
-Neural processing units (NPUs) such as the AMD XDNA~2 bring large language model (LLM) inference to client machines~\citep{rico2024xdna}, and a platform requirement of 40 trillion operations per second has made such an NPU standard equipment in mainstream laptops~\citep{copilotplus-reqs}.
+Neural processing units (NPUs) such as those in AMD Ryzen\texttrademark{} AI processors bring large language model (LLM) inference to client machines~\citep{rico2024xdna}, and Microsoft's Copilot+ PCs require an NPU of at least 40 trillion operations per second~\citep{copilotplus-reqs}.
 % SOURCE: the Copilot+ PC hardware requirement of 40+ TOPS for the NPU (copilotplus-reqs).
-The NPU is a spatial dataflow array, on which a design runs each LLM operator as a flow on its own group of tiles, laid out in today's designs as whole columns, which we call a column group.
+AMD's XDNA~2 NPU is a spatial dataflow array, on which a design runs each LLM operator as a flow on its own group of tiles, laid out in today's designs as whole columns, which we call a column group.
 Yet one in-order command processor (CP) issues the work of every group, so the order of issues and waits compiled into the commands is the schedule that the array runs.
-In MLIR-AIR's fused prefill~\citep{wang2026mlirair}, which with its host program we call the \emph{original program}, attention's columns and those of the matrix multiplications (GEMMs) take turns (Figure~\ref{fig:timeline}, top, for Llama-3.2-1B), although attention on one 128-token chunk neither feeds nor reads the GEMMs of later chunks.
+In MLIR-AIR's fused prefill~\citep{wang2026mlirair}, attention's columns and those of the matrix multiplications (GEMMs) take turns (Figure~\ref{fig:timeline}, top, for Llama-3.2-1B), although attention on one 128-token chunk neither feeds nor reads the GEMMs of later chunks.
+We call this design with its host program the \emph{original program}.
 The measure a developer can compute, which divides the operators' summed time by the wall time, still reads the device as busy for 92--97\% of the time to first token (TTFT).
 % SOURCE: busy 92-97% of TTFT at 512 / 2,048 / 4,096 tokens, each operator's isolated time less the dispatch floor, summed over the prefill (amd-npu e3acc8a prefill-e2/decomp.txt; Section 3.2).
-Issued in another order, the same operators run together and reach the first token \FigOneGain$\times$ sooner (Figure~\ref{fig:timeline}, bottom) on the same split, which is the number of columns that attention takes.
-However, while compilers and mapping frameworks~\citep{hunhoff2025iron,symons2025stream} optimize what each operator computes and where it runs, how operators are composed and issued through the CP has received far less attention.
-The insight of this work is that, because the CP's instruction order is the array's schedule, fixed in the artifact a toolchain emits, every wait in a design, every column a wait holds idle, and which waits could free overlap can be read from that artifact.
-So the waits that leave the array idle can be bounded and removed from it after compilation.
+Issued in another order on the same columns, the same operators run together and reach the first token \FigOneGain$\times$ sooner (Figure~\ref{fig:timeline}, bottom).
+Compilers and mapping frameworks~\citep{hunhoff2025iron,symons2025stream} optimize what each operator computes and where it runs, but they take the order in which the CP issues that work from the program as written.
+The insight of this work is that the CP's instruction order is the array's schedule, fixed in the artifact that a toolchain emits.
+Every wait in a design can therefore be read from that artifact, together with the columns it holds idle and whether removing it could free overlap, so the waits that leave the array idle can be bounded and removed after compilation.
 
 \begin{figure}[t]
     \centering
@@ -37,7 +38,7 @@ This NPU, in contrast, has one in-order CP per hardware context, so the order mu
 % VALUE: (3) the insight and the characterization: the CP's order is the array's schedule, fixed in the artifact, so every wait can be read from it; the waits are textbook false dependences and removing those on the critical path is the textbook remedy (cited); what this platform adds is when removal pays (overlap on resources a rewrite cannot duplicate, with no true dependence, including through the host) and that the design's cut and the prompt length set how much, so the order that pays changes with length and must be priced
 % DECISION: false dependences, their classes, reordering and renaming are textbook and cited; the claim is the condition on this platform and its dependence on the cut and the shape, never "false dependences cost time".
 The waits above are textbook order dependences, and decode attention's loop, which keeps one buffer per role, adds textbook name dependences~\citep{bernstein1966analysis,kuck1981dependence}.
-We call both kinds false orders (Section~\ref{subsec:losses}), and removing those on the critical path is the textbook remedy~\citep{fields2003interaction}.
+We call both kinds false orders (Section~\ref{subsec:losses}), and removing one can save time only if it lies on the critical path~\citep{fields2003interaction}.
 What this platform adds is when removing one frees overlap, namely only where two clauses hold.
 The first is that the work it frees runs on core tiles and DMA channels that the work it waited on does not use, which are resources a rewrite cannot duplicate.
 The second is that no true dependence, on the device or through the host, lies between the two.
@@ -46,8 +47,11 @@ Both clauses name resources and dependences that the artifacts and the host's ac
 How a design cuts its work into configurations, commands, and buffers, and the length of the prompt, set how much work meets this condition.
 In the current releases of a closed production stack, FastFlowLM~\citep{fastflowlm-repo}, the per-operator engine that runs our five LLMs gives each operator its own configuration of nearly the whole array, so consecutive operators share their columns.
 Its flash designs run each layer's attention once over the whole prompt, so every GEMM feeds or reads it.
-The original program instead runs fixed-size chunks, in which attention's work grows with the chunk's position while the GEMMs' stays fixed, so the balance between the groups, and with it whether the overlap repays a new order's per-command costs, shifts with the prompt length.
-The issue order that pays therefore changes with the prompt and must be priced per length rather than fixed, as must the split, which moves with the same balance because more attention columns shorten attention but lengthen every GEMM.
+
+% VALUE: why the order must be priced per prompt length: the original program's chunks make the balance between the groups move with the prompt, and the split moves with it
+The original program, by contrast, runs fixed-size chunks, in which attention's work grows with the chunk's position while the GEMMs' work stays fixed.
+The balance between the groups therefore shifts with the prompt length, and with it whether the overlap repays a new order's per-command costs.
+The issue order that pays therefore changes with the prompt and must be priced per length rather than fixed, as must the split of the columns between attention and the GEMMs, which moves with the same balance because more attention columns shorten attention but lengthen every GEMM.
 
 % VALUE: (4) this work: OPCORD, one sentence per part with what it is and why: the analysis reads compiled artifacts across every agent and decides legality from them; the event model, analytical in form with microbenchmark constants, prices orders and splits per prompt length, and a bound limits what each false order can gain; the composer, the stream pass and the loop pass remove the false orders the price clears, under checkers; headline results against the original program on its best supported split, and the event model's choice quality
 % DECISION: the general benefit (author, 2026-10-25; core rule): OPCORD serves any developer of this hardware; the stacks demonstrate it.
@@ -55,10 +59,13 @@ In this work, we build OPCORD, which removes from compiled designs the false ord
 Designs from open compilers such as MLIR-AIR and IRON, on which researchers and industry build independently, inherit the order their toolchain emits, so OPCORD serves this common path rather than one stack, in today's designs and in each design a toolchain emits later.
 A team that holds a closed stack's source can recover that loss in its own designs the same way.
 First, because the order sits in binaries whose source may be closed, its analysis reads a design's artifacts as a dependence graph over every agent that touches state, accepts a reorder or a rename only where the artifacts and the host's accesses show it legal, and bounds what removing each false order can gain.
-On binaries alone, OPCORD stops there and replays only the few rewrites that leave the host program as it is, to check a bound against measurement.
-Second, because the artifact fixes the order of the work but not its durations, an analytical event model, with constants measured once by microbenchmarks, prices each candidate order and split per prompt length from timings of each operator run alone, and a short measurement settles near-ties when OPCORD plans a prompt length.
+On a closed stack's binaries, OPCORD stops at the analysis and replays only rewrites that leave the host program unchanged, to check a bound against measurement.
+Second, because the artifact fixes the order of the work but not its durations, an analytical event model, with constants measured once by microbenchmarks, prices each candidate order and split per prompt length from timings of each operator run alone.
+When two candidates are priced close, a measurement while OPCORD plans the prompt length settles the choice.
 Third, a composer reorders issue across commands, a stream pass within one operator's stream, and a loop pass renames decode attention's buffers into rings.
 Because OPCORD rewrites designs it did not compile, each stands behind a checker that refuses any rewrite it cannot show legal, with kernels, driver, and firmware unchanged.
+
+% VALUE: the evidence in brief: headline gains against the baseline, the absolute standing, choice quality, exactness and legality, and the condition's scope across the census
 Against the original program on the supported split that minimizes its TTFT, OPCORD shortens TTFT across five LLMs by \PrefillGainLo--\PrefillGainHi$\times$ at prompts of 1K to 32K tokens, and its loop pass shortens decode by \DecodeGainLo--\DecodeGainHi$\times$ at contexts of about 30K tokens against the unmodified decode design, both with bit-identical outputs.
 On MLIR-AIR's designs, OPCORD also reaches the first token sooner than FastFlowLM's current release, on every LLM and prompt length we compare.
 Its choice of order and split stays within \ChoiceOpcordMax\% of the measured minimum on every LLM and prompt length we measure, whereas each fixed rule we test loses \ChoiceAlwaysMax--\ChoiceFourSTwoMax\% on some of them.
