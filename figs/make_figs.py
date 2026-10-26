@@ -715,7 +715,7 @@ def fig_vs_flm():
     ax.set_xlabel("Prompt length (tokens)", labelpad=1)
     ax.axhline(1.0, color="black", linewidth=0.5)
     ax.set_yscale("log", base=2)
-    ax.set_yticks([0.5, 1, 2], ["0.5", "1", "2"])
+    ax.set_yticks([0.5, 0.75, 1, 1.5, 2], ["0.5", "0.75", "1", "1.5", "2"])
     ax.minorticks_off()
     ax.set_ylim(0.45, 2.6)
     ax.set_ylabel("TTFT speedup", labelpad=1)
