@@ -30,12 +30,22 @@ ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
 OUT = Path(os.environ.get("FIGS_OUT", ROOT.parent / "paper" / "fig"))
 
+# Type sizes in pt as printed: every paper figure is saved at the width it prints at (save() below), so these are the
+# sizes on the page. Axis labels and panel titles; tick labels, legends and category labels; annotations on the data.
+# The diagrams in diagrams.py take the scale one step down (titles FS_TICK, labels FS_NOTE).
+FS_LABEL, FS_TICK, FS_NOTE = 8, 7, 6
+
 # The MLSys template sets Times; the figures use Times through LaTeX as well.
 plt.rcParams.update({
     "text.usetex": True,
     "text.latex.preamble": r"\usepackage{newtxtext}\usepackage{newtxmath}",
     "font.family": "serif",
-    "font.size": 8,
+    "font.size": FS_LABEL,
+    "axes.titlesize": FS_LABEL,
+    "figure.labelsize": FS_LABEL,  # fig.supxlabel
+    "xtick.labelsize": FS_TICK,
+    "ytick.labelsize": FS_TICK,
+    "legend.title_fontsize": FS_TICK,
     "axes.linewidth": 0.5,
     "lines.linewidth": 0.8,
     "lines.markersize": 3,
@@ -48,11 +58,29 @@ plt.rcParams.update({
     "xtick.major.size": 2.5,
     "ytick.major.size": 2.5,
     "legend.frameon": False,
-    "legend.fontsize": 7,
+    "legend.fontsize": FS_TICK,
     "savefig.bbox": "tight",
     "savefig.pad_inches": 0.01,
 })
 COLUMN = 3.25  # MLSys column width, inches
+WIDE = 6.75  # MLSys two-column width, inches
+
+
+def save(fig, name, width=COLUMN, relayout=None, **kw):
+    """Save fig so that its tight crop is `width` inches wide, the width the paper prints it at, which keeps every
+    type size at its printed size. The canvas width is adjusted until the crop matches; relayout re-runs the figure's
+    own tight_layout after each change."""
+    pad = plt.rcParams["savefig.pad_inches"]
+    for _ in range(6):
+        if relayout:
+            relayout()
+        fig.draw_without_rendering()
+        w = fig.get_tightbbox().width + 2 * pad
+        if abs(w - width) < 0.002:
+            break
+        fw, fh = fig.get_size_inches()
+        fig.set_size_inches(fw + width - w, fh)
+    fig.savefig(OUT / name, **kw)
 
 # The paper's own palette, built in OKLCH and checked under deuteranopia, protanopia and tritanopia (the pairs that
 # share a figure stay apart): ours violet; attention sand and the GEMMs teal, each with a pastel fill step for areas.
@@ -456,23 +484,20 @@ def fig_timeline():
         assert abs(overlap - a["both_outstanding_ms"]) < 1e-3, (arm, overlap, a["both_outstanding_ms"])
         ttft = a["ttft_ms"]
         ax.axvline(ttft / base, color="black", linewidth=0.6, linestyle=(0, (4, 2)))
-        ax.text(ttft / base + 0.008, 1.5, rf"{ttft / base:.2f}", ha="left", va="center", fontsize=6.5)
-        ax.set_title(name, fontsize=7, pad=2, loc="left")
-        ax.set_yticks([2, 1], ["Attention", "GEMMs"], fontsize=6.5)
+        ax.text(ttft / base + 0.008, 1.5, rf"{ttft / base:.2f}", ha="left", va="center", fontsize=FS_NOTE)
+        ax.set_title(name, pad=2, loc="left")
+        ax.set_yticks([2, 1], ["Attention", "GEMMs"])
         ax.set_ylim(0.45, 2.55)
         ax.tick_params(axis="y", length=0, left=False, right=False)
         for side in ("top", "right", "left"):
             ax.spines[side].set_visible(False)
         ax.tick_params(axis="x", top=False)
     axes[-1].set_xlim(0, 1.12)
-    axes[-1].set_xlabel("Normalized time (original TTFT = 1)", labelpad=1, fontsize=7)
-    axes[-1].tick_params(axis="x", labelsize=6.5)
-    fig.tight_layout(pad=0.2, h_pad=0.3)
-    fig.savefig(OUT / "timeline.pdf")
+    axes[-1].set_xlabel("Normalized time (original TTFT = 1)", labelpad=1)
+    save(fig, "timeline.pdf", relayout=lambda: fig.tight_layout(pad=0.2, h_pad=0.3))
     plt.close(fig)
 
 
-WIDE = 6.75  # MLSys two-column width, inches
 # light steps of OURS, so the near-black error bars stay visible on every bar
 SPLIT_COLOR = {"S1": "#E8DFFD", "S2": "#CEBEEF", "S4": "#AE97D9"}
 LLMS = ("Llama-3.2-1B", "LFM2-1.2B", "Qwen3-4B", "Gemma3-4B", "Llama-3.1-8B")
@@ -501,24 +526,22 @@ def fig_headline():
                     solid_capstyle="butt", zorder=2)
             if c.get("lo") is None:
                 # the baseline and the pick ran in different batches with no shared version: no interval
-                ax.text(i, c["gain"] + 0.01, r"$\dagger$", ha="center", va="bottom", fontsize=6)
+                ax.text(i, c["gain"] + 0.01, r"$\dagger$", ha="center", va="bottom", fontsize=FS_NOTE)
             elif c["hi"] > c["lo"]:
                 ax.errorbar(i, c["gain"], yerr=[[c["gain"] - c["lo"]], [c["hi"] - c["gain"]]], fmt="none",
                             ecolor=INK, elinewidth=0.5, capsize=1.0, zorder=3)
         ax.axhline(1.0, color="black", linewidth=0.5, zorder=4)
-        ax.set_xticks(range(len(lengths)), [lb if k % 2 == 0 else "" for k, lb in enumerate(labels)], fontsize=6)
+        ax.set_xticks(range(len(lengths)), [lb if k % 2 == 0 else "" for k, lb in enumerate(labels)])
         ax.set_xlim(-0.6, len(lengths) - 0.4)
         ax.tick_params(axis="x", length=0, pad=1.5)
-        ax.set_title(llm, fontsize=7, pad=2)
+        ax.set_title(llm, pad=2)
     axes[0].set_ylabel("TTFT speedup", labelpad=2)
     axes[0].set_ylim(0.9, 1.72)
     handles = [plt.Rectangle((0, 0), 1, 1, color=SPLIT_COLOR[s]) for s in ("S1", "S2", "S4")]
-    axes[0].legend(handles, ["$S_1$", "$S_2$", "$S_4$"], title="Configuration", title_fontsize=6, loc="upper left",
-                   fontsize=6, handlelength=0.9,
+    axes[0].legend(handles, ["$S_1$", "$S_2$", "$S_4$"], title="Configuration", loc="upper left", handlelength=0.9,
                    handletextpad=0.4, borderaxespad=0.2, labelspacing=0.2)
-    fig.supxlabel("Prompt length (tokens)", fontsize=7, y=-0.02)
-    fig.tight_layout(pad=0.2, w_pad=0.3)
-    fig.savefig(OUT / "headline.pdf")
+    fig.supxlabel("Prompt length (tokens)", y=-0.02)
+    save(fig, "headline.pdf", width=WIDE, relayout=lambda: fig.tight_layout(pad=0.2, w_pad=0.3))
     plt.close(fig)
 
 
@@ -534,7 +557,7 @@ def fig_decode():
     data/decode-cells.json (figs/paper_numbers.py): one development batch, 5 ABBA repetitions of 256 greedy tokens per
     point, logits bit-identical; the last context is 30,208 tokens (28,800 on Qwen3-4B, its design's window)."""
     cells = json.loads((DATA / "decode-cells.json").read_text())["cells"]
-    fig, ax = plt.subplots(figsize=(COLUMN + 0.37, 1.3))  # the tight crop trims about 0.37 in of margin
+    fig, ax = plt.subplots(figsize=(COLUMN, 1.3))
     order = ("Llama-3.2-1B", "LFM2-1.2B", "Qwen3-4B", "Llama-3.1-8B", "Gemma3-4B")
     for llm in order:
         pts = sorted((c["P"], c) for c in cells if c["llm"] == llm)
@@ -550,8 +573,8 @@ def fig_decode():
     ax.set_xticks([0, 8, 16, 24, 32])
     ax.set_xlim(0, 32)
     ax.set_ylim(0.95, 1.45)
-    ax.legend(loc="upper left", fontsize=6, ncol=2, handlelength=1.6, columnspacing=0.8, labelspacing=0.2)
-    fig.savefig(OUT / "decode.pdf")
+    ax.legend(loc="upper left", ncol=2, handlelength=1.6, columnspacing=0.8, labelspacing=0.2)
+    save(fig, "decode.pdf")
     plt.close(fig)
 
 
@@ -566,7 +589,7 @@ def fig_synthetic():
     128-token chunks, for three two-layer builds of MLIR-AIR's fused prefill that keep attention fixed and vary the
     GEMMs' work. data/synthetic.json: the repeat-position ratio, median with its 95% interval."""
     cells = json.loads((DATA / "synthetic.json").read_text())
-    fig, ax = plt.subplots(figsize=(COLUMN + 0.37, 1.5))
+    fig, ax = plt.subplots(figsize=(COLUMN, 1.5))
     for model, (label, marker, fill, dash) in SYNTH_STYLE.items():
         pts = sorted((c["C"], c["repeat"]) for c in cells if c["model"] == model)
         xs = [c for c, _ in pts]
@@ -582,8 +605,8 @@ def fig_synthetic():
     ax.set_xlabel("Prompt length (128-token chunks)", labelpad=1)
     ax.set_ylabel("TTFT speedup", labelpad=2)
     ax.set_ylim(0.8, 1.8)
-    ax.legend(loc="upper left", fontsize=6, handlelength=1.6, labelspacing=0.2)
-    fig.savefig(OUT / "synthetic.pdf")
+    ax.legend(loc="upper left", handlelength=1.6, labelspacing=0.2)
+    save(fig, "synthetic.pdf")
     plt.close(fig)
 
 
@@ -600,7 +623,7 @@ def fig_choice():
     data/accuracy-cells.json (the frozen form's 70 development cells) and data/choice.json (the 59 priced cells).
     "Never reorder" is left out of (b): its loss is the headline gain forgone, which Figure 6 shows."""
     rows = json.loads((DATA / "accuracy-cells.json").read_text())
-    fig, (a, b) = plt.subplots(2, 1, figsize=(COLUMN + 0.37, 2.55), gridspec_kw=dict(height_ratios=[1.15, 0.85], hspace=0.62))
+    fig, (a, b) = plt.subplots(2, 1, figsize=(COLUMN, 2.8), gridspec_kw=dict(height_ratios=[1.35, 0.85], hspace=0.62))
     a.axhspan(-5, 5, color="#EDEDED", zorder=0, linewidth=0)
     for key, llm in KEY_LLM.items():
         rs = [r for r in rows if r["model"].startswith(key)]
@@ -614,25 +637,25 @@ def fig_choice():
     a.minorticks_off()
     a.set_xlabel("Measured TTFT speedup of the composed order", labelpad=1)
     a.set_ylabel(r"Prediction error (\%)", labelpad=1)
-    a.set_ylim(-16, 8)
-    a.legend(loc="lower left", fontsize=5.5, ncol=2, handletextpad=0.2, columnspacing=0.6, labelspacing=0.15)
-    a.set_title("(a) Event model", fontsize=7, pad=3)
+    a.set_ylim(-24, 8)  # room below the band for the legend
+    a.legend(loc="lower left", ncol=2, handletextpad=0.2, columnspacing=0.6, labelspacing=0.15)
+    a.set_title("(a) Event model", pad=3)
     cells = json.loads((DATA / "choice.json").read_text())["cells"]
     labels = []
     for i, (key, label) in enumerate(CHOICE_RULES):  # each rule's worst loss
         v = [c[key] for c in cells if c.get(key) is not None]
         worst = max(v)
         b.barh(i, worst, height=0.6, color=OURS if key == "opcord" else GRAY, edgecolor="none")
-        b.text(worst + 1.5, i, f"{worst:.1f}", ha="left", va="center", fontsize=6)
+        b.text(worst + 1.5, i, f"{worst:.1f}", ha="left", va="center", fontsize=FS_NOTE)
         labels.append(label)
     b.set_xlim(0, 110)
     b.set_xticks([0, 25, 50, 75, 100])
     b.set_ylim(len(CHOICE_RULES) - 0.5, -0.5)
-    b.set_yticks(range(len(CHOICE_RULES)), labels, fontsize=6)
+    b.set_yticks(range(len(CHOICE_RULES)), labels)
     b.tick_params(axis="y", length=0)
     b.set_xlabel(r"Worst loss (\%)", labelpad=1)
-    b.set_title("(b) Choice of order and configuration", fontsize=7, pad=3)
-    fig.savefig(OUT / "choice.pdf")
+    b.set_title("(b) Choice of order and configuration", pad=3)
+    save(fig, "choice.pdf")
     plt.close(fig)
 
 
@@ -640,7 +663,7 @@ def fig_vs_flm():
     """TTFT speedup over FLM's current release at 1K, 4K and 16K tokens: AIR's original program on its default
     configuration, and the same design under OPCORD. data/absolute.json (D1, one batch)."""
     rows = json.loads((DATA / "absolute.json").read_text())["rows"]
-    fig, ax = plt.subplots(figsize=(COLUMN + 0.37, 1.25))
+    fig, ax = plt.subplots(figsize=(COLUMN, 1.25))
     x, ticks, labels = 0.0, [], []
     for llm in LLMS:
         rs = sorted((r for r in rows if r["llm"] == llm and r.get("N") in (1024, 4096, 16384)), key=lambda r: r["N"])
@@ -652,23 +675,23 @@ def fig_vs_flm():
             ax.plot(x, p, marker="o", markersize=3.0, color=OURS, markeredgewidth=0, zorder=3)
             ticks.append(x)
             labels.append({1024: "1K", 4096: "4K", 16384: "16K"}[r["N"]])
-            x += 1
-        ax.text((x0 + x - 1) / 2, 2.6, llm, ha="center", va="bottom", fontsize=5.5)
+            x += 1.2
+        ax.text((x0 + x - 1.2) / 2, 2.6, llm, ha="center", va="bottom", fontsize=FS_NOTE)
         x += 0.8
     ax.axhline(1.0, color="black", linewidth=0.5)
     ax.set_yscale("log", base=2)
     ax.set_yticks([0.5, 1, 2], ["0.5", "1", "2"])
     ax.minorticks_off()
     ax.set_ylim(0.45, 3.4)
-    ax.set_xticks(ticks, labels, fontsize=5.5)
+    ax.set_xticks(ticks, labels)
     ax.tick_params(axis="x", length=0, pad=1.5)
     ax.set_ylabel("TTFT speedup", labelpad=1)
     handles = [plt.Line2D([], [], marker="s", markersize=2.8, color=INK, markerfacecolor="white", linestyle="none",
                           markeredgewidth=0.6),
                plt.Line2D([], [], marker="o", markersize=3, color=OURS, linestyle="none", markeredgewidth=0)]
     ax.legend(handles, [r"AIR, $S_2$", "AIR with OPCORD"], loc="upper center", bbox_to_anchor=(0.5, -0.13),
-              fontsize=6, handletextpad=0.2, ncol=2)
-    fig.savefig(OUT / "vs-flm.pdf")
+              handletextpad=0.2, ncol=2)
+    save(fig, "vs-flm.pdf")
     plt.close(fig)
 
 

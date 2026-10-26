@@ -15,14 +15,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import make_figs as _m  # noqa: E402  (style, palette, OUT)
-from make_figs import ATTN, ATTN_FILL, COLUMN, GEMM, GEMM_FILL, GRAY, INK, OURS, OURS_TINT, OUT, plt  # noqa: E402
+from make_figs import (ATTN, ATTN_FILL, COLUMN, FS_LABEL, FS_NOTE, FS_TICK, GEMM, GEMM_FILL, GRAY, INK, OURS,  # noqa: E402
+                       OURS_TINT, OUT, plt, save)
 import numpy as np  # noqa: E402
 from matplotlib.patches import FancyArrowPatch, Polygon, Rectangle, Wedge  # noqa: E402
 
 MIST, STONE = "#E4E4E4", "#707070"
 # the fill steps of attention and the GEMMs, for the column groups of the default configuration
 ATTN_PASTEL, GEMM_PASTEL = ATTN_FILL, GEMM_FILL
-FS = 6  # label size, pt
+FS, FS_TITLE = FS_NOTE, FS_TICK  # the diagrams (Figures 2 and 4) take the type scale one step down
 
 
 def _canvas(w, h):
@@ -58,10 +59,10 @@ def fig_arch():
     fig, ax = _canvas(W, H)
     # ---- the submission path along the top: host -> hardware context -> CP -> its instruction stream
     ty, th = 1.64, 0.2
-    _box(ax, 0.02, ty, 0.38, th, "Host", fc=MIST)
-    _box(ax, 0.52, ty, 0.62, th, "Hardware context", fs=FS - 0.5)
+    _box(ax, 0.02, ty, 0.34, th, "Host", fc=MIST)
+    _box(ax, 0.48, ty, 0.66, th, "Hardware context")
     _box(ax, 1.26, ty, 0.30, th, "CP")
-    _arrow(ax, (0.40, ty + th / 2), (0.52, ty + th / 2))
+    _arrow(ax, (0.36, ty + th / 2), (0.48, ty + th / 2))
     _arrow(ax, (1.14, ty + th / 2), (1.26, ty + th / 2))
     kinds = "iisiiis"  # issue, issue, synchronize, ...
     cw, sx = 0.085, 1.66
@@ -90,8 +91,8 @@ def fig_arch():
     top = ys[5] + t
     gy = top + 0.085
     for c in (0, 7):
-        ax.text(xs[c] + t / 2, gy, "Attn.", ha="center", va="center_baseline", fontsize=FS - 0.5)
-    ax.text((xs[1] + xs[6] + t) / 2, gy, "GEMMs", ha="center", va="center_baseline", fontsize=FS - 0.5)
+        ax.text(xs[c] + t / 2, gy, "Attn.", ha="center", va="center_baseline", fontsize=FS)
+    ax.text((xs[1] + xs[6] + t) / 2, gy, "GEMMs", ha="center", va="center_baseline", fontsize=FS)
     by = top + 0.03
     ax.plot([xs[1], xs[1], xs[6] + t, xs[6] + t], [by - 0.012, by, by, by - 0.012], color=INK, lw=0.4, zorder=3,
             solid_joinstyle="miter")
@@ -163,7 +164,7 @@ def _strip(ax, x, y, kinds, cw=0.075, h=0.10, z=5):
 def _stage(ax, x, y, w, h, title, ours=True):
     ax.add_patch(Rectangle((x, y), w, h, facecolor=OURS_TINT if ours else "white", edgecolor=MAGENTA if ours else INK,
                            linewidth=0.7 if ours else 0.5, zorder=1))
-    ax.text(x + w / 2, y + h - 0.075, title, ha="center", va="center_baseline", fontsize=FS, zorder=6)
+    ax.text(x + w / 2, y + h - 0.075, title, ha="center", va="center_baseline", fontsize=FS_TITLE, zorder=6)
 
 
 def _doc(ax, x, y, w=0.1125, h=0.15, z=5):
@@ -222,7 +223,7 @@ def fig_framework():
     left."""
     W, H = _m.WIDE - 0.04, 1.48
     fig, ax = _canvas(W, H)
-    fs = FS + 0.5
+    fs = FS
     top, bot = H - 0.02, 0.30  # the panels' common top and bottom; the probe rail runs beneath them
     # One grid for every panel: items inset `ins` from the panel's sides and `ins + 0.01` from its bottom; each item's
     # content inset `pad` from its sides. The panels' widths follow their widest content (TeX widths at 6.5 pt), the
@@ -284,7 +285,7 @@ def fig_framework():
     for k, (kind, label) in enumerate((("true", "True"), ("name", "Name"), ("order", "Order"))):
         lx, ly = ox + 0.86, 1.23 - k * 0.11
         ax.plot([lx, lx + 0.09], [ly, ly], lw=0.7, zorder=4, **style[kind])
-        ax.text(lx + 0.12, ly, label, ha="left", va="center_baseline", fontsize=fs - 0.5, zorder=6)
+        ax.text(lx + 0.12, ly, label, ha="left", va="center_baseline", fontsize=fs, zorder=6)
     ax.text(ox - 0.03, 0.87, "Dependence graph", ha="left", va="center_baseline", fontsize=fs, zorder=6)
     rows_a = ((0.66, "Legality conditions"), (0.46, "Bound per false dependence"))
     for y, label in rows_a:
@@ -298,7 +299,7 @@ def fig_framework():
            (0.48, "Loop pass", "Rename into rings"))
     for y, name, what in rew:
         _box(ax, rx0, y - 0.10, rw, 0.20, fc="white", lw=0.4, z=3)
-        ax.text(ck, y, r"\checkmark", ha="center", va="center_baseline", fontsize=fs + 1, color=MAGENTA, zorder=5)
+        ax.text(ck, y, r"\checkmark", ha="center", va="center_baseline", fontsize=FS_TITLE, color=MAGENTA, zorder=5)
         ax.text(ck + 0.09, y, name, ha="left", va="center_baseline", fontsize=fs, fontweight="bold", zorder=5)
         ax.text(ck + 0.59, y, what, ha="left", va="center_baseline", fontsize=fs, zorder=5)
     # ---- the event model, prefill only: one item, a priced schedule over its label, centered in the item
@@ -358,14 +359,14 @@ def fig_rewrites():
         then the columns' segments alternate so both run at once.
     (c) Loop pass: with one buffer per role, block i+1's transfer waits for block i's compute to release the buffer;
         with a two-slot ring it fills the other slot (compute is 0.71 of the transfer, as measured in decode)."""
-    fig, axes = plt.subplots(2, 3, figsize=(_m.WIDE, 1.08), sharex="col", gridspec_kw=dict(wspace=0.42, hspace=0.62))
+    fig, axes = plt.subplots(2, 3, figsize=(_m.WIDE, 1.3), sharex="col", gridspec_kw=dict(wspace=0.42, hspace=0.62))
 
     def lanes(ax, rows, labels, end, waits=()):
         for y, bars, color in rows:
             for t0, d, text in bars:
                 ax.broken_barh([(t0, d)], (y - 0.32, 0.64), facecolors=color, edgecolor=INK, linewidth=0.4)
                 if text:
-                    ax.text(t0 + d / 2, y, text, ha="center", va="center_baseline", fontsize=FS - 0.5)
+                    ax.text(t0 + d / 2, y, text, ha="center", va="center_baseline", fontsize=FS_NOTE)
         for x, y0, y1 in waits:  # a solid arrow from y0 to y1: a false dependence
             ax.plot([x, x], [y0, y1], color=INK, linewidth=0.6, zorder=10)
             ax.add_patch(FancyArrowPatch((x, y1 + 0.05 * (y0 - y1)), (x, y1),
@@ -373,7 +374,7 @@ def fig_rewrites():
                                          shrinkA=0, shrinkB=0, zorder=10))
         ax.axvline(end, color="black", linewidth=0.5, linestyle=(0, (4, 2)))
         ax.set_xlim(0, end * 1.04)  # the bars start at the axis
-        ax.set_yticks([1, 0], labels, fontsize=FS)
+        ax.set_yticks([1, 0], labels)
         ax.set_ylim(-0.55, 1.55)
         ax.tick_params(left=False, right=False, top=False, bottom=False)
         ax.set_xticks([])
@@ -395,12 +396,12 @@ def fig_rewrites():
     lanes(axes[1, 2], [(1, [(k * t, t, f"{k}") for k in range(3)], ATTN_LIGHT),
                        (0, [((k + 1) * t, c, f"{k}") for k in range(3)], ATTN_FILL)], ["Transfer", "Compute"], 3 * (t + c))
     for j, title in enumerate(("(a) Composer", "(b) Stream pass", "(c) Loop pass")):
-        axes[0, j].set_title(title, fontsize=7, pad=13, loc="left")
+        axes[0, j].set_title(title, pad=13, loc="left")
     for j in range(3):
         for i, label in enumerate(("Before", "After")):
-            axes[i, j].text(0.0, 1.03, label, transform=axes[i, j].transAxes, fontsize=FS, va="bottom")
-    fig.supxlabel("Time (illustrative)", fontsize=7, y=-0.05)
-    fig.savefig(OUT / "rewrites.pdf", metadata={"CreationDate": None})
+            axes[i, j].text(0.0, 1.03, label, transform=axes[i, j].transAxes, fontsize=FS_TICK, va="bottom")
+    fig.supxlabel("Time (illustrative)", y=-0.05)
+    save(fig, "rewrites.pdf", width=_m.WIDE, metadata={"CreationDate": None})
     plt.close(fig)
 
 
