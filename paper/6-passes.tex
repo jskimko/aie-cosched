@@ -29,7 +29,7 @@ A dispatch concatenates its operators' segments under the conditions of Section~
 \WHILE{$R \neq \emptyset$}
 \STATE $a \gets$ the first attention operator in $R$, if any
 \STATE $P \gets$ next GEMMs in $R$ until $w(P) \ge w(a)$, or $k$ if no $a$
-\STATE $s \gets$ the opening segment of each column of $a$ and of $P$
+\STATE $s \gets$ the issues before the first wait, for each column of $a$ and for $P$
 \FORALL{synchronizations $y$, by predicted completion}
 \STATE append $y$ and the issue it gates to $s$
 \ENDFOR
