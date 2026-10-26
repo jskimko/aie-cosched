@@ -594,7 +594,8 @@ CHOICE_RULES = (("opcord", "OPCORD"), ("always", "Always reorder"), ("fixed_s2",
 
 def fig_choice():
     """(a) The event model's error on each development cell's original-to-composed ratio against that ratio, and
-    (b) each choice rule's loss against the fastest measured choice, one dot per cell, its worst value printed.
+    (b) each choice rule's loss against the fastest measured choice, one dot per cell with a loss, the cells with none as
+    one open marker at 0 with their count, the worst value printed.
 
     data/accuracy-cells.json (the frozen form's 70 development cells) and data/choice.json (the 59 priced cells).
     "Never reorder" is left out of (b): its loss is the headline gain forgone, which Figure 6 shows."""
@@ -618,18 +619,25 @@ def fig_choice():
     a.set_title("(a) Event model", fontsize=7, pad=3)
     cells = json.loads((DATA / "choice.json").read_text())["cells"]
     b.axhspan(-0.5, 0.5, color=OURS_TINT, alpha=0.7, zorder=0, linewidth=0)
+    zero_counts = []
     for i, (key, label) in enumerate(CHOICE_RULES):
         v = sorted(c[key] for c in cells if c.get(key) is not None)
-        jitter = [((k * 0.6180339) % 1 - 0.5) * 0.5 for k in range(len(v))]  # deterministic spread
         color = OURS if key == "opcord" else INK
-        b.plot(v, [i + j for j in jitter], linestyle="none", marker="o", markersize=2.0, color=color, alpha=0.85,
+        # cells where the rule picks the fastest choice (loss 0) are one marker with their count, not a stack
+        zeros, rest = sum(1 for x in v if x == 0), [x for x in v if x > 0]
+        b.plot([0], [i], linestyle="none", marker="o", markersize=3.2, color=color, markerfacecolor="white",
+               markeredgewidth=0.7, zorder=3)
+        zero_counts.append(zeros)
+        jitter = [((k * 0.6180339) % 1 - 0.5) * 0.5 for k in range(len(rest))]  # deterministic spread
+        b.plot(rest, [i + j for j in jitter], linestyle="none", marker="o", markersize=2.0, color=color, alpha=0.85,
                markeredgewidth=0, zorder=2)
         b.text(v[-1] * 1.25 + 0.3, i, f"{v[-1]:.1f}", ha="left", va="center", fontsize=6, color=color)
     b.set_xscale("symlog", linthresh=1, linscale=0.6)
     b.set_xlim(-0.3, 260)
     b.set_xticks([0, 1, 10, 100], ["0", "1", "10", "100"])
     b.set_ylim(len(CHOICE_RULES) - 0.5, -0.5)
-    b.set_yticks(range(len(CHOICE_RULES)), [label for _, label in CHOICE_RULES], fontsize=6)
+    b.set_yticks(range(len(CHOICE_RULES)), [f"{label} ({n})" for (_, label), n in zip(CHOICE_RULES, zero_counts)],
+                 fontsize=6)
     b.tick_params(axis="y", length=0)
     b.minorticks_off()
     b.set_xlabel(r"Loss against the fastest measured choice (\%)", labelpad=1)

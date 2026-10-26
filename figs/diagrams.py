@@ -131,13 +131,12 @@ def fig_arch():
                                  color=INK, linewidth=0.4, shrinkA=0, shrinkB=0, zorder=6))
     ax.text(bx + 3 * 0.15, 1.15, "Buffers", ha="left", va="center_baseline", fontsize=FS, zorder=6)
     ax.text(bx + 3 * 0.15, 1.045, "Locks", ha="left", va="center_baseline", fontsize=FS, zorder=6)
-    # compute tile: the DMA follows a chain of BDs, each naming the next
+    # compute tile: the DMA's BDs form a chain, each naming the next; the chain is configuration, not a runtime exchange
     _box(ax, px, 0.83, 0.30, 0.13, "DMA", z=5)
     for k in range(3):
         _box(ax, bx + k * 0.15, 0.855, 0.09, 0.08, fc=GRAY, lw=0.4, z=5)
         if k:
             _arrow(ax, (bx + (k - 1) * 0.15 + 0.09, 0.895), (bx + k * 0.15, 0.895), lw=0.4)
-    ax.plot([px + 0.30, bx], [0.895, 0.895], color=INK, lw=0.4, zorder=5)
     ax.text(bx + 3 * 0.15, 0.895, "BD chain", ha="left", va="center_baseline", fontsize=FS, zorder=6)
     # shim tile: pushed BDs wait in the DMA's task queue, which feeds the DMA
     _box(ax, px, 0.36, 0.30, 0.13, "DMA", z=5)
