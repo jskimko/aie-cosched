@@ -61,7 +61,7 @@ All three stacks reach the array through the same dispatches and instruction str
 \subsection{LLM Inference on the NPU}
 \label{subsec:prefill}
 
-% VALUE: the layer's operators, all GEMMs but attention; AIR's fused prefill in one configuration, the original program, the split and its supported configurations; the cores loop on runtime parameters, so operators differ only in their streams; 128-token chunks run stage by stage, attention reading earlier chunks; the host's post-processing steps between dispatches
+% VALUE: the layer's operators, all GEMMs but attention; AIR's fused prefill in one configuration, the original program, the split and its supported configurations; the cores loop on runtime parameters, so operators differ only in their streams; 128-token chunks run stage by stage, attention reading earlier chunks; the host's post-processing steps between dispatches; decode is a separate fused design whose attention reads the whole context's KV cache
 % SOURCE: mlir-air a3e26261 programming_examples/llms/shared/fused_prefill/: device.py (column map cols(cfg); "one PDI serves every op and shape and the ops differ only in their insts"), engine.py (strip_columns), dense.py (_mix_all, stage-major order), hostops.py.
 % SOURCE: mlir-air a3e26261 fused_prefill/device.py: Attn(col=...) per group in Config.attn, GCOL0, GNC = 1, 6 as module constants; spec() splits kv_heads evenly, so 1, 2, or 4 attention columns with 8 KV heads (vault lab-split-sweep (1)); logits bit-identical to the default split in every configuration on both models (lab-split-sweep (2), (4), (5)).
 % SOURCE: mlir-air 44e8d8f7 programming_examples/llms/shared/fused_prefill/device.py:24-30, M = 128 rows per chunk as a module constant, TM = 32 per core tile, HR = M // TM = 4 core rows of the 6 x 4 herd; no build flag (npu-gap D4, 2026-10-25), so no chunk-size baseline exists without changing the design.
@@ -73,8 +73,6 @@ The design's cores loop indefinitely on work taken from runtime parameters, so w
 The host runs each layer stage by stage over chunks of 128 tokens, a size that the design fixes, and it finishes every chunk's QKV projection before any attention and every attention before the remaining projections.
 Attention on one chunk reads the QKV projections of that chunk and earlier ones.
 Between dispatches, the host's CPU post-processes the operators' outputs in steps such as normalization and residual addition.
-
-% VALUE: decode is a separate fused design whose attention reads the whole context's KV cache
 \emph{Decode} uses a separate design, AIR's fused decode, whose attention reads the whole context's KV cache.
 
 % VALUE: false and true dependences defined once, the false kinds (name, order) with their sources and the rewrite that removes each; the critical-path rule (cited), which Section 3's condition refines for this NPU
