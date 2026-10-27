@@ -9,7 +9,10 @@ Outputs:
   arch.pdf  the XDNA 2 NPU as the paper uses it: host, hardware context, the CP's in-order instruction stream, the
             array of shim, memory and compute tiles over DRAM, and one compute tile and one shim tile magnified
   rewrites.pdf  OPCORD's three rewrites (composer, stream pass, loop pass), each before and after, full width
+  intro.pdf  Figure 1, full width: (a) the NPU, the in-order CP feeding every column; (b) the CP's issue order in one
+             layer of AIR's prefill, original against OPCORD; (c) the measured timeline (data/fig1-intervals-1b.json)
 """
+import json
 import sys
 from pathlib import Path
 
@@ -419,8 +422,130 @@ def fig_rewrites():
     plt.close(fig)
 
 
+def fig_intro():
+    """Figure 1, full width.
+    (a) The host submits to the in-order CP, which issues the work of every column; the compute tiles are tinted by
+        the column group of AIR's prefill on S2 (attention on columns 0 and 7, the GEMMs on 1-6), and one column is
+        outlined.
+    (b) The CP's issue order in one layer at 4,096 tokens (32 chunks). Original: AIR's host loop (mlir-air
+        fused_prefill/dense.py:206-221) issues attention for every chunk, one dispatch each with its own waits, before
+        the O-projection of chunk 0, which reads only chunk 0's attention. OPCORD: one composed dispatch of the plan the
+        timeline ran (1b-4096-planner.npz, opcord d6caf8b; layer 0's seventh dispatch holds attention on chunk 3, the
+        O-projection of chunk 0 and the QKV GEMMs of chunks 17-18) issues both groups before its first wait and awaits
+        attention's output only at its end.
+    (c) The measured timeline of Figure 1 before the split into panels: the median-TTFT run of each arm, Llama-3.2-1B,
+        4,096 tokens, S2, time normalized to the original's TTFT."""
+    H = 1.80
+    fig = plt.figure(figsize=(_m.WIDE, H))
+
+    def box(ax, x, y, w, h, text=None, fc="white", lw=0.5):
+        _box(ax, x, y, w, h, text, fc=fc, lw=lw, fs=FS_NOTE)
+    # ---- (a) the NPU
+    W = 2.05
+    axa = fig.add_axes([0.0, 0.0, W / _m.WIDE, 1.0])
+    axa.set_xlim(0, W)
+    axa.set_ylim(0, H)
+    axa.set_aspect("equal")
+    axa.axis("off")
+    axa.text(0.02, H - 0.08, "(a) NPU", fontsize=FS_LABEL, va="center_baseline")
+    t, g, x0, y0 = 0.15, 0.035, 0.42, 0.26
+    th = t * 0.62
+    xs = [x0 + c * (t + g) for c in range(8)]
+    ys = [y0 + r * (th + 0.02) for r in range(6)]
+    mid = (xs[0] + xs[-1] + t) / 2  # the CP over the array's middle, so its line drops straight onto the bus
+    cy, ch, cw = 1.38, 0.17, 0.62
+    box(axa, mid - cw / 2, cy, cw, ch, "In-order CP")
+    box(axa, mid - cw / 2 - 0.58, cy, 0.40, ch, "Host", fc=MIST)
+    _arrow(axa, (mid - cw / 2 - 0.18, cy + ch / 2), (mid - cw / 2, cy + ch / 2))
+    for c, x in enumerate(xs):
+        group = ATTN_FILL if c in (0, 7) else GEMM_FILL
+        for r, y in enumerate(ys):
+            box(axa, x, y, t, th, fc=GRAY if r == 0 else MIST if r == 1 else group, lw=0.35)
+    top = ys[-1] + th
+    bus = top + 0.10
+    axa.plot([mid, mid], [cy, bus], color=INK, lw=0.6, solid_capstyle="butt")
+    axa.plot([xs[0] + t / 2, xs[-1] + t / 2], [bus, bus], color=INK, lw=0.6, solid_capstyle="butt")
+    for x in xs:
+        _arrow(axa, (x + t / 2, bus), (x + t / 2, top + 0.005), lw=0.45)
+    c = 2  # one column, outlined and named under the array
+    axa.add_patch(Rectangle((xs[c] - 0.012, ys[0] - 0.012), t + 0.024, top - ys[0] + 0.024, fill=False,
+                            edgecolor=INK, lw=0.6, ls=(0, (2, 1.2)), zorder=6))
+    axa.text(xs[c] + t / 2, y0 - 0.085, "Column", ha="center", fontsize=FS_NOTE, va="center_baseline")
+    for yy, label in ((ys[0] + th / 2, "Shim"), (ys[1] + th / 2, "Memory"), ((ys[2] + top) / 2, "Compute")):
+        axa.text(x0 - 0.04, yy, label, ha="right", va="center_baseline", fontsize=FS_NOTE)
+    for k, (fc, label) in enumerate(((ATTN_FILL, "Attention"), (GEMM_FILL, "GEMMs"))):  # the column groups' key
+        kx = xs[4] + k * 0.52
+        axa.add_patch(Rectangle((kx, y0 - 0.115), 0.07, 0.06, facecolor=fc, edgecolor=INK, lw=0.35))
+        axa.text(kx + 0.10, y0 - 0.085, label, fontsize=FS_NOTE, va="center_baseline")
+    # ---- (b) the CP's issue order
+    W2 = 2.05
+    axb = fig.add_axes([2.25 / _m.WIDE, 0.0, W2 / _m.WIDE, 1.0])
+    axb.set_xlim(0, W2)
+    axb.set_ylim(0, H)
+    axb.axis("off")
+    axb.text(0.0, H - 0.08, "(b) Issue order in one layer", fontsize=FS_LABEL, va="center_baseline")
+
+    def instr(y, kind, text):
+        fc = {"A": ATTN_FILL, "G": GEMM_FILL, "W": "white"}[kind]
+        axb.add_patch(Rectangle((0.05, y - 0.055), 1.75, 0.11, facecolor=fc, edgecolor=INK, linewidth=0.35,
+                                linestyle="-" if kind != "W" else (0, (1.5, 1)), zorder=3))
+        axb.text(0.09, y, text, fontsize=FS_NOTE, va="center_baseline", ha="left", zorder=4)
+    y = H - 0.27
+    axb.text(0.05, y, "Original (one operator per dispatch)", fontsize=FS_NOTE, va="center_baseline")
+    y -= 0.14
+    for kind, text in (("A", "Issue attention, chunk 0"), ("W", "Wait for attention, chunk 0"), (None, r"$\vdots$"),
+                       ("A", "Issue attention, chunk 31"), ("W", "Wait for attention, chunk 31"),
+                       ("G", "Issue O-projection, chunk 0")):
+        if kind is None:
+            axb.text(0.40, y - 0.005, text, fontsize=FS_NOTE, va="center", ha="center")
+            y -= 0.13
+            continue
+        instr(y, kind, text)
+        y -= 0.125
+    y -= 0.06
+    axb.text(0.05, y, "OPCORD (one composed dispatch)", fontsize=FS_NOTE, va="center_baseline")
+    y -= 0.14
+    for kind, text in (("A", r"Issue attention, chunk $i$"), ("G", "Issue and await GEMMs of other chunks"),
+                       ("W", r"Wait for attention, chunk $i$")):
+        instr(y, kind, text)
+        y -= 0.125
+    # ---- (c) the measured timeline
+    d = json.loads((_m.DATA / "fig1-intervals-1b.json").read_text())["arms"]
+    base = d["ship"]["ttft_ms"]
+    x0c, wc = 4.85 / _m.WIDE, 1.90 / _m.WIDE
+    for k, (arm, name) in enumerate((("ship", "Original"), ("comp", "OPCORD"))):
+        ax = fig.add_axes([x0c, 0.56 - k * 0.38, wc, 0.24])
+        a = d[arm]
+        groups = {}
+        for yy, grp, color in ((2, "A", _m.ATTN_BAR), (1, "G", _m.GEMM_BAR)):
+            spans = _m._merge(a["outstanding"][grp])
+            groups[grp] = spans
+            ax.broken_barh([(s / base, (e - s) / base) for s, e in spans], (yy - 0.32, 0.64), facecolors=color,
+                           edgecolor="none")
+        both = sum(e - s for s, e in _m._intersect(groups["A"], groups["G"]))  # checked against the record
+        assert abs(both - a["both_outstanding_ms"]) < 1e-3, (arm, both, a["both_outstanding_ms"])
+        ax.axvline(a["ttft_ms"] / base, color="black", lw=0.6, ls=(0, (4, 2)))
+        ax.text(a["ttft_ms"] / base + 0.01, 1.5, rf"TTFT {a['ttft_ms'] / base:.2f}", fontsize=FS_NOTE, va="center")
+        ax.set_title(name, pad=1.5, loc="left", fontsize=FS_TICK)
+        ax.set_yticks([2, 1], ["Attention", "GEMMs"])
+        ax.set_ylim(0.45, 2.55)
+        ax.set_xlim(0, 1.22)  # room for the TTFT label inside the panel
+        ax.tick_params(axis="y", length=0)
+        ax.tick_params(axis="x", top=False)
+        for side in ("top", "right", "left"):
+            ax.spines[side].set_visible(False)
+        if k == 0:
+            ax.set_xticklabels([])
+        else:
+            ax.set_xlabel("Normalized time", labelpad=1, fontsize=FS_TICK)
+    fig.text(x0c - 0.075, 0.95, "(c) Measured prefill", fontsize=FS_LABEL, va="center_baseline")
+    save(fig, "intro.pdf", width=_m.WIDE, metadata={"CreationDate": None})  # cropped to the text width
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     fig_arch()
     fig_framework()
     fig_rewrites()
+    fig_intro()
