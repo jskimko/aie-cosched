@@ -1,7 +1,7 @@
 \section{Evaluation}
 \label{sec:eval}
 
-% VALUE: what the evaluation establishes, in order: OPCORD shortens prefill and decode on five LLMs against the original program on its own best supported split, and where the gain comes from; its choice of order and split stays near the best measured option; its rewrites are legal and its analysis reads every stream exactly; and what rescheduling recovers follows the cut and the prompt length, as Section 3.3 states
+% VALUE: what the evaluation establishes, in order: OPCORD shortens prefill and decode on five LLMs against the original program on the supported split that minimizes its TTFT, and where the gain comes from; its choice of order and split stays near the measured minimum; its rewrites are legal and its analysis reads every stream exactly; and what rescheduling recovers follows the cut and the prompt length, as Section 3.3 states
 % DECISION: no question list at the head of the evaluation; subsections have question titles and each answers its question in its first sentence (core-rule restructure, 2026-10-25).
 
 \begin{figure*}[t]
@@ -115,7 +115,7 @@ In decode, renaming the keys and values alone, as FLM's authors' Gemma3 mapping 
 \subsection{Choice of Order and Configuration}
 \label{subsec:decision}
 
-% VALUE: the event model's own choice of order and split stays within a few percent of the best measured option on every cell, and every cell where it misses falls in the near-tie band that a short measurement settles, whereas each fixed rule loses badly somewhere: never reordering gives up the long-prompt gains, always reordering loses at one or two chunks, a fixed split loses where the balance moves, and even the rule that reorders from four chunks at the baseline's split loses where the composed order's best split differs
+% VALUE: the event model's own choice of order and split stays within a few percent of the measured minimum on every cell, and every cell where it misses falls in the near-tie band that a short measurement settles, whereas each fixed rule loses badly somewhere: never reordering gives up the long-prompt gains, always reordering loses at one or two chunks, a fixed split loses where the balance moves, and even the rule that reorders from four chunks at the baseline's split loses where the composed order's best split differs
 The event model's own choice of order and configuration stays within \ChoiceOpcordMax\% of the measured minimum on every one of the \ChoiceCells{} cells and matches it on most (Figure~\ref{fig:choice}b).
 These choices come from an earlier form of the event model with the same constants, and the final form of Section~\ref{subsec:pricing}, whose accuracy follows, changes \FinalChanged{} of them and loses at most \FinalLossMax\% on the \FinalMeasured{} cells where its exact choice was measured.
 We also compare its choice against fixed rules.
@@ -128,7 +128,7 @@ Reordering from four chunks, even on the baseline's configuration, loses up to \
 
 \begin{figure}[t]
     \centering
-    % VALUE: (a) the event model's error per development cell stays within a few percent except where it underprices Llama-3.2-1B's largest gains; (b) the event model's own choice stays within a few percent of the fastest measured choice on every cell, whereas each fixed rule loses tens of percent somewhere
+    % VALUE: (a) the event model's error per development cell stays within a few percent except where it underprices Llama-3.2-1B's largest gains; (b) the event model's own choice stays within a few percent of the measured minimum on every cell, whereas each fixed rule loses tens of percent somewhere
     % SOURCE: (a) figs/data/accuracy-cells.json (the frozen form's 70 development cells); (b) figs/data/choice.json (59 cells; the four-chunk rule on the baseline's configuration over the 53 cells where its choice was measured); figs/make_figs.py fig_choice.
     \includegraphics[width=\linewidth]{fig/choice.pdf}
     \caption{(a) The event model's error on the composed order's speedup over the original order on \AccCells{} cells, with \AccWithinFive{} inside the gray $\pm5\%$ band. (b) The worst loss of each choice against each cell's measured minimum TTFT, over \ChoiceCells{} cells, or \ChoiceFourBaseCells{} for the last rule.}
