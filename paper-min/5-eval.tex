@@ -10,7 +10,7 @@
     % SOURCE: figs/make_figs.py fig_headline over figs/data/prefill-cells.json (figs/paper_numbers.py at amd-npu 4ce61672): the amendment-1 batch's registered analysis on its 38 cells (paired, or chained through orig-S2 where the baseline split differs from the pick's), the grid or split cells' paired ratio elsewhere, unpaired (no whisker) for LFM2-1.2B at 2K and Gemma3-4B at 1K; picks by choose() at opcord d6caf8b; Llama-3.2-1B at 32,768 unpriced (chunk 160 outside its probed chunks, n1 NOTES).
     % SOURCE: pre-final; the final sweep re-picks every cell under the frozen form and measures the original on every supported configuration (step 2, section 5 item 3).
     \includegraphics[width=\textwidth]{fig/headline.pdf}
-    \caption{Speedup in TTFT of OPCORD over the original program, which runs on whichever of its measured configurations minimizes its TTFT, as the ratio of medians with a 95\% interval. The fill shows the configuration OPCORD runs, while a dagger marks a ratio across batches, which has no interval.}
+    \caption{Speedup in TTFT of OPCORD over the original program, which runs on whichever of its measured configurations minimizes its TTFT, as the ratio of medians with a 95\% interval. The fill shows the configuration OPCORD runs, while a dagger marks a ratio across batches, which lacks an interval.}
     \label{fig:headline}
 \end{figure*}
 
@@ -54,9 +54,9 @@ Below 1{,}024 tokens, where the groups have little work to overlap, its TTFT sta
 Probing, planning, and composing are paid once per LLM, configuration, and prompt length, outside TTFT for any length composed ahead, except a 7--50\,ms binding step inside every TTFT.
 
 \label{subsec:ablation}
-% VALUE: where the prefill gain comes from at OPCORD's choices: credited in a fixed order, the stream pass gains only where attention waits between its two columns, and the composer's re-cut carries the rest, nearly all of it overlap between the column groups; one cell decomposed
+% VALUE: where the prefill gain comes from at OPCORD's choices: credited in a fixed order, the stream pass gains only where attention waits between its two columns, and the composer's regrouping carries the rest, nearly all of it overlap between the column groups; one cell decomposed
 % SOURCE: at the picks the stream arm measures 1.000 at S4 and the pass makes no move at S1 (amd-npu s4-cells, s1-cells NOTES; vault decisions log, issue check). Gain decomposition on the 70 development cells (census workspace aie-cosched c4a8650, passes/results/2026-10-25-gain-decompose/decompose.json): orig / stream on S2 at 16,384 1.5045 (1B), 1.3581 (Qwen3-4B), 1.2791 (8B), 1.2324 (LFM2-1.2B), 1.0005 (Gemma3-4B); the overlap share of stream - comp, median 0.959; 1B 4096 S2 1.1879 x 1.421 x 1.0192 = 1.7203. Composer at the picks from 1,024 tokens, stream / comp at the pick's split where both were measured: 1.07 (Llama-3.1-8B 1,024, S2) to 1.63 (Llama-3.2-1B 16,384, S4) (figs/data/prefill-cells.json). the overlap and host factors split the measured stream - comp by the event model's group terms (pass-0 aie-cosched c4a8650, passes/gain_decompose.py); the 70 cells are those of figs/data/accuracy-cells.json, 51 of them with a positive stream - comp (median share 0.959 over those 51).
-Crediting the stream pass first and the composer second, at the configuration OPCORD chooses, shows that nearly all of this gain comes from the composer's re-cut.
+Crediting the stream pass first and the composer second, at the configuration OPCORD chooses, shows that nearly all of this gain comes from the composer's regrouping into shared dispatches.
 The stream pass alone gains \StreamSTwoLo--\StreamSTwoHi$\times$ at 16K tokens on $S_2$ for the four LLMs whose attention waits between its columns, and nothing on $S_1$ or $S_4$, where attention has one column or already issues each column's work before it waits.
 The composer carries the rest, \ComposerShareLo--\ComposerShareHi$\times$ at OPCORD's choices from 1K tokens.
 Split by the event model's terms over the cells of Figure~\ref{fig:choice} where composing saves time, a median of \DecompOverlapShare\% of its saving is overlap between the column groups.
@@ -80,14 +80,14 @@ On Llama-3.2-1B's 4{,}096-token prefill on $S_2$, which Figure~\ref{fig:timeline
 Because the loop pass lets each block's transfer overlap the previous block's compute, the decode gain grows with the context, as attention's share of each token does (Figure~\ref{fig:decode}).
 At 30{,}208 tokens, or 28{,}800 on Qwen3-4B, the loop pass lowers the time per token by \DecodeGainLo--\DecodeGainHi$\times$ across the five LLMs.
 Gemma3-4B's gain stays flat, because its decode design reads back a fixed 30{,}720-key window at every context and its sliding-window layers compute only over the last 1{,}024 keys.
-Renaming only the keys and values, as FLM's authors do by hand for Gemma3~\citep{du2026gemma3}, gains at most 0.3\%, because the shared score buffer still closes the loop's critical cycle, as the bound of Section~\ref{subsec:removal} predicts.
+Renaming only the keys and values, as FLM's authors do by hand for Gemma3~\citep{du2026gemma3}, gains at most 0.3\%, because the shared score buffer still closes the loop's critical cycle, as predicted by the bound of Section~\ref{subsec:removal}.
 
 % VALUE: absolute standing, a snapshot of FLM's current release: OPCORD on AIR's designs reaches the first token sooner than FLM's current release on every LLM and length compared, by that engine's own timer, whereas the original program on its default configuration is slower at 16K on four of the five; in decode FLM stays faster, and the loop pass brings two LLMs within a few percent
 % SOURCE: pre-final, pending the FLM same-batch rerun (npu-gap, queued 2026-10-26), which decides this contrast and what Figure fig:vs-flm plots (step 2, section 5 item 2).
 % COMMENT: this contrast uses the original on its default configuration, not the headline baseline (the original on the configuration that minimizes its TTFT). Against the headline baseline, joined across batches (absolute.json with prefill-cells.json baseline_ms), the original is already faster than FLM at 13 of the 15 cells from 1K tokens, ties Qwen3-4B at 16K (0.996), and is slower only on Llama-3.1-8B at 4K (1.094) and 16K (1.128). To be restated against the headline baseline, with vs-flm plotting that baseline, after a same-batch rerun that adds the baseline configuration as an arm (npu-gap, queued 2026-10-26; r7 significance F1).
 % SOURCE: D1 (amd-npu 45421aa3, 3c07fde9, ab/results/d1-2026-10-25; one batch 11:20-14:30 at pin 4c56faa, every gate passed): TTFT medians FastFlowLM (server prefill_duration_ttft) / original S2 / OPCORD's pick, ms, at 1K / 4K / 16K: Llama-3.2-1B 576.7 / 326.0 / 284.8, 1769.1 / 1909.9 / 1076.0, 10980.5 / 17999.2 / 6057.4; LFM2-1.2B 609.6 / 296.6 / 270.2, 1665.6 / 1386.7 / 1053.9, 7962.3 / 9421.2 / 4906.0; Qwen3-4B 1816.5 / 1076.9 / 860.6, 5858.0 / 6557.5 / 3742.7, 34669.4 / 62990.2 / 22142.0; Gemma3-4B 1597.4 / 874.2 / 735.8, 4601.8 / 3903.1 / 2996.2, 19484.0 / 18386.8 / 13926.9; Llama-3.1-8B 2445.6 / 1682.7 / 1528.4, 8004.0 / 8735.5 / 6212.5, 41822.5 / 67623.4 / 34033.5; at 128 tokens FastFlowLM 345-1176 ms against 55.4-251.6 ms. Decode ms per token at 16K, FastFlowLM / original / loop pass: 27.18 / 34.99 / 27.29 (1B), 20.80 / 45.40 / 37.48 (LFM2), 100.09 / 155.89 / 139.76 (Qwen3-4B), 65.84 / 147.89 / 144.42 (Gemma3-4B), 133.16 / 148.43 / 136.20 (8B). The two TTFT timers differ in definition (FastFlowLM's server timer against our prefill call to logits); some FastFlowLM decode reps ended early on EOS (NOTES).
 % DECISION: FastFlowLM, taken as released, is an observation of the condition, never a like-for-like comparison and never evidence that the cost is avoidable; no claim about how its order was chosen.
-In absolute terms, OPCORD on AIR's designs reaches the first token sooner than FLM's current release, version 1.0.8~\citep{fastflowlm-repo}, by that engine's own prefill timer, on all five LLMs at every prompt length compared, by \AbsGainLo--\AbsGainHi$\times$ at 1K to 16K tokens (Figure~\ref{fig:vs-flm}).
+In absolute terms, OPCORD's TTFT on AIR's designs is \AbsGainLo--\AbsGainHi$\times$ lower than that of FLM's current release, version 1.0.8~\citep{fastflowlm-repo}, by that engine's own prefill timer, on all five LLMs at every prompt length compared, from 1K to 16K tokens (Figure~\ref{fig:vs-flm}).
 By contrast, AIR's original program on $S_2$ is slower than that engine at 16K tokens on \AbsOrigSlower{} of the five LLMs.
 In decode at 16K tokens FLM's current release stays faster on all five LLMs, though the loop pass brings Llama-3.2-1B and Llama-3.1-8B within \AbsDecodeClosePct\% of it.
 
@@ -195,14 +195,14 @@ On FLM, a replayed merge of two dispatches at 128-token prompts removes one disp
 % SOURCE: aie-cosched 93f491b, mlir-aie f9ad95dc02f (lab-cosched-passes (62), P7c; lit 36/36): cost-free over 792 analysed streams; with measured task costs (the S4 prefill cell, 34 streams) 246 end-kind NAME edges lie on a longest path but removing every NAME edge leaves every stream's length unchanged (34/34).
 % SOURCE: aie-cosched results/2026-10-23-order-loop (registered ca13ac5, 579d8d1; results 579d8d1, 0ae7bc9; mlir-aie dev 58569749d3e..36f725e8e6e, lit 49/49): with (59)'s costs the critical cycle of decode attention is 28 RAW + 12 name edges as shipped (1.1466 per iteration) and 36 RAW after the loop pass (0.6487), no order edge on either, and removing every order edge leaves both ratios unchanged.
 % DECISION: the stream-granularity instances of Section 3 were identified by reading the designs and confirmed by measurement, so the text never says that the analysis found them.
-Beyond the waits of Section~\ref{subsec:losses}, removing name dependences in a stream or order dependences in a loop shortens no longest path or critical cycle that we compute in AIR's designs.
+Beyond the waits of Section~\ref{subsec:losses}, removing name dependences in a stream or order dependences in a loop does not shorten any longest path or critical cycle that we compute in AIR's designs.
 
 \subsection{Scope of the Condition}
 \label{subsec:pays}
 \label{subsec:clause}
 
-% VALUE: what rescheduling recovers is set by the cut and the prompt length, as the condition predicts from the artifacts; shown by the screen, the census by design class, a direct test of each clause
-What rescheduling can recover is set by how a design cuts its work and by the prompt length, as the condition of Section~\ref{subsec:question} predicts from the artifacts.
+% VALUE: what rescheduling recovers is set by the partition and the prompt length, as predicted by the condition read from the artifacts; shown by the screen, the census by design class, a direct test of each clause
+What rescheduling can recover is set by how a design partitions its work and by the prompt length, as predicted by the condition read from the artifacts (Section~\ref{subsec:question}).
 
 \label{subsec:observed}
 % VALUE: the screen sized: read before any duration, the clauses rule out a quarter of the census's false dependences, nearly all of those in loops and a fifth of those in streams; on FLM's timed flash prefill none of them lies on a longest path
@@ -215,7 +215,7 @@ In FLM's flash prefill, whose dispatches we time, none of the false dependences 
 % SOURCE: same-split shape on the development grids, pre-final: one chunk 0.976-1.006, two chunks (129 and 256 tokens) 0.922-0.980 (figs/data/accuracy-cells.json, the 60 S2 cells of the grids of 2026-10-23/24, re-derived 2026-10-26); step 2 2b verified at N 128, S2, all five LLMs.
 Among the released LLM designs we read, only AIR's prefill and decode meet both clauses (Table~\ref{tab:census}), and they are where we measure gains.
 The gains thus follow the design class rather than the stack, as a fused design that we write with IRON's interface confirms below.
-On AIR's prefill, the share of boundaries that meets no true dependence is $(C-1)/C$ at $C$ chunks.
+On AIR's prefill, the share of boundaries that meet the no-true-dependence clause is $(C-1)/C$ at $C$ chunks.
 At one chunk the share is zero, and there the composed order's speedup over the original order is 0.976--1.006$\times$ on $S_2$ for all five LLMs.
 Durations decide the rest, since at two chunks half of the boundaries meet both clauses and the composed order still loses (Section~\ref{subsec:shape-eval}).
 
@@ -234,7 +234,7 @@ Even with each shared resource allowed to overlap fully, removing every false de
 % COMMENT: FLM per-operator prefill is pending the merge replay (step 2, section 5 item 1; pass-0 5c82a1c, 0e7956f). Until it lands, Table tab:census's FLM prefill entry (<=1.00x) rests on the condition's rule rather than a checked form of the bound, and no body sentence states its size.
 % SOURCE: FastFlowLM's per-operator engine on our five LLMs (pass-0 aie-cosched 334bc31, results/2026-10-25-flm-command-cut/dense4k.json, flm_dense4k.py c90d484; offline 4K recordings, 0 /dev/accel): consecutive pairs sharing a column 100%, on the same column set 83-100%, configuration switches at about a third of the boundaries; Gemma4 gemma4-it E2B / E4B at 4K, 8K, 16K (aie-cosched 1612357, results/2026-10-25-flm-command-cut/long.json): consecutive pairs sharing a shim column 99.6-99.8%, nearly always all 8. FastFlowLM 44d01787: engine by model tag (gemma4-it 32768 / 4096 against gemma4e-flash single-turn 1024).
 % SOURCE: IRON in-command pricing: 35 streams, every x_J 1.000, bound 1.000 (aie-cosched 1a87bc6, partb/iron-partb.json), the population's 32 IRON streams plus 3 non-LLM designs; composition predicted 1.000 (a73ba38).
-Both modular classes fail disjoint resources, as Section~\ref{subsec:question} predicts.
+Both modular classes fail disjoint resources, as predicted in Section~\ref{subsec:question}.
 FLM's per-operator engine, which serves our five LLMs and Gemma4's longer prompts, gives each operator a configuration that usually spans all eight columns, so 99.6--100\% of its consecutive dispatches share a column and a new order frees at most what buffers on a shared route let through.
 IRON's operator sequences reconfigure the whole array between operators, and their 32 streams already issue their transfers ahead of their waits, so all of them bound at $1.000\times$.
 
@@ -289,5 +289,5 @@ The $\le$ entries for FLM's flash prefill and decode and for IRON's LLM designs 
 We also test the disjoint-resources clause by breaking it in a two-group fused design that we write with IRON's interface.
 In the composed stream that IRON emits for it, issuing both groups' work before waiting on either gains $1.89\times$ over issuing them in turn when the groups have their own columns and DMA channels.
 Forced onto one DMA channel with the same routing, it gains only $1.07\times$, within the $1.084\times$ that the bound of Section~\ref{subsec:removal} allows.
-The composer meets the no-true-dependence clause by construction, since with a true host step between every two operations it composes no two into one dispatch, and without those steps the same graph composes.
+The composer meets the no-true-dependence clause by construction, since with a true host step between every two operations it does not compose any two into one dispatch, and without those steps the same graph composes.
 

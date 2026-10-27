@@ -43,17 +43,17 @@ Queuing further dispatches before waiting on the first partly hides this floor b
 \subsection{Modular and Fused Designs}
 \label{subsec:spectrum}
 
-% VALUE: three cuts of a design: into configurations (modular, which pays reconfiguration and runs operators in turn because a context holds one configuration on all eight columns; fused, which can run operators at once but must fit every dataflow into one configuration and queues on one CP), into dispatches, and into buffers per loop role; the three stacks we read and their one interface
+% VALUE: three partitionings of a design: into configurations (modular, which pays reconfiguration and runs operators in turn because a context holds one configuration on all eight columns; fused, which can run operators at once but must fit every dataflow into one configuration and queues on one CP), into dispatches, and into buffers per loop role; the three stacks we read and their one interface
 % DECISION: the modularity-fusion spectrum is the author's framing (2026-10-24): modular designs trade reconfiguration time for ease of programming, fused designs avoid reconfiguration and inherit an order; neither end is called wrong. No claim about how any stack chose its order; FastFlowLM is described by what it ships.
 % SOURCE: every hardware context is allocated all eight columns per the driver's source (amdxdna 2.25.0 npu4_regs.c:94-106, aie2_ctx.c:604-608; vault lab-prefill-overlap (31)); a hardware context holds its configurations one at a time (FastFlowLM's per-operator engine and IRON's operator sequences, Section subsec:pays).
 % SOURCE: IRON's OperatorSequence keeps each operator its own aie.device and emits configure/run per runlist entry in runlist order (amd-iron 1fd3dab, iron/common/sequence.py:89-96, 286; iron/common/compilation/sequence.py:243-324). FastFlowLM's engines reach the runtime through libhrx and ship as compiled libraries and xclbins (FastFlowLM 44d01787, lib/hrx/libgemma4e_flash.so; vault lab-cosched-passes (14)).
-A design's first cut, into configurations, places it along a spectrum.
+A design's first partitioning, into configurations, places it along a spectrum.
 At the spectrum's \emph{modular} end, a design gives each operator its own configuration and reconfigures the array between operators, a cost that prior work characterizes and reduces~\citep{vandelm2026configwall}.
 Because a hardware context holds one configuration at a time and the driver gives every context all eight columns, a modular design runs its operators in turn whatever their order.
 At its \emph{fused} end, a design keeps several operators resident in one configuration, which avoids reconfiguration and lets operators on disjoint parts of the array run at once.
 Fusing has its own cost, because the dataflows of every resident operator must then fit together into one configuration's resources.
 The operators of a fused design also run from one hardware context, whose dispatches queue on one CP.
-A second cut splits a fused design's work into dispatches, and a third decides whether each role in a loop keeps one buffer or several.
+A second partitioning splits a fused design's work into dispatches, and a third decides whether each role in a loop keeps one buffer or several.
 IRON~\citep{hunhoff2025iron}, an interface to MLIR-AIE that can also express fused designs, composes an LLM as a sequence of operators that each reconfigure the whole array, whereas AIR generates fused designs.
 FastFlowLM (FLM)~\citep{fastflowlm-repo} ships fused flash designs and a modular per-operator engine as binaries with the runtime that issues them.
 All three stacks reach the array through the same dispatches and instruction streams.
