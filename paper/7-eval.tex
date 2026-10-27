@@ -238,6 +238,8 @@ Although AIR's prefill has an exposure near one, nearly all of its gain at the c
 FLM's current release leaves little overlap to recover in either of its prefill engines.
 Its flash prefill, which serves Gemma4 at prompts of up to 1{,}024 tokens, exposes most of its time but runs each layer's attention once over the whole prompt rather than in 128-token chunks, so every GEMM dispatch of a layer feeds that attention or reads its output.
 Every turn between its column groups is therefore a true dependence, through the host or through device memory, which fails the no-true-dependence clause at every length the design accepts.
+Each attention command also drives a shim column that the GEMM group uses, so the same turns fail the disjoint-resources clause as well.
+% SOURCE: pass-0 aie-cosched f52c12c, passes/results/2026-10-26-table1 (README, Follow-ups): in the flash runs the GEMM commands drive shim columns 1-6 and the attention commands drive {0, 3} (7 per run) or {6, 7} (28 per run), so every attention command shares column 3 or 6 with the GEMM group; 0 of the 1,232 attention<->GEMM turns are disjoint on the clause-1 test (a shared DMA channel or core tile). The table's earlier check mark came from reading the compute groups (flm_chunking / flm_command_cut).
 Its false dependences bound at $B = 1.000\times$ inside dispatches, a ceiling of $1\times$ however large $M$ is.
 With measured durations, the joint bound over every order of its dispatches, legal or not, limits the overlap that any rewrite could free to 1.04--1.09$\times$ at every prompt from 128 to 1{,}024 tokens.
 Merging dispatches that no host step separates raises it to at most 1.13$\times$, at 128 tokens, because the dispatches it saves cost a fixed time at the CP while a short prompt shortens everything else (Section~\ref{subsec:census}).
@@ -286,7 +288,7 @@ Their 32 streams, at an exposure of zero and with their transfers already issued
         \quad AIR prefill & \cmark & \cmark & \PrefillGainLo--\PrefillGainHi$\times$ \\
         \quad AIR decode & \cmark & \cmark & \DecodeGainLo--\DecodeGainHi$\times$ \\
         \quad IRON (ours)\tnote{*} & \cmark & \cmark & 1.28$\times$ \\
-        \quad FLM flash prefill & \cmark & \xmark & $\le$1.09$\times$ \\
+        \quad FLM flash prefill & \xmark & \xmark & $\le$1.09$\times$ \\
         \quad FLM decode & \xmark & N/A & $\le$1.01$\times$ \\
         \tabgroup{One operator per configuration} \\
         \quad FLM prefill & \xmark & N/A & $\le$1.00$\times$ \\
