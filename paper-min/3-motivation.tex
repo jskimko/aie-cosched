@@ -60,7 +60,8 @@ Each column's half alone takes the same time, so the loss comes from the CP's or
 % SOURCE: per-token time = 15.94 ms + 1.156 us x L, max residual 0.2% over L = 2,048-32,704 (Llama-3.2-1B, one 32k-window build, median of 3) (vault lab-decode-long-context (5)); bytes-only discriminator: ELF window 32,768 vs 2,048 at the same small L, 20.81 ms / 30,720 positions = 0.677 us; serialized compute 1.156 - 0.677 = 0.478 us = 41% of the per-position time (vault lab-decode-long-context (7)).
 % SOURCE: single buffering, the build's own comment ("air-label-scf-for-to-ping-pong declines it, because the running max and accumulator are live across blocks") (vault lab-decode-long-context (5)).
 In decode, attention's loop holds the keys, the values, and the scores passed between its two cores in one buffer each, so a block's transfer must wait until the compute on the previous block releases the buffer (Figure~\ref{fig:rewrites}c).
-On Llama-3.2-1B that compute makes up 41\% of the time per position.
+% SOURCE: 32 KiB per position / 1.156 us = 28.4 GB/s against a same-batch 8x2 read cap of 55.2 GB/s; the transfer alone 0.677 us, 88% of the cap (vault lab-decode-long-context (5), (7)).
+On Llama-3.2-1B that compute makes up 41\% of the time per position, so attention reads the KV cache at only half the DRAM read cap.
 
 \subsection{The Overlap Condition}
 \label{subsec:question}
@@ -73,7 +74,7 @@ We call this clause \emph{disjoint resources}, because a rewrite can reorder iss
 The second clause, \emph{no true dependence}, requires that no true dependence separates the two, either on the device or through a host step.
 Together the two clauses form the \emph{condition}.
 The condition refines the critical-path rule for this NPU, since removing a dependence on the critical path frees more than buffers on a shared route let through only where both clauses hold.
-Both clauses are read from the artifacts and the host's accesses before any duration is measured, whereas the critical-path rule needs durations, which then decide the rest.
+Both clauses are read from the artifacts and the host's accesses before any duration is measured, whereas the critical-path rule needs durations, which then decide the rest through OPCORD's bound and event model (Section~\ref{sec:method}).
 
 % VALUE: the partition decides where the condition holds: consecutive operators of a modular design share core tiles and DMA channels and fail disjoint resources; attention run once over the whole prompt makes every turn with the GEMMs a true dependence; AIR's chunked one-operator dispatches meet both clauses, so regrouping them into shared dispatches recovers their overlap, and decode's single buffers leave name dependences that meet both clauses
 How a design partitions its work therefore decides where the condition can hold.
