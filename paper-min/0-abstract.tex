@@ -7,7 +7,7 @@
 %   sentence 3, chooses the order and the configuration per prompt length with an event model -> subsec:decision (Choice of Order and Configuration);
 %   sentence 4 (TTFT, decode, bit-identical outputs) -> subsec:e2e (End-to-End Speedup);
 %   sentence 5, the rescheduled designs against the closed engine's current release -> subsec:e2e (End-to-End Speedup);
-%   sentence 6 (the cut and the prompt length set what a rewrite recovers, as predicted by a condition read from the compiled program) -> subsec:pays (Scope of the Condition: the share read from the artifacts) and subsec:decision (Choice of Order and Configuration: the shape that durations decide).
+%   sentence 6 (the partition and the prompt length set what a rewrite recovers, as predicted by a condition read from the compiled program) -> subsec:pays (Scope of the Condition: the share read from the artifacts) and subsec:decision (Choice of Order and Configuration: the shape that durations decide).
 % COMMENT: the closed engine's explanation (its flash prefill and decode leave little to recover) is no longer in the abstract (author, 2026-10-27, for length); the intro and subsec:pays carry it.
 On AMD Ryzen\texttrademark{} AI processors, the neural processing unit (NPU) executes each large language model (LLM) operator on its own group of AI Engine tiles, while a single in-order command processor issues all of their work.
 The compiled issue order is therefore the array's schedule, and in fused designs it forces operations to wait on work whose results they do not consume.
