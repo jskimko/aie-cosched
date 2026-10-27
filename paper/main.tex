@@ -61,11 +61,10 @@
 % \CLSblock{<class>}. The class is S (spine), D (support), P (protective), E (elaboration) or X (peripheral),
 % with a trailing L where the unit is locked (author-only). Each tag's reason is in the vault,
 % 3-lab/aie-cosched/paper/paper-cosched-sentence-classes.md.
-% \classcolorstrue colors each sentence by its class, with a legend in the running header; \classcolorsfalse
+% \classcolorstrue colors each sentence by its class, with a legend in the top margin; \classcolorsfalse
 % (the default) leaves the PDF unchanged.
 \newif\ifclasscolors
 \classcolorsfalse
-\newif\ifclsblock
 \definecolor{clsS}{rgb}{0.00,0.35,0.70}
 \definecolor{clsD}{rgb}{0.00,0.55,0.35}
 \definecolor{clsP}{rgb}{0.80,0.37,0.00}
@@ -75,14 +74,21 @@
 % A tag in vertical mode (a paragraph's or an \item's first sentence) colors the paragraph when it starts.
 \def\clspending{}
 \NewDocumentCommand{\CLS}{m}{\ifclasscolors\ifvmode\def\clspending{#1}\else\clscolor#1\relax\fi\fi\ignorespaces}
-\NewDocumentCommand{\CLSblock}{m}{\ifclasscolors\clsblocktrue\clscolor#1\relax\fi\ignorespaces}
-% Untagged text (headings, figure contents) returns to black at each paragraph, except inside a tagged block.
-\def\clsparareset{\ifx\clspending\empty\ifclsblock\else\normalcolor\fi\else\expandafter\clscolor\clspending\relax\def\clspending{}\fi}
-% The references stay untagged and keep the uncolored layout.
-\AtBeginDocument{\ifclasscolors\AddToHook{para/begin}{\ifclasscolors\clsparareset\fi}%
-  \AddToHook{env/thebibliography/begin}{\normalcolor\classcolorsfalse}\fi}
-\AtBeginDocument{\ifclasscolors\mlsystitlerunning{OPCORD\quad{\color{clsS}S spine}\quad{\color{clsD}D support}\quad
-  {\color{clsP}P protective}\quad{\color{clsE}E elaboration}\quad{\color{clsX}X peripheral}}\fi}
+% \CLSblock tags a float's body, such as a table, whose first paragraph starts after the tag.
+\NewDocumentCommand{\CLSblock}{m}{\CLS{#1}}
+% A paragraph takes a pending tag's color when it starts and returns to black when it ends, so untagged text
+% (headings, figure contents, the references) stays black. The hooks test the switch when they run, so
+% \classcolorstrue works anywhere, in the preamble or the body.
+\makeatletter
+\def\clsparabegin{\ifx\clspending\empty\else\expandafter\clscolor\clspending\relax\def\clspending{}\fi}
+\def\clsparaend{\ifx\current@color\default@color\else\unskip\normalcolor\fi}
+\makeatother
+\AddToHook{para/begin}{\ifclasscolors\clsparabegin\fi}
+\AddToHook{para/end}{\ifclasscolors\clsparaend\fi}
+% The legend is drawn in the top margin of every page, outside the layout.
+\AddToHook{shipout/background}{\ifclasscolors\put(0.75in,-0.45in){\normalcolor\footnotesize\sffamily
+  {\color{clsS}S spine}\quad{\color{clsD}D support}\quad{\color{clsP}P protective}\quad
+  {\color{clsE}E elaboration}\quad{\color{clsX}X peripheral}\quad{\normalcolor L suffix in the source: locked}}\fi}
 
 % The \mlsystitle you define below is probably too long as a header.
 % Therefore, a short form for the running title is supplied here:
