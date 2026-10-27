@@ -5,15 +5,15 @@
 \label{subsec:overview}
 
 % VALUE: the components in the core rule's order, a bridge in place of the overview figure: the analysis reads the CP's order as a dependence graph and bounds each false dependence before any rewrite is built; the composer and stream pass reorder issue and the loop pass renames buffers, each behind a checker, since OPCORD rewrites designs it did not compile; an event model prices every candidate per prompt length from probes, and a runtime runs the choice
-OPCORD's analysis reads the CP's order, which the design's artifacts fix, as a dependence graph over every agent that touches state (Section~\ref{sec:order}) and bounds what removing each false dependence could recover before any rewrite is built (Section~\ref{subsec:removal}).
-Our composer and stream pass reorder issue, and our loop pass renames decode attention's buffers (Section~\ref{subsec:order}), each behind a checker that refuses any rewrite it cannot show legal (Section~\ref{subsec:legality}).
-An event model prices every candidate per prompt length from \emph{probes}, which time each operator dispatched alone (Section~\ref{subsec:pricing}), and a runtime runs the choice.
+\CLS{X}OPCORD's analysis reads the CP's order, which the design's artifacts fix, as a dependence graph over every agent that touches state (Section~\ref{sec:order}) and bounds what removing each false dependence could recover before any rewrite is built (Section~\ref{subsec:removal}).
+\CLS{S}Our composer and stream pass reorder issue, and our loop pass renames decode attention's buffers (Section~\ref{subsec:order}), each behind a checker that refuses any rewrite it cannot show legal (Section~\ref{subsec:legality}).
+\CLS{E}An event model prices every candidate per prompt length from \emph{probes}, which time each operator dispatched alone (Section~\ref{subsec:pricing}), and a runtime runs the choice.
 
 % VALUE: general benefit, by what each component needs from a stack: reading, bounding, legality and the stream pass work on any stack's streams, compiled or lifted; the loop forms and the loop pass need the lowered design; the composer, probes, event model, choice and runtime are built for attention/GEMM fused prefill, and the composer and runtime need an open host program; choosing the configuration needs the stack's own build of each split
-The analysis, the bound, the legality conditions, and the stream pass with its checker work on any stack's instruction streams, compiled or recorded.
+\CLS{X}The analysis, the bound, the legality conditions, and the stream pass with its checker work on any stack's instruction streams, compiled or recorded.
 % SOURCE: vault lab-cosched-passes (52): the loop pass is an opt-in aiecc flag, run in MLIR-AIE's compile right after the object-FIFO lowering; the rest of that compile rebuilds the configuration.
-Their loop forms need the design's lowered MLIR-AIE form, and the loop pass is an opt-in pass in MLIR-AIE's compile.
-The composer, the probes, the event model, and the runtime are built for a fused prefill that pairs attention with GEMMs, the composer and the runtime also need an open host program, and the configuration is chosen only among the splits that the design's stack builds.
+\CLS{E}Their loop forms need the design's lowered MLIR-AIE form, and the loop pass is an opt-in pass in MLIR-AIE's compile.
+\CLS{P}The composer, the probes, the event model, and the runtime are built for a fused prefill that pairs attention with GEMMs, the composer and the runtime also need an open host program, and the configuration is chosen only among the splits that the design's stack builds.
 
 \subsection{Dependence Analysis}
 \label{sec:order}
@@ -21,38 +21,38 @@ The composer, the probes, the event model, and the runtime are built for a fused
 % VALUE: the analysis's terms: a phase as operations on agents (CP, DMA channels, core loops, host) with read and write sets over locations, every exclusively held resource a location, so run-time arbitration is a conflict on a location; the host as an agent; happens-before edges from mechanisms, not issue order; segments
 % SOURCE: operations, locations, and static control (vault lab-cosched-passes (30), item 1); every loop analysed: on all nine fused decodes 0 loops refused (aie-cosched results/2026-10-23-phase-rerun, registered 7687182; mlir-aie dev line 0c5e8e37fac, 6b9e6666991, lit 46/46), and all 3,488 MLIR-AIR prefill loops judged (decisions log, loop census part 3; mlir-aie ba266793aa8); the host's static control (outline v9 section 1); the decode kernels' early return on the pad block branches on a runtime parameter, so it stays static per context length (lab-decode-long-context (10)).
 % SOURCE: the mechanism table, attribution order, granularities, UNATTRIBUTED, and issue edges (vault lab-cosched-passes (30), item 2); the library AIECoschedDeps (mlir-aie f1725dae1f1, pinned); segments as in txn.segments (amd-npu a0ee2ed prefill-overlap/txn.py); one edge per (wait, gated op) pair (lab-cosched-passes (30), item 3).
-The analysis represents a \emph{phase}, all the dispatches that the host issues for a prefill or a decode step, as operations on \emph{agents}: the CP, the DMA channels, the cores' loops, and the host, whose steps between dispatches access the buffers those dispatches bind.
-Each operation reads and writes \emph{locations}, the resources that one operation holds exclusively, from memory bytes and BDs to locks, DMA channels, task-queue slots, and switch ports, so run-time arbitration on a shared port or lock is a conflict on a location.
-A \emph{happens-before} edge from $a$ to $b$ means $b$ starts only after $a$ completes, and edges come from mechanisms such as synchronizations, BD chains, and locks, not from issue order.
-Within one operator's stream, a \emph{segment} is a run of synchronizations followed by the issues they gate.
+\CLS{E}The analysis represents a \emph{phase}, all the dispatches that the host issues for a prefill or a decode step, as operations on \emph{agents}: the CP, the DMA channels, the cores' loops, and the host, whose steps between dispatches access the buffers those dispatches bind.
+\CLS{E}Each operation reads and writes \emph{locations}, the resources that one operation holds exclusively, from memory bytes and BDs to locks, DMA channels, task-queue slots, and switch ports, so run-time arbitration on a shared port or lock is a conflict on a location.
+\CLS{E}A \emph{happens-before} edge from $a$ to $b$ means $b$ starts only after $a$ completes, and edges come from mechanisms such as synchronizations, BD chains, and locks, not from issue order.
+\CLS{E}Within one operator's stream, a \emph{segment} is a run of synchronizations followed by the issues they gate.
 % VALUE: the validity assumption the legality rests on: a core touches a shared buffer only between the locks that guard it (Eraser's lockset discipline, cited; MLIR-AIE's object FIFOs guarantee it)
 % SOURCE: spine v18, "The system", the principle and the validity assumption (vault paper-cosched-spine-v18).
-The analysis assumes the lock discipline that Eraser checks~\citep{savage1997eraser}, namely that a core touches a shared buffer only between the locks that guard it, and MLIR-AIE's object FIFOs guarantee it by lowering their acquires and releases to those locks.
+\CLS{P}The analysis assumes the lock discipline that Eraser checks~\citep{savage1997eraser}, namely that a core touches a shared buffer only between the locks that guard it, and MLIR-AIE's object FIFOs guarantee it by lowering their acquires and releases to those locks.
 
 \label{subsec:closed}
 % VALUE: lifting: every stream read, compiled or recorded, round-trips byte for byte through MLIR-AIE's runtime sequence; on a closed stack: record at the runtime boundary, attribute each issue to a column group by decoded routes, observe the host there; bound only rewrites that leave the closed host program as it is, and replay only to test a bound, never to deploy
 % SOURCE: recording libhrx (FastFlowLM 44d01787, gemma4e-flash), every prompt length 1-1,024 recorded with 0 /dev/accel opens; 8 buckets, 218 distinct streams, round trip and identity 218 / 218 (vault lab-cosched-passes (14)); lifter fix mlir-aie 91f64387ffb, 375 / 375 MLIR-AIR streams byte-identical (lab-cosched-passes (3)).
 % SOURCE: streams recorded with a library that never opens the device, or captured with an XRT interposer during a device run (gemma4e-flash:e2b, 1,009 tokens; appendix-body.tex, app:capture (cut 2026-10-24)); route maps from the cdo_routes decoder: shim 3 and shim 6 MM2S0 reach only columns 0 and 7 (vault lab-flm-streams (11), (13)).
 % SOURCE: the closed-stack rule and the host observed at the driver boundary (spine v18, The system; census partb/README); the measured rewrites are the merges at the 128-token bucket and e4898ce3's stream (census partb/replay/, registered 3ae0370, 67d54fe).
-Every stream the analysis reads, compiled or recorded, round-trips byte for byte through MLIR-AIE's runtime sequence (its intermediate form for a dispatch's stream).
-On a closed stack such as FLM (Section~\ref{subsec:spectrum}), we record the designs' streams and the host's accesses at the issuing runtime's boundary, lift the streams into the same form, and attribute each issue to a column group by the routes decoded from the design's configuration.
-There, OPCORD only bounds rewrites that leave the closed host program as it is, and never deploys them.
+\CLS{E}Every stream the analysis reads, compiled or recorded, round-trips byte for byte through MLIR-AIE's runtime sequence (its intermediate form for a dispatch's stream).
+\CLS{D}On a closed stack such as FLM (Section~\ref{subsec:spectrum}), we record the designs' streams and the host's accesses at the issuing runtime's boundary, lift the streams into the same form, and attribute each issue to a column group by the routes decoded from the design's configuration.
+\CLS{P}There, OPCORD only bounds rewrites that leave the closed host program as it is, and never deploys them.
 
 % VALUE: the dependence classes: each edge labelled true, name, or order by the pairs it alone orders (true: a read after a write; name: a write after a read or write; order: otherwise), loop-carried edges over the loop's iterations
 % SOURCE: classification by Lost(e), REDUNDANT, CONTROL, loop-carried distance (vault lab-cosched-passes (30), item 3); computed at stream granularity by aie-cosched-stream-deps (mlir-aie 2392abdc230 onward, fixture stream-turns with ORDER, NAME, RAW and REDUNDANT edges, lab-cosched-passes (49)), which agrees with its Python oracle on every compared count on 792 of 793 population streams, the 793rd too large for either (mlir-aie 0489d325082, lab-cosched-passes (53)); at loop granularity by AIECoschedDeps, whose buffer classes are the Lost-pair classes of the loop-carried edges (lab-cosched-passes (33)), with order edges and critical cycles computed in results/2026-10-23-order-loop (mlir-aie dev 58569749d3e..36f725e8e6e).
 % DECISION: the classes are computed by the analysis; the stream-granularity instances of Section 3 were identified by reading the designs and confirmed by measurement, so the text never says that the analysis found them.
-The analysis labels each edge by the pairs of operations that the edge alone orders, and labels a loop's carried edges over the loop's iterations.
-An edge is a true dependence if, in one of these pairs, the later operation reads a location that the earlier one writes, otherwise a name dependence if, in one of them, either operation writes a location that the other reads or writes, and otherwise an order dependence.
-The same graph decides both clauses of the condition of Section~\ref{subsec:question}, since its agents and locations show whether two operations share a core tile or a DMA channel, and its true edges, including those through the host's steps, whether one consumes the other's results.
+\CLS{E}The analysis labels each edge by the pairs of operations that the edge alone orders, and labels a loop's carried edges over the loop's iterations.
+\CLS{D}An edge is a true dependence if, in one of these pairs, the later operation reads a location that the earlier one writes, otherwise a name dependence if, in one of them, either operation writes a location that the other reads or writes, and otherwise an order dependence.
+\CLS{E}The same graph decides both clauses of the condition of Section~\ref{subsec:question}, since its agents and locations show whether two operations share a core tile or a DMA channel, and its true edges, including those through the host's steps, whether one consumes the other's results.
 
 \subsection{Recovery Bound}
 \label{subsec:removal}
 
 % VALUE: the bound per false dependence: T/(T - O(d)) by Amdahl's law for an ordering (cited); T the longest path once each resource adds its service order, or the maximum cycle mean in a loop (cited); the condition in the bound (1.000x where no true dependence fails; what buffers on the shared route let through where only disjoint resources fails)
 % SOURCE: the bound and its typed resources (outline v9 section 2, C1; vault lab-bound-validation (1)); the buffering on a shared channel: pass-0 aie-cosched de43b4d (model) and eb7b29b, 8d03ffe (the clause test's 1.084x; passes/results/2026-10-26-buffering/README.md).
-By Amdahl's law~\citep{amdahl1967validity} applied to an ordering, removing a false dependence $d$ can speed a phase up by at most $T / (T - O(d))$.
-Here $T$ is the phase's time, the longest path through the graph once each resource adds the order in which it serves its work, or in a loop the maximum cycle mean~\citep{ghamarian2006throughput}, and $O(d)$ is how long $d$ alone keeps work on disjoint resources from running at once.
-Because true dependences stay edges and no rewrite can duplicate a core tile or a DMA channel, a false dependence that fails the no-true-dependence clause (Section~\ref{subsec:question}) does not free overlap and bounds at $1.000\times$, and one that fails only disjoint resources frees at most what the buffers on the shared route let through.
+\CLS{D}By Amdahl's law~\citep{amdahl1967validity} applied to an ordering, removing a false dependence $d$ can speed a phase up by at most $T / (T - O(d))$.
+\CLS{D}Here $T$ is the phase's time, the longest path through the graph once each resource adds the order in which it serves its work, or in a loop the maximum cycle mean~\citep{ghamarian2006throughput}, and $O(d)$ is how long $d$ alone keeps work on disjoint resources from running at once.
+\CLS{E}Because true dependences stay edges and no rewrite can duplicate a core tile or a DMA channel, a false dependence that fails the no-true-dependence clause (Section~\ref{subsec:question}) does not free overlap and bounds at $1.000\times$, and one that fails only disjoint resources frees at most what the buffers on the shared route let through.
 
 \subsection{Order and Buffer Rewrites}
 \label{subsec:order}
@@ -60,23 +60,23 @@ Because true dependences stay edges and no rewrite can duplicate a core tile or 
 % VALUE: the composer, cause then response: queued dispatches run one at a time, so reordering them alone recovers nothing; the composer regroups the one-operator dispatches by list-scheduling the operators chunk by chunk, in the order the operators and the host's steps produce and consume data, into shared dispatches (the composed order); each dispatch takes the ready attention operator of the lowest layer and chunk, ready meaning the host has post-processed every output it reads, and adds ready GEMMs in the same order until their probe-estimated work reaches attention's, because a dispatch runs both groups in about the longer one's time; within each dispatch, every group's work opens before the CP waits on any, attention's two columns counted as two groups
 % SOURCE: merged.plan (amd-npu a0ee2ed prefill-overlap/merged.py, now opcord/compose/merged.py at aie-cosched opcord-runtime 446fa1c): qkv(L, c) after down(L-1, c); attn(L, c) after qkv(L, 0..c); o after attn; gate and up after o; down after gate and up; GEMMs added in the same order until their estimated work reaches the attention operator's; an optional cap on the GEMMs per attention command.
 % SOURCE: opcord/compose/merged.py at npu-gap-0/opcord-pin 836f84b: :13 "each command takes the ready attention op with the lowest (layer, chunk) plus ready GEMMs until their estimated work reaches the attention's"; :447 an op "is ready once every one of them has been posted (its host post-op run)"; :340-342 the GEMM estimates are "the shipped stage probe less the frozen F", attention's "the per-chunk probes"; a command without a lead takes up to batch ready ops.
-Because queued dispatches run one at a time (Section~\ref{subsec:semantics}), reordering the original program's one-operator dispatches alone recovers nothing, so our \emph{composer} regroups them into shared dispatches, whose order we call the \emph{composed order}.
-It schedules the operators chunk by chunk as the host's steps make their inputs ready: each dispatch takes the ready attention operator of the lowest layer and chunk, then adds ready GEMMs in schedule order until their work, estimated from the probes, reaches attention's, since a dispatch that runs both groups takes about the longer group's time.
+\CLS{E}Because queued dispatches run one at a time (Section~\ref{subsec:semantics}), reordering the original program's one-operator dispatches alone recovers nothing, so our \emph{composer} regroups them into shared dispatches, whose order we call the \emph{composed order}.
+\CLS{D}It schedules the operators chunk by chunk as the host's steps make their inputs ready: each dispatch takes the ready attention operator of the lowest layer and chunk, then adds ready GEMMs in schedule order until their work, estimated from the probes, reaches attention's, since a dispatch that runs both groups takes about the longer group's time.
 % SOURCE: merged.cp_order (a0ee2ed, now opcord/compose/merged.py): the opening segments of both attention columns and of the first GEMM, then synchronizations by predicted completion; the in-turn order takes 1.26x as long on the same 38 commands (lab-prefill-overlap (16)).
-Within each dispatch, the composer opens every group's work before the CP waits on any, counting each of attention's columns as its own group (Figure~\ref{fig:rewrites}a).
+\CLS{E}Within each dispatch, the composer opens every group's work before the CP waits on any, counting each of attention's columns as its own group (Figure~\ref{fig:rewrites}a).
 
 % VALUE: the stream pass: the same reorder inside one operator's stream, compiled or lifted (each column's segments interleaved position by position), so the CP issues each column's next work before it waits on another; it emits the hand alternation of Section 3 byte for byte
 % SOURCE: aie-cosched-schedule (mlir-aie 573e0140174, identical in f1725dae1f1; in place on cosched-flag), proposal format /2 at aie-cosched 8dee63f; 42 / 42 decoded order and bytes equal to the hand versions (vault lab-cosched-passes (35), (40)); in place and byte-identical to the Python-applied moves and to the hand template on 42 / 42 (decisions log D24, P4).
 % DECISION: the pass emits the alternation and the checker accepts it; it is never said to discover it.
-Our \emph{stream pass}, an MLIR-AIE pass, applies the same reorder within one operator's stream, compiled or recorded, by interleaving the columns' segments position by position (Figure~\ref{fig:rewrites}b).
-It emits the hand alternation of Section~\ref{subsec:losses} byte for byte.
+\CLS{E}Our \emph{stream pass}, an MLIR-AIE pass, applies the same reorder within one operator's stream, compiled or recorded, by interleaving the columns' segments position by position (Figure~\ref{fig:rewrites}b).
+\CLS{E}It emits the hand alternation of Section~\ref{subsec:losses} byte for byte.
 
 % VALUE: the loop pass: removes the name dependence of decode attention's single buffers (cause stated in Section 3) by renaming each into a two-slot ring and leaves the carried maximum and accumulator, which is why AIR's double buffering declines the loop and ours does not
 % SOURCE: single buffering, the build's own comment ("air-label-scf-for-to-ping-pong declines it, because the running max and accumulator are live across blocks") (vault lab-decode-long-context (5)).
 % SOURCE: aie-cosched-rename (mlir-aie 41b4947f09e): each name-class buffer becomes a depth-2 ring, a second buffer on the same tile, the free-slot lock's init 1 -> 2, each BD chain extended (buffer -> its twin -> the old successor), and in each core loop the slot chosen per iteration (vault lab-cosched-passes (33), "The pass"); 12 buffers renamed on the 1B census build (K, V, score per attention pair); tokens and every step's logits bit-identical across the original design, the hand edit, and the pass, 1B P = 0 to 32,517 and Qwen3-4B P = 2,048 to 28,800 (vault lab-decode-long-context (22), amd-npu a6bc94b and 455740b).
 % DECISION: the rename is our loop pass's output on the lowered design, not a hand edit.
-Our \emph{loop pass} removes the name dependence of decode attention's single buffers (Section~\ref{subsec:losses}) by renaming each into a two-slot \emph{ring}, so each position takes about the longer of transfer and compute rather than their sum (Figure~\ref{fig:rewrites}c).
-It leaves in place the running maximum and the accumulator, which alone carry data from block to block, whereas AIR's double buffering declines the whole loop because of that carried state.
+\CLS{DL}Our \emph{loop pass} removes the name dependence of decode attention's single buffers (Section~\ref{subsec:losses}) by renaming each into a two-slot \emph{ring}, so each position takes about the longer of transfer and compute rather than their sum (Figure~\ref{fig:rewrites}c).
+\CLS{PL}It leaves in place the running maximum and the accumulator, which alone carry data from block to block, whereas AIR's double buffering declines the whole loop because of that carried state.
 
 \subsection{Legality and Checkers}
 \label{subsec:legality}
@@ -87,16 +87,16 @@ It leaves in place the running maximum and the accumulator, which alone carry da
 % DECISION: the conditions are stated as what the streams and their configuration can check, never as sufficient for every design.
 % DECISION: the drop rule (QUEUE-DROP, DROP-UNDECIDED without a configuration) is in the checkers (landed at aie-cosched 0d74483 / mlir-aie 95be81b09e8; the CE5b-tightened checkers at b98abe9 / 19e156632e5, on which the final census ran, contain it), alongside QUEUE-OVERFLOW and the deadlock rule (QUEUE-DEADLOCK).
 % SOURCE: bit-identical logits for every composed prefill and append, and identical tokens and logits for every renamed decode (Section~\ref{subsec:setup} defaults; vault lab-decode-long-context (22)).
-OPCORD judges each of these rewrites as a whole, deciding its legality from the streams, their configuration, and the host's accesses.
-A reorder keeps every instruction once, and each column's segments and each channel's pushes and waits in their order, and must not create a hazard on data and BDs, on a task queue, or on device state.
-Two whole operators on different groups may interleave when each writes only its own group's shim BDs, task queues, locks, and runtime parameters, they address disjoint host buffers or disjoint byte ranges of one, and neither writes a buffer that the other reads or writes.
-These conditions hold only where an operation's locations cover all the state it touches, so we do not claim they suffice for every design; every accepted rewrite we run also leaves the outputs bit-identical (Section~\ref{subsec:setup}).
+\CLS{E}OPCORD judges each of these rewrites as a whole, deciding its legality from the streams, their configuration, and the host's accesses.
+\CLS{D}A reorder keeps every instruction once, and each column's segments and each channel's pushes and waits in their order, and must not create a hazard on data and BDs, on a task queue, or on device state.
+\CLS{E}Two whole operators on different groups may interleave when each writes only its own group's shim BDs, task queues, locks, and runtime parameters, they address disjoint host buffers or disjoint byte ranges of one, and neither writes a buffer that the other reads or writes.
+\CLS{P}These conditions hold only where an operation's locations cover all the state it touches, so we do not claim they suffice for every design; every accepted rewrite we run also leaves the outputs bit-identical (Section~\ref{subsec:setup}).
 
 % VALUE: the checkers: the composer and both passes each carry one; a failed check leaves the composition, stream, or loop unchanged and names its reason, and nothing is dropped to pass
 % SOURCE: stream checker in C++ inside aie-cosched-schedule, route facts from the device IR (mlir-aie cosched-flag e20940fac7e); any finding refuses the whole rewrite and the IR is unchanged; outcomes DECIDED (shown illegal) against RESOURCE-UNPROVEN, RANGE-UNKNOWN, TOOL-FAILED, PASS-ERROR (not shown legal) (vault lab-cosched-passes (57) steps 3-5, and the checker's reason list).
 % SOURCE: composer checks (whole-operator condition, no early ring-slot reuse, each split within a shim BD's fields): own-group register writes (shim BDs and DMA queues, own cores' locks, own cores' runtime parameters), disjoint argument slots or byte ranges, segment order and every op once, assert_no_hazard on ring slots, BD iteration wrap 6 bits and stride 20 bits per GEMM, check_posted for commands in flight; each turns red on a defeated input (lab-prefill-overlap (3), (4), (9); lab-split-sweep (5), (35)); checks fail rather than drop, 26 / 26 (decisions log D24 N1).
 % SOURCE: loop pass input checks (one free / full lock pair, free lock starting at 1, BD and L1 budgets, every BD block ending in a next_bd, use inside a block loop, supported loop control) and output check (ring as made, carried state's users unchanged, budgets), mlir-aie aie-cosched-pass-0 e9fc225b2b6 / ba7ea1aa552, cherry-picked to cosched-flag (lab-cosched-passes (56), (57) step 2).
-The composer and both passes each carry a checker, and a failed check leaves the composition, stream, or loop unchanged and names its reason, rather than dropping work to pass.
+\CLS{E}The composer and both passes each carry a checker, and a failed check leaves the composition, stream, or loop unchanged and names its reason, rather than dropping work to pass.
 
 \subsection{Event Model and Choice}
 \label{subsec:pricing}
@@ -105,29 +105,29 @@ The composer and both passes each carry a checker, and a failed check leaves the
 % SOURCE: opcord/model/event_model.py (opcord-runtime 3bead38): Eq. 1 at EM:122 (end = max(end_prev + eps, h + F) + busy, h the host clock after the issue cost, busy with the floor removed, the first command's eps 0); eps by command kind EM:114-121; GEMM-only commands, the stages' times plus gamma per extra GEMM, EM:406; the two-regime composition max(a, g) + a_r + b_r min(a, g), EM:13-18, 82-89; the composer's depth wait EM:170 and the shipped program's stage-major waits EM:179-224; the shipped program through the same simulate(), EM:402-403; refusal outside the measured contexts EM:239-240, a chunk at its absolute position EM:263-276; per-model post costs EM:346 and head EM:389 (npu-gap term checks, 2026-10-25).
 % SOURCE: the floor in the work terms, pass-0 opcord/model/event_model.py at 3bead38, the module doc: "On work, a = A - F and g = G - F (each alone time pays one floor; the composed command pays one)".
 % DECISION: this subsection states the frozen form (dev form, frozen 2026-10-25; amd-npu 12250226, FORM-A2.md; opcord-runtime 3bead38, opcord/model/event_model.py, constants opcord/model/constants/frozen.json), term by term as npu-gap checked it against the code.
-The \emph{event model} is an analytical simulation of the device, the CP, and the host.
-Dispatch $k$ ends at
+\CLS{E}The \emph{event model} is an analytical simulation of the device, the CP, and the host.
+\CLS{E}Dispatch $k$ ends at
 \begin{equation}
 \label{eq:cmd}
-e_k = \max\bigl(e_{k-1} + s_k,\; q_k + F\bigr) + \tau_k,
+\CLS{E}e_k = \max\bigl(e_{k-1} + s_k,\; q_k + F\bigr) + \tau_k,
 \end{equation}
-where $q_k$ is when the host has queued the dispatch and paid its issue cost, $F$ is the dispatch floor, and $\tau_k$ is the dispatch's device time beyond that floor.
-The transition $s_k$ is one constant per ordered pair of dispatch kinds, attention or GEMM, and is negative where the next dispatch starts before the previous one ends.
-Without attention, a dispatch takes its GEMMs' times alone summed, plus a fixed $\gamma$ for each GEMM after the first, and with attention beside GEMMs it takes
+\CLS{E}where $q_k$ is when the host has queued the dispatch and paid its issue cost, $F$ is the dispatch floor, and $\tau_k$ is the dispatch's device time beyond that floor.
+\CLS{E}The transition $s_k$ is one constant per ordered pair of dispatch kinds, attention or GEMM, and is negative where the next dispatch starts before the previous one ends.
+\CLS{D}Without attention, a dispatch takes its GEMMs' times alone summed, plus a fixed $\gamma$ for each GEMM after the first, and with attention beside GEMMs it takes
 \begin{equation}
 \label{eq:overlap}
-\tau_k = \max(a_k, g_k) + c_r + d_r \min(a_k, g_k),
+\CLS{D}\tau_k = \max(a_k, g_k) + c_r + d_r \min(a_k, g_k),
 \end{equation}
-where $a_k$ and $g_k$ are the attention and GEMM groups' times alone, each beyond the floor, $r$ says which is longer, and $c_r$ and $d_r$ are a fixed cost and the fraction of the shorter time that the overlap leaves unhidden.
+\CLS{D}where $a_k$ and $g_k$ are the attention and GEMM groups' times alone, each beyond the floor, $r$ says which is longer, and $c_r$ and $d_r$ are a fixed cost and the fraction of the shorter time that the overlap leaves unhidden.
 
 % VALUE: what makes the price move with the prompt and keeps it honest: probes on each supported configuration, each attention chunk probed at several cached-context lengths and priced at its position, so the candidate that pays changes with length; no constant comes from an LLM's end-to-end runs
 % SOURCE: frozen constants (opcord/model/constants/frozen.json; calibration hold 2026-10-22 22:20-22:43, amd-npu d94266bf, microbench device.json / host.json; frozen.json from npu-gap-0-c8 b15d9dca): F 94.507 us; transitions gemm->gemm 12.93, gemm->attn -6.65, attn->gemm 47.95, attn->attn 20.94 us; gamma 24.56 us; regimes GEMM-longer c 42.33 us, d 0.1160 (n 10), attention-longer c 21.43 us, d -0.0260 (n 5); issue attention 68.06, GEMM 7.36 us; post per model and operator (host.json, e.g. Llama-3.2-1B qkv 179.5, up 202.3, attention 76.1 us). The microbenchmarks run Llama-3.2-1B's layer-0 operators with real weights; tests/test_event_model.py forbids end-to-end sources in frozen.json.
-The prices come from probes taken on each supported configuration, with each attention chunk probed at several cached-context lengths and priced at its position in the prompt, so the candidate that minimizes TTFT changes with the prompt length.
-The host's post-processing costs are measured once per LLM, and no constant comes from an LLM's end-to-end runs, so Section~\ref{subsec:decision} tests the event model rather than calibrates it.
+\CLS{E}The prices come from probes taken on each supported configuration, with each attention chunk probed at several cached-context lengths and priced at its position in the prompt, so the candidate that minimizes TTFT changes with the prompt length.
+\CLS{P}The host's post-processing costs are measured once per LLM, and no constant comes from an LLM's end-to-end runs, so Section~\ref{subsec:decision} tests the event model rather than calibrates it.
 
 % VALUE: the choice per prompt length: price every candidate and run the minimum unless a measurement settles a near tie; order and configuration chosen together, because the configuration that minimizes each order's TTFT moves with the balance and can differ between orders
 % SOURCE: opcord/plan/planner.py choose(model, L, N): candidates every split with a committed probe (S1, S2, S4), orders ship / shipar / comp, composer policies depth {1, 2, 4, 8} x GEMM cap {none, 4} x packing {1, 4}, each priced by event_model.predict, the minimum returned with the whole table; the hold as pipe {0, 1} (opcord-pipe 4a60cc4).
 % SOURCE: measure-when-close, implemented test-first in opcord (planner.CLOSE_BAND, close_candidates, decide; test_measure_close 10/10); bands same 5%, cross 15%, tie 0.5%, one warm and three kept runs per candidate (vault decisions log, "Spine v18 drafted; amendment-1 batch and measure-when-close approved").
 % SOURCE: planner.py:154 CLOSE_BAND same 0.05 / cross 0.15 by order family (_family), opcord-pin.
-Before a prompt length runs, OPCORD prices every candidate and runs the one predicted fastest, except where another candidate is predicted within 5\% of it, or 15\% with the other order, and a measurement at planning time settles this near tie.
-Because the configuration that minimizes TTFT moves with the balance and can differ between the orders (Section~\ref{subsec:question}), OPCORD chooses the order and the configuration together.
+\CLS{E}Before a prompt length runs, OPCORD prices every candidate and runs the one predicted fastest, except where another candidate is predicted within 5\% of it, or 15\% with the other order, and a measurement at planning time settles this near tie.
+\CLS{X}Because the configuration that minimizes TTFT moves with the balance and can differ between the orders (Section~\ref{subsec:question}), OPCORD chooses the order and the configuration together.

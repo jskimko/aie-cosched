@@ -11,15 +11,15 @@
 % SOURCE: IOS (arXiv 2011.01302v2) section 7.2, p. 9 "IOS discovers different schedules for different batch sizes."; section 4.1, p. 5 "It directly measures the latencies of both parallelization strategies on the hardware." (step 4 B2; verify-citations-s34 section 1)
 % SOURCE: LATTICE (arXiv 2607.17422v3, abstract read 2026-10-22): three stages; command traces from a DaVinci NPU; reports a modeled makespan (vault src-lattice)
 \textbf{Operator Scheduling and Concurrency.}
-IOS and Nimble run independent operators concurrently on GPU streams~\citep{ding2021ios,kwon2020nimble}, and IOS fits a schedule to each batch size by measuring candidate stages on the device.
-LATTICE reorders NPU command graphs from traces~\citep{liu2026lattice}, taking their dependences as given.
-Unlike these systems, which construct a schedule from a program or a traced graph, OPCORD starts from the one that the CP's order in compiled binaries already fixes, closed ones included, and derives there the dependences that keep operators on disjoint column groups of one array from running at once.
-In open designs, it chooses that order with the configuration per prompt length, without running each candidate.
+\CLS{D}IOS and Nimble run independent operators concurrently on GPU streams~\citep{ding2021ios,kwon2020nimble}, and IOS fits a schedule to each batch size by measuring candidate stages on the device.
+\CLS{D}LATTICE reorders NPU command graphs from traces~\citep{liu2026lattice}, taking their dependences as given.
+\CLS{D}Unlike these systems, which construct a schedule from a program or a traced graph, OPCORD starts from the one that the CP's order in compiled binaries already fixes, closed ones included, and derives there the dependences that keep operators on disjoint column groups of one array from running at once.
+\CLS{D}In open designs, it chooses that order with the configuration per prompt length, without running each candidate.
 
 % VALUE: the closest prior instance of the same false dependence: GPU streams on one hardware queue ran at once when issued breadth first; XDNA 2 fixes order but not duration and has one in-order CP per context, so the order must be written into one instruction stream
 % SOURCE: Rennich 2012 webinar (minimal3/cite-pdf/rennich.txt): "Example - Blocked Kernel" (:308-330), issue depth first runtime = 3, issue breadth first runtime = 2, Ka1 and Ka2 in execution together; "within queues, stream dependencies are lost"; its guideline is only "Pay attention to issue order" (:496), so the sentence says the kernels ran at once, not that breadth first was recommended (decisions-s5op-r1, A-M1).
 % DECISION: the pointer to Background for the single-queue false dependence, keeping the GPU work as prior work (pending-names-v2).
 % DECISION: the GPU-serving works are an extra; their one-sentence stand-in (step 4 B14) was dropped by the author's call (2026-10-27): DistServe and Splitwise put the phases on separate GPUs, Sarathi mixes prefill chunks into decode batches, POD runs both attentions in one kernel. The transfer to other in-order issuers is a scope claim and goes in the conclusion (step 4 section 2).
 \textbf{GPU Work Queues.}
-On Fermi GPUs, one hardware work queue placed the order dependences of Section~\ref{sec:background} between streams, and kernels of different streams ran at once when issued breadth first~\citep{rennich2012streams}, as our composer issues them (Section~\ref{subsec:order}).
-XDNA~2's program fixes the order of each engine's work but not its duration, and because each hardware context has one in-order CP and a second context shares the whole array in time, the breadth-first order must be written into one instruction stream.
+\CLS{D}On Fermi GPUs, one hardware work queue placed the order dependences of Section~\ref{sec:background} between streams, and kernels of different streams ran at once when issued breadth first~\citep{rennich2012streams}, as our composer issues them (Section~\ref{subsec:order}).
+\CLS{D}XDNA~2's program fixes the order of each engine's work but not its duration, and because each hardware context has one in-order CP and a second context shares the whole array in time, the breadth-first order must be written into one instruction stream.

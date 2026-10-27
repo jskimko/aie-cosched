@@ -56,6 +56,34 @@
 
 \hyphenation{tool-chain}
 
+% Sentence classes against the strict core: each sentence opens with \CLS{<class>} (before \item in a list,
+% where microtype's label kern must see the first letter), and Table 1's body with
+% \CLSblock{<class>}. The class is S (spine), D (support), P (protective), E (elaboration) or X (peripheral),
+% with a trailing L where the unit is locked (author-only). Each tag's reason is in the vault,
+% 3-lab/aie-cosched/paper/paper-cosched-sentence-classes.md.
+% \classcolorstrue colors each sentence by its class, with a legend in the running header; \classcolorsfalse
+% (the default) leaves the PDF unchanged.
+\newif\ifclasscolors
+\classcolorsfalse
+\newif\ifclsblock
+\definecolor{clsS}{rgb}{0.00,0.35,0.70}
+\definecolor{clsD}{rgb}{0.00,0.55,0.35}
+\definecolor{clsP}{rgb}{0.80,0.37,0.00}
+\definecolor{clsE}{rgb}{0.55,0.55,0.55}
+\definecolor{clsX}{rgb}{0.80,0.47,0.65}
+\def\clscolor#1#2\relax{\color{cls#1}}
+% A tag in vertical mode (a paragraph's or an \item's first sentence) colors the paragraph when it starts.
+\def\clspending{}
+\NewDocumentCommand{\CLS}{m}{\ifclasscolors\ifvmode\def\clspending{#1}\else\clscolor#1\relax\fi\fi\ignorespaces}
+\NewDocumentCommand{\CLSblock}{m}{\ifclasscolors\clsblocktrue\clscolor#1\relax\fi\ignorespaces}
+% Untagged text (headings, figure contents) returns to black at each paragraph, except inside a tagged block.
+\def\clsparareset{\ifx\clspending\empty\ifclsblock\else\normalcolor\fi\else\expandafter\clscolor\clspending\relax\def\clspending{}\fi}
+% The references stay untagged and keep the uncolored layout.
+\AtBeginDocument{\ifclasscolors\AddToHook{para/begin}{\ifclasscolors\clsparareset\fi}%
+  \AddToHook{env/thebibliography/begin}{\normalcolor\classcolorsfalse}\fi}
+\AtBeginDocument{\ifclasscolors\mlsystitlerunning{OPCORD\quad{\color{clsS}S spine}\quad{\color{clsD}D support}\quad
+  {\color{clsP}P protective}\quad{\color{clsE}E elaboration}\quad{\color{clsX}X peripheral}}\fi}
+
 % The \mlsystitle you define below is probably too long as a header.
 % Therefore, a short form for the running title is supplied here:
 % VALUE: the acronym is recoverable from the subtitle word for word (OPerator Concurrency from Command ORDer),
