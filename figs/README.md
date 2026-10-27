@@ -40,7 +40,7 @@ Four further files are not byte copies but extracts, each recording its own sour
 | `timeline-1b.json` | `57621ff4` `prefill-overlap/ml-timeline/hold-2/report/report-1b.json` | per column group, the CP's blocked time and the time its work was outstanding |
 | `turns.json` | `c61445da` `turn-w3-1b.json` and `171082f6` `turn-w3-qwen.json` | whole turns by append size and cached context, ratios re-derived here from the per-rep wall times |
 
-`data/synthetic.json` is a byte copy of `amd-npu` `300cfc22` `ab/results/d7-2026-10-26/read.json`: the synthetic two-layer
+`data/synthetic.json` is a byte copy of `amd-npu` `ae515715` `ab/results/d7-2026-10-26/tierR/read.json` (the rerun in the recorded power state): the synthetic two-layer
 designs (three builds that keep attention fixed and vary the GEMMs' work), the original against the composed order at 1-32
 chunks, the repeat-position ratio as median with its 95% interval (`repeat`); the `predicted` field is not plotted.
 
