@@ -1,22 +1,20 @@
-\section{Motivation}
+\section{Command Order and Overlap}
 \label{sec:motivation}
 
 \subsection{Dispatch Semantics}
 \label{subsec:semantics}
 
-% VALUE: queued, or in sequence in one dispatch, two operators take the sum of their times less at most one floor, so packing dispatches does not free overlap; one dispatch that issues both groups' work before waiting on either runs the pair near the longer operator alone, its excess near the read cap; a second hardware context time-shares the same columns; so concurrency comes only from the order inside a dispatch
+% VALUE: queued, or in sequence in one dispatch, two operators take the sum of their times less at most one floor, so packing dispatches does not free overlap, and a second hardware context time-shares the same columns; one dispatch that issues both groups' work before waiting on either runs the pair near the longer operator alone
 % DECISION: packing several operators per dispatch (batching) is cited as standard practice, never presented as ours.
 % SOURCE: queued / in-sequence = 1.007-1.029 on 7 pairs, 20 runs per pair (amd-npu 17f7ec3 prefill-overlap/ovl4/, lab-prefill-overlap (5)b); in-sequence / (A + G - F) = 0.996-1.021 over 17 pair runs (ovl/, ovl2/ at 8f13e05 and ovl4/; report.txt H1 column).
 % SOURCE: XRT run list, /opt/xilinx/xrt/include/xrt/experimental/xrt_kernel.h:21 (XRT 2.25.0).
 To find what lets two operators run at once, we pair one attention operator of the original program with one GEMM on disjoint column groups.
 On each of seven pairs, two dispatches queued on one hardware context run within 3\% of one dispatch that holds both streams in sequence, and that dispatch takes the sum of both operators' times less at most one dispatch floor (Figure~\ref{fig:rewrites}a, before).
-Packing dispatches, as CUDA Graphs~\citep{nvidia-cudagraphs}, XRT's run lists~\citep{xrt-repo}, and an MLIR-AIR deployment of LLMs on this NPU~\citep{li2026agentnpu} do, therefore recovers none of the overlap, nor does a second hardware context, since a one-column design run on two contexts at once takes $1.97\times$ its time alone, as two runs on one context do.
+Packing dispatches, as CUDA Graphs~\citep{nvidia-cudagraphs} and XRT's run lists~\citep{xrt-repo} do, therefore recovers none of the overlap, nor does a second hardware context, since a one-column design run on two contexts at once takes $1.97\times$ its time alone, as two runs on one context do.
 % SOURCE: amd-npu d8c63fb1 roofline/two-ctx-hold/two_ctx.json: rho 1.970, 95% bootstrap CI [1.955, 1.976], same-context ratio 1.970; medians solo 19.76 / 19.81 ms, pair 39.10 ms, same 39.09 ms (vault lab-prefill-overlap (34)); driver allocation amdxdna 2.25.0 npu4_regs.c:94-106, aie2_ctx.c:604-608 (vault lab-prefill-overlap (31)); the design is a one-column xclbin (AIE_PARTITION column_width 1, amd-npu 2171857e roofline/two-ctx-build/; vault lab-prefill-overlap (33)).
 % SOURCE: interleaved / max(A, G) = 0.998-1.058 over 10 pair runs = 9 pairs (c8 + lm measured twice, 1.054 and 1.058; the figure keeps each pair's first measurement); GEMM shapes up, LM head chunk, down; attention chunks 0, 4, 8, 12, 15 (lab-prefill-overlap (3)).
-% SOURCE: DRAM rate during the interleaved command 52.2 GB/s against a same-batch 8x2 cap of 53.9-55.3 GB/s for c8 + lm, the costliest overlap (1.054-1.058) (lab-prefill-overlap (3)); the cap is the 8x2 bracket's read of 256 MiB (Section subsec:setup's SOURCE).
 In contrast, one dispatch that issues all the GEMM's work, then attention's stream, and only then the GEMM's synchronizations runs the pair within 6\% of the longer operator's time alone on each of nine pairs (Figure~\ref{fig:rewrites}a, after).
 The small excess appears where the pair's DRAM reads approach the \emph{read cap}, namely the highest rate at which the column groups together can read DRAM.
-Concurrency thus comes only from one dispatch that issues several groups' work before waiting on any, which makes the order inside a dispatch a scheduling decision.
 
 \subsection{Waits in Fused Designs}
 \label{subsec:losses}
@@ -31,19 +29,14 @@ Concurrency thus comes only from one dispatch that issues several groups' work b
 
 % VALUE: three false dependences (defined and cited in Background) cost time in AIR's fused designs, two order dependences in prefill and one name dependence in decode, each found by reading the designs and confirmed by measurement
 % DECISION: the kinds are defined once, with their sources, in Background; the paper claims their analysis on this platform, never the classes. These instances were identified by reading the designs and confirmed by measurement, so the text never says that the analysis found them.
-% VALUE: the waits that leave a fused design's tiles idle are fixed in the order and buffers its compiler emits
-% SOURCE: the lowering preserves the program's order (mlir-air AIRRtToNpuPass.cpp; fused_prefill device.py preserve_shim_dma_order).
-AIR lowers its host program's issue order as written, so the waits that leave its fused designs' tiles idle are fixed in the compiled order and buffers.
-Reading those designs, we found three such waits that are false dependences, two order dependences in prefill and a name dependence in decode, and measured the cost of each.
+Reading AIR's fused designs, we found three waits that are false dependences, two order dependences in prefill and a name dependence in decode, and measured the cost of each.
 
-% VALUE: prefill across operators: one operator per dispatch, stage by stage, makes the column groups take turns, so attention on a chunk blocks later chunks' GEMMs that it does not feed; the runtime reports nothing per column and the lock-stall counters show that the cores wait, not when; reissued on the same columns, with attention's columns alternated, the operators reach the first token 1.76x sooner
+% VALUE: prefill across operators: one operator per dispatch, stage by stage, makes the column groups take turns, so attention on a chunk blocks later chunks' GEMMs that it does not feed; the occupancy a developer can compute from each operator's time alone still reads 92-97% busy, yet reissued on the same columns, with attention's columns alternated, the operators reach the first token 1.76x sooner
 % SOURCE: figs/data/fig1-intervals-1b.json drawn by figs/make_figs.py fig_timeline (amd-npu 60b8002a prefill-overlap/ml-timeline/fig1-2026-10-25); Llama-3.2-1B 4,096 tokens on S2. The ratio is from the same session's runs without timer records: 1908.3 / 1084.7 ms = 1.759 [1.750, 1.766], 5 kept (fig1-2026-10-25/run/1b-N/ab-4096.json; figs/paper_numbers.py FigOneGain).
-% DECISION: the runtime reports nothing per column, and lock-stall counters show that the cores wait, though not when (the 92-97% symptom decision is at 1-intro).
-% SOURCE: no occupancy counter: xrt-smi reports "Estimated Power : N/A" and has no telemetry report on this device (XRT 2.25.0, examined 2026-10-21) (vault lab-decode-long-context (39), lab-metric-fields (1)).
-% SOURCE: npu-gap hold 11:42-11:46 (amd-npu outputs 3031e9f8, HEAD ea56fcf8; vault lab-bound-validation, per-tile counters): LOCK_STALL / timer 0.815-0.831 on attention columns 0 and 7, 0.442-0.444 on GEMM columns 1-6; TRUE counts 0.9996-0.9999 of the core timer; logits identical over 24 runs; lock stalls include waits between commands and waits on true dependences. Shipped 1B prefill, in-tree S2.
+% DECISION: the symptom is "the occupancy a developer can compute reads 92-97% busy", never "invisible to every metric" (moved here from 1-intro with its sentence, 2026-10-27).
+% SOURCE: amd-npu e3acc8a prefill-e2/decomp.txt via figs/make_figs.py: busy = isolated time - dispatch floor = 92/95/97% of TTFT at 512/2k/4k (Llama-3.2-1B, S2); serial execution, the isolated busy times sum to at most TTFT (vault lab-prefill-device (4)).
 In prefill, the original program issues one operator per dispatch, stage by stage, so the column groups take turns and attention on one chunk blocks later chunks' GEMMs although it does not feed them.
-The runtime reports nothing per column, and the tiles' lock-stall counters show that the cores wait, though not when.
-Reissued on the same columns, with attention's columns also alternated as below, the same operators reduce TTFT by \FigOneGain$\times$ on Llama-3.2-1B's 4{,}096-token prompt (Figure~\ref{fig:timeline}; Section~\ref{subsec:ablation}).
+The one occupancy a developer can compute, from each operator's time when dispatched alone, reads 92--97\% busy on Llama-3.2-1B at 512, 2{,}048, and 4{,}096 tokens, yet the same operators, reissued on the same columns with attention's columns also alternated as below, reduce TTFT by \FigOneGain$\times$ at 4{,}096 tokens (Figure~\ref{fig:timeline}).
 
 % VALUE: inside attention: the shipped stream issues column 7's work only after column 0's synchronizations; alternating the columns' work by hand reduces attention's device-busy time to 0.67x with the same instructions, and each half alone takes the same time, so the CP's order causes the loss
 % SOURCE: decoded from the shipped a_32_4_0_0 stream, mid-stream synchronizations at ops 70, 75 (column 0) and 92, 97 (column 7); column 7's issue (ops 81-91) follows column 0's two mid-stream synchronizations (vault lab-prefill-overlap (4)).
@@ -59,25 +52,22 @@ In decode, attention's loop holds the keys, the values, and the scores passed be
 % SOURCE: 32 KiB per position / 1.156 us = 28.4 GB/s against a same-batch 8x2 read cap of 55.2 GB/s; the transfer alone 0.677 us, 88% of the cap (vault lab-decode-long-context (5), (7)).
 On Llama-3.2-1B that compute makes up 41\% of the time per position, so attention reads the KV cache at only half the DRAM read cap.
 
-\subsection{The Overlap Condition}
+\subsection{Overlap Condition}
 \label{subsec:question}
 
-% VALUE: the condition: removing a false dependence frees overlap, beyond what buffers on a shared route let through, only where the freed work uses core tiles and DMA channels the awaited work does not use (disjoint resources, which no rewrite can duplicate) and no true dependence, on the device or through a host step, separates the two; together the two clauses are the condition; it refines the classical critical-path rule for this NPU, since a removal on the critical path frees more than buffers on a shared route let through only where both clauses hold; both clauses are read from the artifacts and the host's accesses before any duration, whereas the critical-path rule needs durations, which then decide the rest
+% VALUE: the condition: removing a false dependence frees overlap, beyond what buffers on a shared route let through, only where the freed work uses core tiles and DMA channels the awaited work does not use (disjoint resources, which no rewrite can duplicate) and no true dependence, on the device or through a host step, separates the two; together the two clauses are the condition; both clauses are read from the artifacts and the host's accesses before any duration, whereas the critical-path rule needs durations, which then decide the rest
 % DECISION: the critical-path rule is classical and cited in Background; the paper's claim is the condition's platform terms (resources no rewrite can duplicate, the host as an agent) and its dependence on the partition and the prompt length, never "false dependences cost time".
 % SOURCE: the condition and its resource wording (vault paper-cosched-decisions-log, "The lead", "The legality control is a designed single-hazard rewrite; the condition's resource wording", 2026-10-24); the buffering carve-out (pass-0 aie-cosched de43b4d, model; 8d03ffe, passes/results/2026-10-26-buffering/README.md).
 Removing a dependence frees overlap, beyond what buffers on a shared route let through, only where the freed work uses core tiles and DMA channels the awaited work does not use.
 We call this clause \emph{disjoint resources}, because a rewrite can reorder issue or rename a buffer but cannot duplicate a core tile or a DMA channel.
 The second clause, \emph{no true dependence}, requires that no true dependence separates the two, on the device or through a host step.
 Together the two clauses form the \emph{condition}.
-When two operations share a DMA channel, the channel passes to the next operation once the first's last data is held in its consumer's buffers or the route's switches, so the consumer's remaining work, including its last output's drain, can overlap the next transfer.
-On a shared core tile, only such buffered transfers overlap.
-The condition refines the critical-path rule for this NPU, since removing a dependence on the critical path frees more than buffers on a shared route let through only where both clauses hold.
+When two operations share a DMA channel, the channel passes to the next operation once the first's last data is held in its consumer's buffers or the route's switches, so the consumer's remaining work can overlap the next transfer.
 Both clauses are read from the artifacts and the host's accesses before any duration is measured, whereas the critical-path rule needs durations, which then decide the rest through OPCORD's bound and event model (Section~\ref{sec:method}).
 
-% VALUE: the partition decides where the condition holds: consecutive operators of a modular design share core tiles and DMA channels and fail disjoint resources; attention run once over the whole prompt makes every turn with the GEMMs a true dependence; AIR's chunked one-operator dispatches meet both clauses, so regrouping them into shared dispatches recovers their overlap, and decode's single buffers leave name dependences that meet both clauses
+% VALUE: the partition decides where the condition holds: consecutive operators of a modular design share core tiles and DMA channels and fail disjoint resources; AIR's chunked one-operator dispatches meet both clauses, so regrouping them into shared dispatches recovers their overlap, and decode's single buffers leave name dependences that meet both clauses
 How a design partitions its work therefore decides where the condition can hold.
 Consecutive operators of a modular design share core tiles and DMA channels, so they fail disjoint resources.
-A fused design that runs each layer's attention once over the whole prompt makes every turn between attention and the GEMMs a true dependence.
 AIR's prefill instead keeps one configuration and partitions its work into one-operator dispatches over chunks.
 An earlier chunk's attention and a later chunk's GEMMs then meet both clauses, so regrouping those dispatches into shared ones can recover their overlap.
 AIR's decode keeps one buffer per loop role, which leaves name dependences that meet both clauses too.
@@ -86,4 +76,4 @@ AIR's decode keeps one buffer per loop role, which leaves name dependences that 
 The prompt length then decides what the freed overlap is worth.
 Attention on a later chunk reads more of the context, whereas a GEMM's work per chunk is fixed, so the balance between the two groups moves with the length, and with it whether overlap outweighs the host post-processing a new order exposes.
 % SOURCE: the four-column split's GEMMs are 27% (1B) and 35% (Qwen3-4B) slower than on six columns (vault lab-split-sweep (4)-(5)).
-Columns given to attention are taken from the GEMMs, so the configuration that minimizes TTFT shifts as the prompt grows and can differ between orders (Section~\ref{subsec:shape-eval}).
+Columns given to attention are taken from the GEMMs, so the configuration that minimizes TTFT shifts as the prompt grows and can differ between orders (Section~\ref{subsec:e2e}).
