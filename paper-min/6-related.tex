@@ -15,8 +15,8 @@
 \textbf{Operator Scheduling and Concurrency.}
 IOS and Nimble run independent operators concurrently on GPU streams~\citep{ding2021ios,kwon2020nimble}, and IOS fits a schedule to each batch size by measuring candidate stages on the device.
 Rammer fixes a spatio-temporal schedule of a DNN's operators at compile time~\citep{ma2020rammer}, and other systems order or overlap operators within or across devices~\citep{barham2022pathways,pan2026dynaflow,jax-pgle,zhu2025nanoflow,gandhi2026dataflow} or across an SoC's processors~\citep{jun2026heteromosaic,wei2025agentxpu}.
-LATTICE reorders NPU command graphs taken from traces~\citep{liu2026lattice}, taking the graph's dependences as given.
-On mobile NPUs, llm.npu runs prefill as fixed-size chunks on pre-built graphs and, at run time, issues the chunks' subgraphs to the CPU/GPU and NPU out of chunk order, picking each from profiled times, with each processor running one subgraph at a time~\citep{xu2025llmnpu}.
+LATTICE reorders NPU command graphs from traces~\citep{liu2026lattice}, taking their dependences as given.
+On mobile NPUs, llm.npu runs prefill as fixed-size chunks on pre-built graphs and, at run time, issues the chunks' subgraphs to the CPU/GPU and NPU out of chunk order by profiled times, each processor running one subgraph at a time~\citep{xu2025llmnpu}.
 Unlike these systems, which construct a schedule from a program or a traced graph, OPCORD starts from the one that the CP's order in compiled binaries already fixes, closed ones included, and derives there the dependences that keep operators on disjoint column groups of one array from running at once.
 In open designs, it chooses that order with the configuration per prompt length, without running each candidate.
 
@@ -38,7 +38,7 @@ XDNA~2 sits between the two ends, since its program fixes the order of each engi
 \textbf{NPU and AI Engine Compilers.}
 AIR and IRON compile operators and fused multi-operator designs onto the AIE array~\citep{wang2026mlirair,hunhoff2025iron}, and Stream, compilation flows and programming models automate the mapping of layer-fused and dataflow designs~\citep{symons2025stream,zhuang2025aries,danopoulos2025aie4ml,chen2024allo,fang2025dato}.
 On XDNA NPUs, a FlashAttention case study compares expert-chosen mappings, up to a fused AIR kernel~\citep{wang2026flashattention}.
-AscendNPU-IR places a kernel's synchronizations as it lowers, so that the fewest hardware events are used~\citep{ascend-autosync}.
+AscendNPU-IR places a kernel's synchronizations as it lowers, to use the fewest hardware events~\citep{ascend-autosync}.
 These tools generate a design from a program, whereas OPCORD takes designs as their stack compiles them, reading and bounding closed ones and, in open ones, removing the false dependences that the condition of Section~\ref{subsec:question} says can free overlap, rather than placing the fewest synchronizations.
 
 % VALUE: post-compilation analysis and rewriting is established on CPUs and GPUs, over one processor's stream, or recovers a closed driver's command stream to attribute runtime behavior; OPCORD analyzes and rewrites the streams that coordinate several kinds of engines and decides legality from every agent's accesses
