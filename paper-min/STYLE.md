@@ -1,1 +1,0 @@
-../paper/STYLE.md
