@@ -169,7 +169,7 @@ It submits to the design's own hardware context, so OPCORD changes no kernel, dr
 % VALUE: OPCORD's costs are paid once per prompt length, LLM, and split, outside the measured call except a small binding step every TTFT includes; probing is once per LLM and split; the tie-break measurement is once per prompt length
 OPCORD chooses the order and configuration once per LLM and number of 128-token chunks, because the event model prices a prompt by its chunks.
 It composes the dispatches once per prompt length, because the last chunk's attention carries its token count, so later prompts reuse its work.
-Reusing one choice across a power-of-two range of lengths instead would lose up to 10\% where the best configuration changes within the range.
+Reusing one choice across a power-of-two range of lengths instead would lose up to 10\% where the configuration that minimizes TTFT changes within the range.
 % SOURCE: N1 (amd-npu ab/results/n1-2026-10-25, n1_reuse.py on the frozen dev form): predict() prices ceil(N/128) chunks, only the head term depends on N, and 129 / 256 get one pick on all five LLMs; plan files carry the last chunk's token count (load_plan to assert N, npu-gap); choose() 0.01-1.2 s up to 16K and 3-10 s at 32,768, plan 1.14 s and compose 0.10 s (medians over 71 plan files); bucket reuse regret by the model: 0.00% at 129 <- 256, at most 0.28% at 2049 <- 4096 except LFM2-1.2B 2.44%, and at 16385 <- 32768 at most 0.86% except LFM2-1.2B 10.04% (S2 against S4).
 Composing a length's dispatches takes 56--368\,ms and planning it up to 10\,s at 32K tokens, and settling a near-tie by measurement would take up to 4.6 minutes.
 By contrast, probing each operator alone costs 9--39\,s once per LLM and configuration.

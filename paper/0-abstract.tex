@@ -7,7 +7,7 @@ We identify that, because a single in-order command processor issues all of the 
 The recoverable time depends on the design's partitioning and the prompt length, both of which can be analyzed from the compiled design prior to any measurement.
 We present OPCORD, a system that analyzes compiled NPU programs, including closed-source binaries, as dependence graphs and bounds the cost of each false dependence.
 OPCORD reorders instructions and renames buffers under checkers that reject any rewrite they cannot prove legal, and it selects the instruction order and array configuration for each prompt length using an event model of the device and host.
-Across five LLMs, OPCORD reduces the time to first token (TTFT) by \PrefillGainLo--\PrefillGainHi$\times$ for prompts of 1K to 32K tokens, relative to each design's original program on its fastest measured configuration.
+Across five LLMs, OPCORD reduces the time to first token (TTFT) by \PrefillGainLo--\PrefillGainHi$\times$ for prompts of 1K to 32K tokens, relative to each design's original program on the measured configuration that minimizes its TTFT.
 It reduces the decode time per token by \DecodeGainLo--\DecodeGainHi$\times$ at contexts of approximately 30K tokens, with bit-identical outputs in both phases.
 Applied to open-source designs, OPCORD also achieves a lower TTFT than the current release of a closed production engine for every LLM and prompt length in the comparison, and our analysis explains why that engine's own designs offer little recoverable overlap.
 
