@@ -31,7 +31,7 @@ We call the columns that one operator occupies its \emph{column group}.
 \textbf{Command Processor.}
 The host drives the array through \emph{dispatches}, and each is a command buffer whose \emph{instruction stream} the NPU's CP executes in order (Figure~\ref{fig:arch}).
 An \emph{issue} pushes a BD into a shim DMA channel's task queue and returns at once, whereas a \emph{synchronization} blocks the CP until a named transfer completes.
-A synchronization on one column therefore delays every later issue, whichever column it targets, and no hardware or runtime scheduler on XDNA~2 reorders work across engines.
+A synchronization on one column therefore delays every later issue, whichever column it targets, and no hardware or runtime scheduler on XDNA~2 reorders work across engines (Section~\ref{subsec:semantics}).
 
 % VALUE: the host side: dispatches go through XRT and the driver to a hardware context, which holds one configuration and has one CP that runs them in submission order; each dispatch costs a fixed floor F, partly hidden by queuing
 % SOURCE: XRT empty dispatch (4 KB bypass), 93.0-98.5 us at every bracket of lab-prefill-device (3); 92-99 us in lab-prefill-overlap (3).

@@ -36,15 +36,13 @@ Concurrency thus comes only from one dispatch that issues several groups' work b
 AIR lowers its host program's issue order as written, so the waits that leave its fused designs' tiles idle are fixed in the compiled order and buffers.
 Reading those designs, we found three such waits that are false dependences, two order dependences in prefill and a name dependence in decode, and measured the cost of each.
 
-% VALUE: prefill across operators: one operator per dispatch, stage by stage, makes the column groups take turns, so attention on a chunk blocks later chunks' GEMMs that it does not feed; the runtime reports nothing per column and the lock-stall counters show that the cores wait, not when; the occupancy a developer can compute reads 92-97% busy; reissued on the same columns, with attention's columns alternated, the operators reach the first token 1.76x sooner
-% SOURCE: amd-npu e3acc8a prefill-e2/decomp.txt via figs/make_figs.py: busy = isolated time - dispatch floor = 92/95/97% of TTFT at 512/2k/4k (Llama-3.2-1B, S2); serial execution, the isolated busy times sum to at most TTFT (vault lab-prefill-device (4)).
+% VALUE: prefill across operators: one operator per dispatch, stage by stage, makes the column groups take turns, so attention on a chunk blocks later chunks' GEMMs that it does not feed; the runtime reports nothing per column and the lock-stall counters show that the cores wait, not when; reissued on the same columns, with attention's columns alternated, the operators reach the first token 1.76x sooner
 % SOURCE: figs/data/fig1-intervals-1b.json drawn by figs/make_figs.py fig_timeline (amd-npu 60b8002a prefill-overlap/ml-timeline/fig1-2026-10-25); Llama-3.2-1B 4,096 tokens on S2. The ratio is from the same session's runs without timer records: 1908.3 / 1084.7 ms = 1.759 [1.750, 1.766], 5 kept (fig1-2026-10-25/run/1b-N/ab-4096.json; figs/paper_numbers.py FigOneGain).
-% DECISION: the symptom is "the measure a developer can compute reads 92-97% busy", never "invisible to every metric"; the runtime reports nothing per column, and lock-stall counters show that the cores wait, though not when.
+% DECISION: the runtime reports nothing per column, and lock-stall counters show that the cores wait, though not when (the 92-97% symptom decision is at 1-intro).
 % SOURCE: no occupancy counter: xrt-smi reports "Estimated Power : N/A" and has no telemetry report on this device (XRT 2.25.0, examined 2026-10-21) (vault lab-decode-long-context (39), lab-metric-fields (1)).
 % SOURCE: npu-gap hold 11:42-11:46 (amd-npu outputs 3031e9f8, HEAD ea56fcf8; vault lab-bound-validation, per-tile counters): LOCK_STALL / timer 0.815-0.831 on attention columns 0 and 7, 0.442-0.444 on GEMM columns 1-6; TRUE counts 0.9996-0.9999 of the core timer; logits identical over 24 runs; lock stalls include waits between commands and waits on true dependences. Shipped 1B prefill, in-tree S2.
 In prefill, the original program issues one operator per dispatch, stage by stage, so the column groups take turns and attention on one chunk blocks later chunks' GEMMs although it does not feed them.
 The runtime reports nothing per column, and the tiles' lock-stall counters show that the cores wait, though not when.
-The one occupancy a developer can compute, which sums each operator's time when dispatched alone less the dispatch floor, reads 92--97\% of TTFT on Llama-3.2-1B at 512, 2{,}048, and 4{,}096 tokens, although each column group idles while the other runs.
 Reissued on the same columns, with attention's columns also alternated as below, the same operators reduce TTFT by \FigOneGain$\times$ on Llama-3.2-1B's 4{,}096-token prompt (Figure~\ref{fig:timeline}; Section~\ref{subsec:ablation}).
 
 % VALUE: inside attention: the shipped stream issues column 7's work only after column 0's synchronizations; alternating the columns' work by hand reduces attention's device-busy time to 0.67x with the same instructions, and each half alone takes the same time, so the CP's order causes the loss
@@ -71,6 +69,8 @@ Removing a dependence frees overlap, beyond what buffers on a shared route let t
 We call this clause \emph{disjoint resources}, because a rewrite can reorder issue or rename a buffer but cannot duplicate a core tile or a DMA channel.
 The second clause, \emph{no true dependence}, requires that no true dependence separates the two, on the device or through a host step.
 Together the two clauses form the \emph{condition}.
+When two operations share a DMA channel, the channel passes to the next operation once the first's last data is held in its consumer's buffers or the route's switches, so the consumer's remaining work, including its last output's drain, can overlap the next transfer.
+On a shared core tile, only such buffered transfers overlap.
 The condition refines the critical-path rule for this NPU, since removing a dependence on the critical path frees more than buffers on a shared route let through only where both clauses hold.
 Both clauses are read from the artifacts and the host's accesses before any duration is measured, whereas the critical-path rule needs durations, which then decide the rest through OPCORD's bound and event model (Section~\ref{sec:method}).
 
@@ -80,7 +80,7 @@ Consecutive operators of a modular design share core tiles and DMA channels, so 
 A fused design that runs each layer's attention once over the whole prompt makes every turn between attention and the GEMMs a true dependence.
 AIR's prefill instead keeps one configuration and partitions its work into one-operator dispatches over chunks.
 An earlier chunk's attention and a later chunk's GEMMs then meet both clauses, so regrouping those dispatches into shared ones can recover their overlap.
-AIR's decode keeps one buffer per loop role, which leaves name dependences that meet both clauses too (Table~\ref{tab:census}).
+AIR's decode keeps one buffer per loop role, which leaves name dependences that meet both clauses too.
 
 % VALUE: the prompt length decides what the freed overlap is worth: attention's work per chunk grows with position while the GEMMs' stays fixed, so the balance between the groups, and whether overlap outweighs the host post-processing a new order exposes, moves with length; columns given to attention are taken from the GEMMs, so the configuration that minimizes TTFT moves too and can differ between orders
 The prompt length then decides what the freed overlap is worth.

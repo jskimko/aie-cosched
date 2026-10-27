@@ -3,6 +3,7 @@
 
 Outputs (into this directory):
   choice-a.pdf   panel (a) of figs/make_figs.py fig_choice alone: the event model's error per development cell
+  choice-len.pdf the composed order's speedup against the prompt length per development cell, measured and predicted
 
 Run with the figure venv: aie-cosched/.venv/bin/python make_figmin.py [path to aie-cosched/figs]
 """
@@ -44,5 +45,46 @@ def fig_choice_a():
     plt.close(fig)
 
 
+@m.type_scale(m.CHOICE_SCALE)
+def fig_choice_len():
+    """The composed order's speedup over the original against the prompt length on the development cells of
+    data/accuracy-cells.json, measured (marker, filled on S2) and as the event model predicts (violet dash, measured
+    times its 'dev' = predicted / measured), at choice-a.pdf's size. Each LLM is offset slightly in length so that the
+    five stay apart."""
+    rows = json.loads((m.DATA / "accuracy-cells.json").read_text())
+    fig, a = plt.subplots(figsize=(m.COLUMN, 1.316))
+    offsets = dict(zip(m.KEY_LLM, (-0.24, -0.12, 0.0, 0.12, 0.24)))  # octaves
+    handles = []
+    for key, llm in m.KEY_LLM.items():
+        rs = sorted((r for r in rows if r["model"].startswith(key)), key=lambda r: r["N"])
+        marker, _, _ = m.DECODE_STYLE[llm]
+        xs = [r["N"] * 2 ** offsets[key] for r in rs]
+        meas = [r["measured"] for r in rs]
+        pred = [r["measured"] * r["dev"] for r in rs]
+        a.vlines(xs, meas, pred, color=m.OURS, linewidth=0.5, zorder=2)
+        a.plot(xs, pred, linestyle="none", marker="_", markersize=3.2, markeredgewidth=0.8, color=m.OURS, zorder=3)
+        for x, y, r in zip(xs, meas, rs):
+            a.plot([x], [y], linestyle="none", marker=marker, markersize=2.6, color=m.INK, markeredgewidth=0.5,
+                   markerfacecolor=m.INK if r["split"] == "S2" else "white", zorder=4)
+        handles.append(plt.Line2D([], [], linestyle="none", marker=marker, markersize=2.6, color=m.INK,
+                                  markeredgewidth=0.5, markerfacecolor=m.INK, label=llm))
+    handles.append(plt.Line2D([], [], linestyle="none", marker="_", markersize=3.2, markeredgewidth=0.8,
+                              color=m.OURS, label="Predicted"))
+    a.axhline(1, color="black", linewidth=0.5, zorder=1)
+    a.set_xscale("log", base=2)
+    a.set_xticks([128, 512, 2048, 8192, 32768], ["128", "512", "2K", "8K", "32K"])
+    a.minorticks_off()
+    a.set_xlim(128 * 2 ** -0.6, 32768 * 2 ** 0.6)
+    a.set_ylim(0.85, 2.25)
+    a.set_yticks([1.0, 1.5, 2.0], ["1.0", "1.5", "2.0"])
+    a.set_xlabel("Prompt length (tokens)", labelpad=1)
+    a.set_ylabel(r"Speedup ($\times$)", labelpad=1)
+    a.legend(handles=handles, loc="upper left", ncol=2, handletextpad=0.1, columnspacing=0.5, labelspacing=0.15,
+             borderaxespad=0.2)
+    m.save(fig, "choice-len.pdf")
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     fig_choice_a()
+    fig_choice_len()
