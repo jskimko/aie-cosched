@@ -88,4 +88,5 @@ AIR's decode keeps one buffer per loop role, which leaves name dependences that 
 % VALUE: the prompt length decides what the freed overlap is worth: attention's work per chunk grows with position while the GEMMs' stays fixed, so the balance between the groups, and whether overlap outweighs the host post-processing a new order exposes, moves with length; columns given to attention are taken from the GEMMs, so the configuration that minimizes TTFT moves too and can differ between orders
 The prompt length then decides what the freed overlap is worth.
 Attention on a later chunk reads more of the context, whereas a GEMM's work per chunk is fixed, so the balance between the two groups moves with the length, and with it whether overlap outweighs the host post-processing that a new order exposes.
+% SOURCE: the four-column split's GEMMs are 27% (1B) and 35% (Qwen3-4B) slower than on six columns (vault lab-split-sweep (4)-(5)).
 Columns given to attention are taken from the GEMMs, so the configuration that minimizes TTFT shifts as the prompt grows and need not be the same for every order (Section~\ref{subsec:shape-eval}).
