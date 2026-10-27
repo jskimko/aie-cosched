@@ -53,7 +53,7 @@ Reissued on the same columns, with attention's columns also alternated as below,
 % SOURCE: decoded from the shipped a_32_4_0_0 stream, mid-stream synchronizations at ops 70, 75 (column 0) and 92, 97 (column 7); column 7's issue (ops 81-91) follows column 0's two mid-stream synchronizations (vault lab-prefill-overlap (4)).
 % SOURCE: (alternated - F) / (original - F) = 0.666-0.668 on 7 pairs, chunks 2-14 at 2,048 tokens; column 7 alone / column 0 alone = 0.994-1.010 (amd-npu 17f7ec3 ovl4/, vault lab-prefill-overlap (5)c).
 Inside attention, column~7 waits behind column~0's synchronizations, because the shipped attention stream issues column~7's work only after them (Figure~\ref{fig:rewrites}b).
-Alternating the two columns' work by hand, so that both start before the CP waits on either, reduces attention's device-busy time to $0.67\times$ at each of seven chunks of a 2{,}048-token prompt, with the same instructions.
+Alternating the two columns' work by hand, so that both start before the CP waits on either, reduces attention's device-busy time to $0.67\times$ in each of seven pairs, at five chunks of a 2{,}048-token prompt, with the same instructions.
 Each column's half alone takes the same time, so the loss comes from the CP's order rather than an imbalance of work.
 
 % VALUE: decode attention: keys, values and scores in one buffer each, so each block's transfer waits for the previous block's compute, 41% of the time per position
