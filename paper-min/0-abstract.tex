@@ -3,7 +3,7 @@
 % DECISION: the abstract names the platform once, in its first sentence, and no toolchain, stack, or benchmark label; the baseline in plain words ("each design's original program on the configuration that minimizes its TTFT", the body's original program on the supported split that minimizes its TTFT; decode against the unmodified design); the closed engine is its current release, a snapshot; the opening is worded apart from the authors' FPGA'27 abstract (author, 2026-10-25).
 % DECISION: each result claim maps to one evaluation subsection. Sentences 1-3 (the setting, the problem, the insight) are the cause the method answers and are shown in Section sec:motivation (subsec:semantics, subsec:losses, Figure fig:timeline), not in the evaluation.
 %   sentence 4 (the cut and the prompt length set what a rewrite can recover, as a condition checkable from the compiled design predicts) -> subsec:pays (Scope of the Condition: the share read from the artifacts) and subsec:decision (Choice of Order and Configuration: the shape that durations decide);
-%   sentence 5, analyzes compiled programs, closed ones included, as dependence graphs and bounds each false dependence -> subsec:census (Exactness of the Analysis and the Bound);
+%   sentence 5, analyzes compiled programs, closed ones included, as dependence graphs and bounds each false dependence -> subsec:census (Analysis and Bound Exactness);
 %   sentence 5, checkers that reject any rewrite they cannot show legal -> subsec:legality-eval (Legality of the Rewrites);
 %   sentence 5, selects the order and the configuration per prompt length with an event model -> subsec:decision (Choice of Order and Configuration);
 %   sentence 6 (TTFT, decode, bit-identical outputs) -> subsec:e2e (End-to-End Speedup);

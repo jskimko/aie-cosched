@@ -62,7 +62,7 @@ Each column's half alone takes the same time, so the loss comes from the CP's or
 In decode, attention's loop holds the keys, the values, and the scores passed between its two cores in one buffer each, so a block's transfer must wait until the compute on the previous block releases the buffer (Figure~\ref{fig:rewrites}c).
 On Llama-3.2-1B that compute makes up 41\% of the time per position.
 
-\subsection{The Condition}
+\subsection{The Overlap Condition}
 \label{subsec:question}
 
 % VALUE: the condition: removing a false dependence frees overlap, beyond what buffers on a shared route let through, only where the freed work uses core tiles and DMA channels the awaited work does not use (disjoint resources, which no rewrite can duplicate) and no true dependence, on the device or through a host step, separates the two; together the two clauses are the condition; it refines the classical critical-path rule for this NPU, since a removal on the critical path frees more than buffers on a shared route let through only where both clauses hold; both clauses are read from the artifacts and the host's accesses before any duration, whereas the critical-path rule needs durations, which then decide the rest

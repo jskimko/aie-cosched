@@ -25,7 +25,7 @@ The analysis, the bound, the legality conditions, and the stream pass with its c
 Their loop forms and the loop pass need the lowered design.
 The composer, the probes, the event model, and the runtime are built for a fused prefill that pairs attention with GEMMs, the composer and the runtime also need an open host program, and the choice of configuration ranges only over the splits that the design's stack builds.
 
-\subsection{Reading Compiled Designs}
+\subsection{Dependence Analysis}
 \label{sec:order}
 \label{subsec:reading}
 \label{subsec:model}
@@ -60,7 +60,7 @@ The analysis labels each edge by the pairs of operations that the edge alone ord
 An edge is a true dependence if, in one of these pairs, the later operation reads a location that the earlier one writes, otherwise a name dependence if, in one of them, either operation writes a location that the other reads or writes, and otherwise an order dependence.
 The same graph decides both clauses of the condition of Section~\ref{subsec:question}, since its agents and locations show whether two operations share a core tile or a DMA channel, and its true edges, including those through the host's steps, show whether one consumes the other's results.
 
-\subsection{Bounding a Removal}
+\subsection{Recovery Bound}
 \label{subsec:removal}
 
 % VALUE: the bound per false dependence: T/(T - O(d)) over typed resources (column groups, the CP with its per-dispatch cost, the DRAM read rate up to its cap, DMA channels one group shares with another); T the longest path, or the maximum cycle mean in a loop (cited); O(d) zero off every longest path and critical cycle, so the critical-path test discards sets that leave one uncut (cited for paths); the condition in the bound (1.000x where no true dependence fails; what buffers on the shared route let through where only disjoint resources fails) with the channel's hand-over; Amdahl's law for an ordering (cited), durations from the probes on AIR and timed dispatches elsewhere
@@ -115,7 +115,7 @@ The stream pass's checker tests every pair of instructions that a proposed order
 The composer checks the whole-operator condition on every dispatch it forms, and the loop pass refuses any buffer that it cannot show renamable and re-checks the renamed buffers and the carried state on its output.
 Unlike a hand edit, the composer and the passes check every design they rewrite, including designs nobody has read.
 
-\subsection{Reordering and Renaming}
+\subsection{Order and Buffer Rewrites}
 \label{subsec:order}
 \label{subsec:compose}
 
@@ -150,7 +150,7 @@ It emits the hand alternation of Section~\ref{subsec:losses} byte for byte, and 
 Our \emph{loop pass} removes the name dependence of decode attention's single buffers (Section~\ref{subsec:losses}) by renaming each into a two-slot \emph{ring}, so transfer and compute pipeline (Figure~\ref{fig:rewrites}c).
 It leaves in place the running maximum and the accumulator, which alone carry data from block to block, whereas AIR's double buffering declines the whole loop because of that carried state.
 
-\subsection{Pricing and Choosing}
+\subsection{Event Model and Choice}
 \label{subsec:pricing}
 \label{subsec:split}
 \label{subsec:formulation}
