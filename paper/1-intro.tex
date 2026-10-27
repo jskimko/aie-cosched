@@ -39,7 +39,7 @@ Unlike GPUs, whose hardware queues removed this kind of wait (Section~\ref{sec:r
 % DECISION: false dependences, their classes, reordering and renaming are textbook and cited; the claim is the condition on this platform and its dependence on the cut and the shape, never "false dependences cost time".
 The waits above are textbook order dependences, and decode attention's loop, which keeps one buffer per role, adds textbook name dependences~\citep{bernstein1966analysis,kuck1981dependence}.
 Both kinds are false dependences (Section~\ref{subsec:losses}), and removing one can save time only if it lies on the critical path~\citep{fields2003interaction}.
-What this platform adds is when removing one frees overlap, which happens only where two clauses hold.
+What this platform adds is when removing one frees overlap beyond what buffers on a shared route let through, which happens only where two clauses hold.
 The first is that the work it frees runs on core tiles and DMA channels that the work it waited on does not use, which are resources a rewrite cannot duplicate.
 The second is that no true dependence, on the device or through the host, lies between the two.
 Both clauses name resources and dependences that the artifacts and the host's accesses establish, so they can be decided before any duration is measured.
@@ -50,7 +50,7 @@ Its flash designs run each layer's attention once over the whole prompt, so ever
 
 % VALUE: why the order must be priced per prompt length: the original program's chunks make the balance between the groups move with the prompt, and the split moves with it
 The original program, by contrast, runs fixed-size chunks, in which attention's work grows with the chunk's position while the GEMMs' work stays fixed.
-The balance between the groups, and with it whether the overlap repays a new order's per-dispatch costs, therefore shifts with the prompt.
+The balance between the groups, and with it whether the overlap outweighs the host post-processing that a new order exposes, therefore shifts with the prompt.
 The order and the configuration, namely the split of the columns between attention and the GEMMs, must therefore be priced per length (Section~\ref{subsec:question}).
 
 % VALUE: (4) this work: OPCORD, one sentence per part with what it is and why: the analysis reads compiled artifacts across every agent and decides legality from them; the event model, analytical in form with microbenchmark constants, prices orders and splits per prompt length, and a bound limits what each false dependence can gain; the composer, the stream pass and the loop pass remove the false dependences the price clears, under checkers; headline results against the original program on the supported split that minimizes its TTFT, and the event model's choice quality
@@ -70,7 +70,7 @@ Against the original program on the measured supported configuration that minimi
 Against the unmodified decode design, its loop pass shortens decode by \DecodeGainLo--\DecodeGainHi$\times$ at contexts of about 30K tokens, again with bit-identical outputs.
 On AIR's designs, OPCORD also reaches the first token sooner than FLM's current release, on every LLM and prompt length we compare.
 Its choice of order and configuration stays within \ChoiceOpcordMax\% of the measured minimum on every LLM and prompt length it prices, whereas each fixed rule we test loses \ChoiceAlwaysMax--\ChoiceFourSTwoMax\% on some of them.
-Its analysis re-emits every stream we read from three stacks byte for byte, and its checkers refuse every illegal rewrite we inject.
+Its analysis re-emits every stream we read from three stacks byte for byte, and its stream pass's checker refuses every illegal rewrite we inject.
 Across the designs we read, every overlap gain we measure falls where the condition says one can arise, and FLM's two prefill engines leave little overlap to recover, as the condition predicts.
 % DECISION: the census's counts are stated once, in Section 6.6, as distinct designs read (author, 2026-10-25: accurate, and not repeated everywhere).
 
