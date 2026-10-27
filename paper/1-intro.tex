@@ -37,8 +37,8 @@ Unlike GPUs, whose hardware queues removed this kind of wait (Section~\ref{sec:r
 
 % VALUE: (3) the insight and the characterization: the CP's order is the array's schedule, fixed in the artifact, so every wait can be read from it; the waits are false dependences (sourced) and removing those on the critical path is the textbook remedy (cited); what this platform adds is when removal pays (overlap on resources a rewrite cannot duplicate, with no true dependence, including through the host) and that the design's cut and the prompt length set how much, so the order that pays changes with length and must be priced
 % DECISION: false dependences, their two kinds, reordering and renaming are sourced and cited (Tomasulo for the name kind; NVIDIA's Kepler whitepaper for the order kind; see 3-motivation's DECISION); the claim is the condition on this platform and its dependence on the cut and the shape, never "false dependences cost time".
-The waits above are order dependences, which the issue order alone places between independent work~\citep{nvidia-kepler-gk110}, and decode attention's loop, which keeps one buffer per role, adds name dependences~\citep{tomasulo1967}.
-Both kinds are false dependences (Section~\ref{subsec:losses}), and removing one can save time only if it lies on the critical path~\citep{fields2003interaction}.
+The waits above are order dependences, and decode attention's loop, which keeps one buffer per role, adds name dependences (Section~\ref{sec:background}).
+Both kinds are false dependences (Section~\ref{subsec:losses}), and removing one can save time only if it lies on the critical path~\citep{kelley1961critical}.
 What this platform adds is when removing one frees overlap beyond what buffers on a shared route let through, which happens only where two clauses hold.
 The first is that the work it frees runs on core tiles and DMA channels that the work it waited on does not use, which are resources a rewrite cannot duplicate.
 The second is that no true dependence, on the device or through the host, lies between the two.

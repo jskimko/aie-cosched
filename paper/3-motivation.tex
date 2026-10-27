@@ -33,9 +33,8 @@ The serial execution of the original program is thus a property of how its dispa
 \label{subsec:losses}
 
 % VALUE: in the fused LLM designs we study, the waits recur at three places, each a false dependence (cited): an order dependence where the instruction order puts a wait data does not require, a name dependence where work shares storage it need not share
-At three places in the fused LLM designs we study, work waits on other work whose results it does not consume, which is a \emph{false dependence}.
-It is an \emph{order} dependence where the issue order alone places the wait between independent work, which reordering removes, as on GPUs whose streams once shared one hardware work queue~\citep{nvidia-kepler-gk110}, or a \emph{name} dependence where two uses share storage they need not share and one writes it after the other reads or writes it, which renaming removes~\citep{tomasulo1967}.
-% DECISION: the two kinds are sourced, not textbook classes (checked against the PDFs, 2026-10-26, tmp/r1/minimal3/verify-citations-pdf.md): the name kind and renaming are Tomasulo's (p. 29, same sink, "in fact, independent", doubling); the order kind is NVIDIA's single-work-queue false dependence (Kepler GK110 whitepaper, "false intra-stream dependencies", "tailor the launch order"); Bernstein and Kuck name no order class; the paper claims their analysis on this platform, never the classes. Section 4 classes each wait formally.
+At three places in the fused LLM designs we study, work waits on other work whose results it does not consume: two order dependences in prefill and a name dependence in decode.
+% DECISION: the kinds are defined once, with their sources, at the end of Section~\ref{sec:background}'s background (author, 2026-10-26); the paper claims their analysis on this platform, never the classes. Section 4 classes each wait formally.
 
 \textbf{Column Groups in Prefill.}
 % VALUE: one operator per dispatch and no overlap across dispatches make the prefill's column groups take turns, an order dependence in the CP's stream between operators; the array idles while the device reads busy: the computable occupancy reads 92-97% of TTFT and counts neither idle group; attention's share grows 12% -> 49%; the counters show the cores waiting
@@ -82,7 +81,7 @@ Removing a false dependence frees overlap, beyond what buffers on a shared route
 These are resources a rewrite cannot duplicate, because every engine runs its own work in order, and a buffer can be renamed into several slots whereas a core tile or a DMA channel cannot.
 It also frees overlap only where \emph{no true dependence}, on the device or through a host step that reads one dispatch's output before it issues the next, separates the two pieces of work.
 We call these two checkable clauses together the \emph{condition}.
-They refine the rule that removing a false dependence gains time only on the critical path~\citep{fields2003interaction}, since on this platform removing one shortens that path by more than what buffers on a shared route let through only when both hold.
+They refine the rule that removing a false dependence gains time only on the critical path~\citep{kelley1961critical}, since on this platform removing one shortens that path by more than what buffers on a shared route let through only when both hold.
 Both clauses name resources and dependences that the analysis reads from the artifacts and the host's accesses (Section~\ref{sec:order}).
 The condition therefore screens out, before any duration is measured, the false dependences that can free no overlap beyond what such buffers let through, whereas the critical-path rule needs durations to say which do.
 Durations decide the rest: how much each remaining false dependence frees, whether that exceeds its cost, and what a rewrite saves beyond overlap, such as a dispatch.

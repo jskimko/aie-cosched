@@ -90,3 +90,9 @@ Between dispatches, its CPU computes the normalizations, rotary embedding, and r
 % VALUE: decode is a separate design that generates one token per step and whose attention reads the KV cache of the whole context
 \emph{Decode} generates one token per step with a separate design, namely AIR's fused decode, in which every layer's attention reads the KV cache of the whole context.
 % DECISION: appends to a cached context and agent turns are an extension under spine v18 and are not described in the body; their text is archived in the vault (archive-tex-2026-10-24).
+
+\textbf{False Dependences.}
+% VALUE: the two kinds of wait the paper removes, defined once, here, with their sources; everywhere else uses the terms
+% DECISION: author, 2026-10-26: define the kinds once in Background, "classical" never "textbook"; Kuck names anti and output (p. 208) but no order class, Bernstein names none (PDFs checked, tmp/r1/minimal3/verify-citations-pdf.md); renaming is Tomasulo's (p. 29, doubling); the order kind is NVIDIA's single-work-queue false dependence (Kepler GK110 whitepaper: "false intra-stream dependencies", "tailor the launch order")
+Work that waits on other work whose results it does not consume has a \emph{false dependence}.
+It is either a classical anti or output dependence~\citep{kuck1981dependence}, which we call a \emph{name} dependence because renaming removes it~\citep{tomasulo1967}, or an ordering that the issue order alone places between independent work, like those on a GPU with a single hardware work queue~\citep{nvidia-kepler-gk110}, which we call an \emph{order} dependence and which reordering removes.
