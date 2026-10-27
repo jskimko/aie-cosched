@@ -1,3 +1,5 @@
+% The minimal paper, written from scratch in step 5 from tmp/r1/minimal3 (step1-core, step2-evidence, steps 3-4).
+% Shares the draft's macros (fig/numbers.tex), figures, bibliography and style through symlinks to ../paper.
 %%%%%%%% mlsys 2025 EXAMPLE LATEX SUBMISSION FILE %%%%%%%%%%%%%%%%%
 % DECISION: MLSys'27 research track (author, 2026-10-15): the MLSys 2025 style files, which the MLSys 2027 call names; two columns, at most 10 pages before the references; double-blind.
 %% Template: mlsys2025.sty and mlsys2025.bst copied unchanged from media.mlsys.org/Conferences/MLSYS2025/mlsys2025style.zip (sha256 04e77090...ba3768ef); algorithm, algorithmic, and fancyhdr come from TeX Live.
@@ -132,11 +134,10 @@
 \input{1-intro}
 \input{2-background}
 \input{3-motivation}
-\input{4-method}
-\input{6-passes}
-\input{7-eval}
-\input{9-related}
-\input{10-conclusion}
+\input{4-opcord}
+\input{5-eval}
+\input{6-related}
+\input{7-conclusion}
 
 \bibliography{refs}
 \bibliographystyle{mlsys2025}
@@ -150,8 +151,7 @@
 \input{11-ai-disclosure}
 
 % The appendix is cut (author, 2026-10-24); appendix-body.tex keeps the old framing's text as the record.
-% \appendix
-% \input{appendix-body}
+
 
 \end{document}
 
