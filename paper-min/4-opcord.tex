@@ -147,7 +147,7 @@ These conditions hold only where an operation's locations cover all the state it
 The composer and both passes each carry a checker for these conditions, and a failed check leaves the composition, stream, or loop unchanged and names its reason, rather than dropping work to pass.
 The stream pass's checker tests every pair of instructions that a proposed order inverts, and reports a refusal as shown illegal, where a condition is violated, or only not shown legal, where the stream cannot decide one, such as a buffer range it does not fix.
 The composer checks the whole-operator condition on every dispatch it forms, and the loop pass refuses any buffer it cannot show renamable and re-checks the renamed buffers and the carried state on its output.
-% SOURCE: the loop pass on the AIR fused decodes of five LLMs outside the evaluation (Llama-3.2-3B, Phi-4-mini, Qwen2.5-3B, Qwen2.5-7B, Qwen3-8B): each judged, output check passed, 12 buffers renamed (6 on Qwen2.5-3B) (pass-0 aie-cosched passes/results/2026-10-23-phase-rerun, registered 7687182).
+% SOURCE: the loop pass on the AIR fused decodes of five LLMs outside the evaluation (Llama-3.2-3B, Phi-4-mini, Qwen2.5-3B, Qwen2.5-7B, Qwen3-8B): each judged, output check passed, 12 buffers renamed (6 on Qwen2.5-3B) (pass-0 aie-cosched passes/results/2026-10-23-phase-rerun, registered 7687182, results 3c5355f).
 Unlike a hand edit, the composer and the passes check every design they rewrite, including designs nobody has read.
 
 \subsection{Event Model and Choice}

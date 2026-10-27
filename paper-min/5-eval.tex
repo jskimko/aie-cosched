@@ -89,6 +89,8 @@ Renaming only the keys and values, as FLM's authors do by hand for Gemma3~\citep
 % DECISION: FastFlowLM, taken as released, is an observation of the condition, never a like-for-like comparison and never evidence that the cost is avoidable; no claim about how its order was chosen.
 In absolute terms, OPCORD's TTFT on AIR's designs is \AbsGainLo--\AbsGainHi$\times$ lower than that of FLM's current release, version 1.0.8~\citep{fastflowlm-repo}, by that engine's own prefill timer, on all five LLMs at every prompt length compared, from 1K to 16K tokens (Figure~\ref{fig:vs-flm}).
 By contrast, AIR's original program on $S_2$ is slower than that engine at 16K tokens on \AbsOrigSlower{} of the five LLMs.
+% SOURCE: D1 notes (vault lab-flm-practice, D1 item 6): FastFlowLM's closed engine against MLIR-AIR's open kernels on the same Q4NX files; the kernels and the quantization path differ.
+The two stacks run the same Q4NX weight files but differ in kernels and dequantization path, so this comparison is a reference point rather than a like-for-like speedup.
 In decode at 16K tokens FLM's current release stays faster on all five LLMs (Section~\ref{subsec:pays}), though the loop pass brings Llama-3.2-1B and Llama-3.1-8B within \AbsDecodeClosePct\% of it.
 
 \begin{figure}[t]
@@ -166,6 +168,8 @@ The task-queue condition refuses none of the 2{,}070 distinct rewritten streams 
 % SOURCE: every forced loop-pass refusal REFUSED by loopcheck with READS-DIFFER (decisions log, "P6 steps 1-5 done"; vault lab-cosched-passes (57) step 5 and forced refusals).
 % SOURCE: composer checks 26 / 26 tests, each check red on a defeated input (4-method.tex SOURCE in the legality subsection; decisions log D24 N1; vault lab-split-sweep, amd-npu 8073b924); bit-identical logits for every composed prefill and append (4-method.tex SOURCE, setup defaults).
 Every rename the loop pass refuses, when forced, yields a design that an independent static check of the loop also refuses.
+% SOURCE: pass-0 aie-cosched passes/results/2026-10-23-phase-rerun (registered 7687182, results 3c5355f, each report.json output_check "passed"): Llama-3.2-3B, Phi-4-mini, Qwen2.5-3B, Qwen2.5-7B, Qwen3-8B; each judged, output check passed, 12 buffers renamed (6 on Qwen2.5-3B).
+The loop pass also judges the AIR decodes of five LLMs outside our evaluation, renaming their buffers with every output check passed, though we do not claim a gain on any of them.
 The composer's checks refuse all 13 inputs built to break them, and every composed prefill we run leaves the outputs bit-identical.
 
 \subsection{Analysis and Bound Exactness}
