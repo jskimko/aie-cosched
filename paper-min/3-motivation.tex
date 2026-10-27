@@ -8,8 +8,8 @@
 % DECISION: packing several operators per dispatch (batching) is cited as standard practice, never presented as ours.
 % SOURCE: queued / in-sequence = 1.007-1.029 on 7 pairs, 20 runs per pair (amd-npu 17f7ec3 prefill-overlap/ovl4/, lab-prefill-overlap (5)b); in-sequence / (A + G - F) = 0.996-1.021 over 17 pair runs (ovl/, ovl2/ at 8f13e05 and ovl4/; report.txt H1 column).
 % SOURCE: XRT run list, /opt/xilinx/xrt/include/xrt/experimental/xrt_kernel.h:21 (XRT 2.25.0).
-We pair one attention operator of the original program with one GEMM on disjoint column groups.
-Two dispatches queued on one hardware context run within 3\% of one dispatch that holds both streams in sequence on each of seven pairs, and that dispatch takes the sum of both operators' times less at most one dispatch floor (Figure~\ref{fig:rewrites}a, before).
+To find what lets two operators run at once, we pair one attention operator of the original program with one GEMM on disjoint column groups.
+On each of seven pairs, two dispatches queued on one hardware context run within 3\% of one dispatch that holds both streams in sequence, and that dispatch takes the sum of both operators' times less at most one dispatch floor (Figure~\ref{fig:rewrites}a, before).
 Packing dispatches, as CUDA Graphs~\citep{nvidia-cudagraphs}, XRT's run lists~\citep{xrt-repo}, and an MLIR-AIR deployment of LLMs on this NPU~\citep{li2026agentnpu} do, therefore recovers none of the overlap.
 % SOURCE: amd-npu d8c63fb1 roofline/two-ctx-hold/two_ctx.json: rho 1.970, 95% bootstrap CI [1.955, 1.976], same-context ratio 1.970; medians solo 19.76 / 19.81 ms, pair 39.10 ms, same 39.09 ms (vault lab-prefill-overlap (34)); driver allocation amdxdna 2.25.0 npu4_regs.c:94-106, aie2_ctx.c:604-608 (vault lab-prefill-overlap (31)); the design is a one-column xclbin (AIE_PARTITION column_width 1, amd-npu 2171857e roofline/two-ctx-build/; vault lab-prefill-overlap (33)).
 A second hardware context recovers none either, because it shares the same eight columns in time.

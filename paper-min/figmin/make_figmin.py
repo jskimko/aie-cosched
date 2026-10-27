@@ -39,7 +39,6 @@ def fig_choice_a():
     a.set_ylabel(r"Prediction error (\%)", labelpad=1)
     a.set_ylim(-24, 8)  # room below the band for the legend
     a.legend(loc="lower left", ncol=2, handletextpad=0.2, columnspacing=0.6, labelspacing=0.15)
-    a.set_title("Event model", pad=4)
     fig.delaxes(b)
     m.save(fig, "choice-a.pdf")
     plt.close(fig)
