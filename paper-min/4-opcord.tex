@@ -18,7 +18,7 @@ Figure~\ref{fig:framework} shows OPCORD's components, which take a design that i
 Because the CP's instruction order is fixed in the design's artifacts, OPCORD's analysis reads that order as a dependence graph over every agent that touches state, from open and closed binaries alike (Section~\ref{sec:order}), and bounds what removing each false dependence could recover before any rewrite is built (Section~\ref{subsec:removal}).
 Since OPCORD rewrites designs it did not compile, its checkers refuse any rewrite they cannot show legal (Section~\ref{subsec:legality}).
 To remove the waits of Section~\ref{subsec:losses}, our composer and stream pass reorder issue, and our loop pass renames decode attention's buffers (Section~\ref{subsec:order}).
-What pays changes with the prompt, so an event model prices every candidate per prompt length from \emph{probes}, which time each operator dispatched alone (Section~\ref{subsec:pricing}), and a runtime runs the choice (Section~\ref{subsec:impl}).
+What pays changes with the prompt, so an event model prices every candidate per prompt length from \emph{probes}, which time each operator dispatched alone (Section~\ref{subsec:pricing}), and a runtime runs the choice.
 
 % VALUE: general benefit, by what each component needs from a stack: reading, bounding, legality and the stream pass work on any stack's streams, compiled or lifted; the loop forms and the loop pass need the lowered design; the composer, probes, event model, choice and runtime are built for attention/GEMM fused prefill, and the composer and runtime need an open host program; choosing the configuration needs the stack's own build of each split
 The analysis, the bound, the legality conditions, and the stream pass with its checker work on any stack's instruction streams, compiled or recorded, so a team with a closed stack's source can run them on its own designs.
@@ -51,7 +51,7 @@ On a closed design, whose core programs we cannot read, our verdicts rest on it.
 % SOURCE: the closed-stack rule and the host observed at the driver boundary (spine v18, The system; census partb/README); the measured rewrites are the merges at the 128-token bucket and e4898ce3's stream (census partb/replay/, registered 3ae0370, 67d54fe).
 Every stream the analysis reads, compiled or recorded, round-trips byte for byte through MLIR-AIE's runtime sequence (i.e., its intermediate form for a dispatch's stream).
 On a closed stack such as FLM (Section~\ref{subsec:spectrum}), we record the designs' streams and the host's accesses at the boundary of the runtime that issues them, lift the streams into the same form, and attribute each issue to a column group by the routes decoded from the design's configuration.
-There, OPCORD only bounds rewrites that leave the closed host program as it is, and it replays a few with room under their bound on the device, to check the bound against measurement (Section~\ref{subsec:census}) and never to deploy them.
+There, OPCORD only bounds rewrites that leave the closed host program as it is, and it replays a few on the device, to check the bound against measurement (Section~\ref{subsec:census}) and never to deploy them.
 
 % VALUE: the dependence classes: each edge labelled true, name, or order by the pairs it alone orders (true: a read after a write; name: a write after a read or write; order: otherwise), loop-carried edges over the loop's iterations; the same graph decides the condition's two clauses, which is not a separate step
 % SOURCE: classification by Lost(e), REDUNDANT, CONTROL, loop-carried distance (vault lab-cosched-passes (30), item 3); computed at stream granularity by aie-cosched-stream-deps (mlir-aie 2392abdc230 onward, fixture stream-turns with ORDER, NAME, RAW and REDUNDANT edges, lab-cosched-passes (49)), which agrees with its Python oracle on every compared count on 792 of 793 population streams, the 793rd too large for either (mlir-aie 0489d325082, lab-cosched-passes (53)); at loop granularity by AIECoschedDeps, whose buffer classes are the Lost-pair classes of the loop-carried edges (lab-cosched-passes (33)), with order edges and critical cycles computed in results/2026-10-23-order-loop (mlir-aie dev 58569749d3e..36f725e8e6e).
@@ -99,7 +99,7 @@ The bound decides which rewrites are worth building, but it cannot predict a los
 OPCORD decides legality from the streams, their configuration, and the host's accesses, and judges each rewrite as a whole.
 A reorder keeps every instruction once, and each column's segments and each channel's pushes in their order, and it must create no hazard of any of three kinds.
 On data and BDs, a read moved above the wait that guards the write it reads returns stale data, and a BD may not be written after its push or rewritten while a transfer that loaded it may still be queued.
-On a task queue, a push onto a channel's full queue, which is four deep, is dropped, and any wait on it never returns.
+On a task queue, a push onto a channel's full four-deep queue is dropped, and any wait on it never returns.
 On device state, neither instruction of an inverted pair may write the locks, runtime parameters, or configuration of the other's column group, or host bytes that the other uses.
 Two whole operators on different groups may interleave when each writes only its own group's shim BDs, task queues, locks, and runtime parameters, they address disjoint host buffers or disjoint byte ranges of one, and neither writes a buffer that the other reads or writes.
 A buffer may be renamed only where all its conflicts are writes after reads or writes, and in a loop only where one pair of locks guards it and its tile has room for a second slot in its BDs and local memory.
@@ -110,11 +110,10 @@ These conditions hold only where an operation's locations cover all the state it
 % SOURCE: stream checker in C++ inside aie-cosched-schedule, route facts from the device IR (mlir-aie cosched-flag e20940fac7e); any finding refuses the whole rewrite and the IR is unchanged; outcomes DECIDED (shown illegal) against RESOURCE-UNPROVEN, RANGE-UNKNOWN, TOOL-FAILED, PASS-ERROR (not shown legal) (vault lab-cosched-passes (57) steps 3-5, and the checker's reason list).
 % SOURCE: composer checks (whole-operator condition, no early ring-slot reuse, each split within a shim BD's fields): own-group register writes (shim BDs and DMA queues, own cores' locks, own cores' runtime parameters), disjoint argument slots or byte ranges, segment order and every op once, assert_no_hazard on ring slots, BD iteration wrap 6 bits and stride 20 bits per GEMM, check_posted for commands in flight; each turns red on a defeated input (lab-prefill-overlap (3), (4), (9); lab-split-sweep (5), (35)); checks fail rather than drop, 26 / 26 (decisions log D24 N1).
 % SOURCE: loop pass input checks (one free / full lock pair, free lock starting at 1, BD and L1 budgets, every BD block ending in a next_bd, use inside a block loop, supported loop control) and output check (ring as made, carried state's users unchanged, budgets), mlir-aie aie-cosched-pass-0 e9fc225b2b6 / ba7ea1aa552, cherry-picked to cosched-flag (lab-cosched-passes (56), (57) step 2).
-The composer and both passes each carry a checker for these conditions, and a failed check leaves the composition, stream, or loop unchanged and names its reason.
-No rewrite drops an operator or an instruction to pass a check.
+The composer and both passes each carry a checker for these conditions, and a failed check leaves the composition, stream, or loop unchanged and names its reason, rather than dropping work to pass.
 The stream pass's checker tests every pair of instructions that a proposed order inverts, and it reports a refusal as shown illegal, where a condition is violated, or only not shown legal, where the stream cannot decide one, such as a buffer range that the stream does not fix.
-The composer checks the whole-operator condition on every dispatch it forms, and the loop pass refuses any buffer that it cannot show renamable and re-checks, on its output, each renamed buffer's slots and the state that the loop carries across iterations.
-Unlike a hand edit, which covers only the streams someone has read, the composer and the passes apply their checkers to every design they rewrite, including designs nobody has read.
+The composer checks the whole-operator condition on every dispatch it forms, and the loop pass refuses any buffer that it cannot show renamable and re-checks the renamed buffers and the carried state on its output.
+Unlike a hand edit, the composer and the passes check every design they rewrite, including designs nobody has read.
 
 \subsection{Reordering and Renaming}
 \label{subsec:order}
@@ -171,7 +170,7 @@ Because queued dispatches run one at a time, dispatch $k$ ends at
 e_k = \max\bigl(e_{k-1} + s_k,\; q_k + F\bigr) + \tau_k,
 \end{equation}
 where $q_k$ is when the host has queued the dispatch and paid its issue cost, $F$ is the dispatch floor, and $\tau_k$ is the dispatch's device time beyond that floor.
-The transition $s_k$ from the previous dispatch is one constant per ordered pair of dispatch kinds, where a kind is attention or GEMM, and it is negative where the next dispatch starts before the previous one ends.
+The transition $s_k$ is one constant per ordered pair of dispatch kinds, attention or GEMM, and is negative where the next dispatch starts before the previous one ends.
 Without attention, a dispatch takes its GEMMs' times alone summed, plus a fixed $\gamma$ for each GEMM after the first, and with attention beside GEMMs it takes
 \begin{equation}
 \label{eq:overlap}
@@ -184,18 +183,16 @@ The host waits where each program does, stage by stage for the original program 
 % VALUE: what makes the price move with the prompt and keeps it honest: each attention chunk priced at its position, so the balance between the groups and the candidate that pays change with length; machine constants once from microbenchmarks (precedent cited), none fitted to an LLM's end-to-end runs
 % SOURCE: frozen constants (opcord/model/constants/frozen.json; calibration hold 2026-10-22 22:20-22:43, amd-npu d94266bf, microbench device.json / host.json; frozen.json from npu-gap-0-c8 b15d9dca): F 94.507 us; transitions gemm->gemm 12.93, gemm->attn -6.65, attn->gemm 47.95, attn->attn 20.94 us; gamma 24.56 us; regimes GEMM-longer c 42.33 us, d 0.1160 (n 10), attention-longer c 21.43 us, d -0.0260 (n 5); issue attention 68.06, GEMM 7.36 us; post per model and operator (host.json, e.g. Llama-3.2-1B qkv 179.5, up 202.3, attention 76.1 us). The microbenchmarks run Llama-3.2-1B's layer-0 operators with real weights; tests/test_event_model.py forbids end-to-end sources in frozen.json.
 Because each attention chunk is priced at its position in the prompt, the balance between the groups, and with it the candidate that minimizes TTFT, changes with the prompt length.
-The machine constants do not depend on the LLM and come from microbenchmarks run once, as analytical models of communication and of memory-bound kernels measure theirs~\citep{culler1993logp,williams2009roofline}.
+The machine constants do not depend on the LLM and come from microbenchmarks run once, as LogP and the roofline model measure theirs~\citep{culler1993logp,williams2009roofline}.
 The host's post-processing costs are measured once per LLM, and no constant comes from an LLM's end-to-end runs, so Section~\ref{subsec:decision} tests the event model rather than calibrates it.
 
-% VALUE: the choice per prompt length: price every candidate (each supported configuration; the original order with or without the stream pass; the composed order with attention issued once ready or held; each host policy) and run the minimum unless a short measurement settles a near tie; order and configuration chosen together because the configuration that minimizes each order's TTFT moves with the balance and differs between orders; the original order kept wherever composing is priced higher
+% VALUE: the choice per prompt length: price every candidate (each supported configuration; the original order with or without the stream pass; the composed order with attention issued once ready or held; each host policy) and run the minimum unless a short measurement settles a near tie; order and configuration chosen together because the configuration that minimizes each order's TTFT moves with the balance and differs between orders
 % SOURCE: opcord/plan/planner.py choose(model, L, N): candidates every split with a committed probe (S1, S2, S4), orders ship / shipar / comp, composer policies depth {1, 2, 4, 8} x GEMM cap {none, 4} x packing {1, 4}, each priced by event_model.predict, the minimum returned with the whole table; the hold as pipe {0, 1} (opcord-pipe 4a60cc4).
 % SOURCE: measure-when-close, implemented test-first in opcord (planner.CLOSE_BAND, close_candidates, decide; test_measure_close 10/10); bands same 5%, cross 15%, tie 0.5%, one warm and three kept runs per candidate (vault decisions log, "Spine v18 drafted; amendment-1 batch and measure-when-close approved").
 Before a prompt length runs, OPCORD prices every candidate and runs the one with the minimum predicted time, except where a short measurement at planning time settles a near tie.
 The candidates are each supported configuration, the original order with or without the stream pass, the composed order with each attention operator issued once ready or held, and each host policy.
 Because the configuration that minimizes TTFT moves with the balance and need not be the same for both orders (Section~\ref{subsec:question}), OPCORD chooses the order and the configuration together.
-Since the original order is itself a candidate, OPCORD keeps it wherever composing is priced higher.
 
-\subsection{Runtime}
 \label{subsec:impl}
 
 % VALUE: the runtime: replaces the host program's dispatch loop, runs the choice and switches configurations; the rewrites touch only issue order, the cut into dispatches and buffer slots, so no kernel changes, and submitting to the design's own hardware context needs no driver or firmware change
