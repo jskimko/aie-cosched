@@ -22,7 +22,7 @@ To remove the waits of Section~\ref{subsec:losses}, our composer and stream pass
 What pays changes with the prompt, so an event model prices every candidate per prompt length from \emph{probes}, which time each operator dispatched alone (Section~\ref{subsec:pricing}), and a runtime runs the choice.
 
 % VALUE: general benefit, by what each component needs from a stack: reading, bounding, legality and the stream pass work on any stack's streams, compiled or lifted; the loop forms and the loop pass need the lowered design; the composer, probes, event model, choice and runtime are built for attention/GEMM fused prefill, and the composer and runtime need an open host program; choosing the configuration needs the stack's own build of each split
-The analysis, the bound, the legality conditions, and the stream pass with its checker work on any stack's instruction streams, compiled or recorded, so a team with a closed stack's source can run them on its own designs.
+The analysis, the bound, the legality conditions, and the stream pass with its checker work on any stack's instruction streams, compiled or recorded.
 % SOURCE: vault lab-cosched-passes (52): the loop pass is an opt-in aiecc flag, run in MLIR-AIE's compile right after the object-FIFO lowering; the rest of that compile rebuilds the configuration.
 Their loop forms need the design's lowered MLIR-AIE form, and the loop pass is an opt-in pass in MLIR-AIE's compile.
 The composer, the probes, the event model, and the runtime are built for a fused prefill that pairs attention with GEMMs, the composer and the runtime also need an open host program, and the configuration is chosen only among the splits that the design's stack builds.
