@@ -32,10 +32,10 @@ The serial execution of the original program is thus a property of how its dispa
 \subsection{Where Fused Designs Wait}
 \label{subsec:losses}
 
-% VALUE: in the fused LLM designs we study, the waits recur at three places, each a textbook false dependence (cited): an order dependence where the instruction order puts a wait data does not require, a name dependence where work shares storage it need not share
-At three places in the fused LLM designs we study, work waits on other work whose results it does not consume, which is a \emph{false dependence} in the textbook sense~\citep{bernstein1966analysis,kuck1981dependence}.
-It is an \emph{order} dependence where the instruction order alone places the wait, which reordering removes, or a \emph{name} dependence where two uses share storage they need not share, which renaming removes~\citep{tomasulo1967,lam1988software}.
-% DECISION: false dependences, the order and name causes, reordering, and renaming are textbook and cited; the paper claims their analysis on this platform, never the classes. Section 4 classes each wait formally.
+% VALUE: in the fused LLM designs we study, the waits recur at three places, each a false dependence (cited): an order dependence where the instruction order puts a wait data does not require, a name dependence where work shares storage it need not share
+At three places in the fused LLM designs we study, work waits on other work whose results it does not consume, which is a \emph{false dependence}.
+It is an \emph{order} dependence where the issue order alone places the wait between independent work, which reordering removes, as on GPUs whose streams once shared one hardware work queue~\citep{nvidia-kepler-gk110}, or a \emph{name} dependence where two uses share storage they need not share and one writes it after the other reads or writes it, which renaming removes~\citep{tomasulo1967}.
+% DECISION: the two kinds are sourced, not textbook classes (checked against the PDFs, 2026-10-26, tmp/r1/minimal3/verify-citations-pdf.md): the name kind and renaming are Tomasulo's (p. 29, same sink, "in fact, independent", doubling); the order kind is NVIDIA's single-work-queue false dependence (Kepler GK110 whitepaper, "false intra-stream dependencies", "tailor the launch order"); Bernstein and Kuck name no order class; the paper claims their analysis on this platform, never the classes. Section 4 classes each wait formally.
 
 \textbf{Column Groups in Prefill.}
 % VALUE: one operator per dispatch and no overlap across dispatches make the prefill's column groups take turns, an order dependence in the CP's stream between operators; the array idles while the device reads busy: the computable occupancy reads 92-97% of TTFT and counts neither idle group; attention's share grows 12% -> 49%; the counters show the cores waiting
