@@ -11,7 +11,7 @@
 \textbf{AI Engine Array.}
 \CLS{E}An AMD XDNA~2 NPU is a spatial dataflow array of AI Engine tiles in 8 columns~\citep{linux-amdnpu}.
 \CLS{E}Each column holds a shim tile that reaches DRAM, a memory tile, and 4 core tiles with local memory.
-\CLS{E}DMA engines move data by following chainable buffer descriptors (BDs), and locks hand each buffer from its producer to its consumer~\citep{amd_am027}.
+\CLS{E}Direct memory access (DMA) engines move data by following chainable buffer descriptors (BDs), and locks hand each buffer from its producer to its consumer~\citep{amd_am027}.
 \CLS{E}Each DMA channel takes work from its own \emph{task queue}, and data travels between tiles on \emph{routes} through the tiles' stream switches, whose ports buffer data in flight.
 \CLS{E}A \emph{configuration} is the array's core programs, stream routes, BDs, and locks, which a compiler such as MLIR-AIE~\citep{mlir-aie-repo} or AIR~\citep{wang2026mlirair} emits, and a \emph{design} is one or more configurations with the host program that issues their dispatches.
 \CLS{E}We call the columns that one operator occupies its \emph{column group}.
