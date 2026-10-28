@@ -8,7 +8,7 @@
 % DECISION: packing several operators per dispatch (batching) is cited as standard practice, never presented as ours.
 % SOURCE: queued / in-sequence = 1.007-1.029 on 7 pairs, 20 runs per pair (amd-npu 17f7ec3 prefill-overlap/ovl4/, lab-prefill-overlap (5)b); in-sequence / (A + G - F) = 0.996-1.021 over 17 pair runs (ovl/, ovl2/ at 8f13e05 and ovl4/; report.txt H1 column).
 % SOURCE: XRT run list, /opt/xilinx/xrt/include/xrt/experimental/xrt_kernel.h:21 (XRT 2.25.0).
-\CLS{E}To find what lets two operators run at once, we pair one attention operator of the original program with one GEMM on disjoint column groups.
+\CLS{E}We pair one attention operator of the original program with one GEMM on disjoint column groups.
 \CLS{D}On each of seven pairs, two dispatches queued on one hardware context run within 3\% of one dispatch that holds both streams in sequence, and that dispatch takes the sum of both operators' times less at most one dispatch floor (Figure~\ref{fig:rewrites}a, before).
 \CLS{E}Packing dispatches, as CUDA Graphs~\citep{nvidia-cudagraphs} and XRT's run lists~\citep{xrt-repo} do, therefore recovers none of the overlap, nor does a second hardware context, since a one-column design run on two contexts at once takes $1.97\times$ its time alone, as two runs on one context do.
 % SOURCE: amd-npu d8c63fb1 roofline/two-ctx-hold/two_ctx.json: rho 1.970, 95% bootstrap CI [1.955, 1.976], same-context ratio 1.970; medians solo 19.76 / 19.81 ms, pair 39.10 ms, same 39.09 ms (vault lab-prefill-overlap (34)); driver allocation amdxdna 2.25.0 npu4_regs.c:94-106, aie2_ctx.c:604-608 (vault lab-prefill-overlap (31)); the design is a one-column xclbin (AIE_PARTITION column_width 1, amd-npu 2171857e roofline/two-ctx-build/; vault lab-prefill-overlap (33)).
@@ -23,7 +23,7 @@
     \centering
     % VALUE: OPCORD's three rewrites, before and after: (a) the composer removes the GEMMs' wait for attention, (b) the stream pass removes column 7's wait behind column 0's synchronizations, (c) the loop pass removes decode's wait for compute to free a single buffer; a schematic, not data
     \includegraphics[width=\textwidth]{fig/rewrites.pdf}
-    \caption{\CLS{E}OPCORD's three rewrites, which remove (a) the GEMMs' wait for attention, in its dispatch or the next, (b) column~7's wait behind the CP's synchronizations on column~0, and (c) decode's wait for compute to free a single buffer before the next block's transfer. \CLS{E}Arrows point to the waiting work, and dashed lines mark where the work finished before.}
+    \caption{\CLS{E}OPCORD's three rewrites, which remove (a) the GEMMs' wait for attention, in its dispatch or the next, (b) column~7's wait behind the CP's synchronizations on column~0, and (c) decode's wait for compute to free a single buffer before the next block's transfer. \CLS{E}Dashed lines mark where the work finished before.}
     \label{fig:rewrites}
 \end{figure*}
 
@@ -35,7 +35,7 @@
 % SOURCE: figs/data/fig1-intervals-1b.json drawn by figs/diagrams.py fig_intro (amd-npu 60b8002a prefill-overlap/ml-timeline/fig1-2026-10-25); Llama-3.2-1B 4,096 tokens on S2. The ratio is from the same session's runs without timer records: 1908.3 / 1084.7 ms = 1.759 [1.750, 1.766], 5 kept (fig1-2026-10-25/run/1b-N/ab-4096.json; figs/paper_numbers.py FigOneGain).
 % DECISION: the symptom is "the occupancy a developer can compute reads 92-97% busy", never "invisible to every metric" (moved here from 1-intro with its sentence, 2026-10-27).
 % SOURCE: amd-npu e3acc8a prefill-e2/decomp.txt via figs/make_figs.py: busy = isolated time - dispatch floor = 92/95/97% of TTFT at 512/2k/4k (Llama-3.2-1B, S2); serial execution, the isolated busy times sum to at most TTFT (vault lab-prefill-device (4)).
-\CLS{X}In prefill, the original program issues one operator per dispatch, stage by stage, so the column groups take turns and attention on one chunk blocks later chunks' GEMMs although it does not feed them.
+\CLS{X}In prefill, the original program issues one operator per dispatch, stage by stage, so attention on one chunk blocks later chunks' GEMMs, which it does not feed.
 \CLS{D}The one occupancy a developer can compute, from each operator's time when dispatched alone, reads 92--97\% busy on Llama-3.2-1B at 512, 2{,}048, and 4{,}096 tokens, yet the same operators, reissued on the same columns of $S_2$ with attention's columns also alternated as below, reduce TTFT by \FigOneGain$\times$ at 4{,}096 tokens (Figure~\ref{fig:timeline}c).
 
 % VALUE: inside attention: the shipped stream issues column 7's work only after column 0's synchronizations; alternating the columns' work by hand reduces attention's device time beyond the dispatch floor to 0.67x with the same instructions, and each half alone takes the same time, so the CP's order causes the loss
@@ -68,8 +68,7 @@
 % VALUE: the partition decides where the condition holds: consecutive operators of a modular design share core tiles and DMA channels and fail disjoint resources; AIR's chunked one-operator dispatches meet both clauses, so regrouping them into shared dispatches recovers their overlap, and decode's single buffers leave name dependences that meet both clauses
 \CLS{X}How a design partitions its work therefore decides where the condition can hold.
 \CLS{E}Consecutive operators of a modular design share core tiles and DMA channels, so they fail disjoint resources.
-\CLS{E}AIR's prefill instead keeps one configuration and partitions its work into one-operator dispatches over chunks.
-\CLS{E}An earlier chunk's attention and a later chunk's GEMMs then meet both clauses, so regrouping those dispatches into shared ones can recover their overlap.
+\CLS{E}In AIR's fused prefill, an earlier chunk's attention and a later chunk's GEMMs meet both clauses, so regrouping its one-operator dispatches into shared ones can recover their overlap.
 \CLS{EL}AIR's decode keeps one buffer per loop role, which leaves name dependences that meet both clauses too.
 
 % VALUE: the prompt length decides what the freed overlap is worth: attention's work per chunk grows with position while the GEMMs' stays fixed, so the balance between the groups, and whether overlap outweighs the host post-processing a new order exposes, moves with length; columns given to attention are taken from the GEMMs, so the configuration that minimizes TTFT moves too and can differ between orders

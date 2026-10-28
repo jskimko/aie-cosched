@@ -39,7 +39,7 @@
 % VALUE: the prefill headline: OPCORD shortens TTFT on all five LLMs from 1K tokens with bit-identical outputs; below 1K it stays near the baseline; its one-time costs stay outside TTFT except a short binding step that every TTFT includes
 % SOURCE: figs/data/prefill-cells.json (figs/paper_numbers.py, amd-npu 4ce61672): 40 cells at 1,024-32,768 tokens, 1.097 (LFM2-1.2B 1,024, S1) to 1.625 [1.337, 1.632] (Llama-3.2-1B 16,384, S4); per LLM 1B 1.22-1.63, LFM2 1.10-1.49, Qwen 1.25-1.57, Gemma 1.18-1.30, 8B 1.11-1.56; peaks 1B 16K, LFM2 8K (16K 1.485), Qwen 16K, Gemma 8K, 8B 8K; prompts of 128-512 tokens 0.985-1.040 (LFM2-1.2B 256 0.985 [0.971, 0.999], Llama-3.1-8B 512 1.040). Pre-final: picks by choose() at opcord d6caf8b, the event model before its frozen form, except Llama-3.2-1B at 32,768, which that form left unpriced (chunk 160 outside its probes): picked by choose() at opcord b8fe009 (comp on S4) and measured beside the original on every split in one batch, 1.435 [1.422, 1.435] paired on S4 (original S4 28,914 ms, S2 63,731, S1 81,826; composed S4 20,149; registered prediction 1.411; amd-npu 4ce61672, ab/results/fig5-1b32k-2026-10-26). Kept out of subsec:decision's choice scoring, which scores the d6caf8b picks.
 % SOURCE: prompts of 128-512 tokens 0.985-1.040, the headline SOURCE line above (\ShortGainLo, \ShortGainHi). Pre-final.
-\CLS{X}OPCORD shortens TTFT on all five LLMs by \PrefillGainLo--\PrefillGainHi$\times$ at prompts from 1K tokens, with bit-identical outputs (Figure~\ref{fig:headline}).
+\CLS{X}OPCORD shortens TTFT on all five LLMs by \PrefillGainLo--\PrefillGainHi$\times$ at prompts from 1K tokens (Figure~\ref{fig:headline}).
 \CLS{E}Picking by the event model alone, it runs the composed order at all 40 cells from 1K tokens, which include 2{,}049 and 16{,}385 tokens beside the figure's powers of two, on a configuration other than the baseline's at 15 of them.
 \CLS{P}Below 1K tokens, where the groups have little work to overlap, its TTFT stays within \ShortGainLo--\ShortGainHi$\times$ of the baseline's.
 % SOURCE: N1 (amd-npu ab/results/n1-2026-10-25, n1_reuse.py on the frozen dev form): choose() 0.01-1.2 s up to 16K and 3-10 s at 32,768, plan 1.14 s and compose 0.10 s (medians over 71 plan files); composition host-only (amd-npu 82c5b5b0, compose-gate-2026-10-22): S2 1B 56-148 ms, Qwen3-4B 143-368 ms; bind step 7-50 ms; probes 9-39 s per model and split (vault lab-split-sweep (29)-(30)).
@@ -59,7 +59,7 @@
 % SOURCE: Gemma3-4B's shipped decode is one full-ELF build at ELF_LBUILD 30720 in both arms (pass-0 tmp/p5/artifacts/gemma-30720/{off,on}/.decode_elf_flags; ruled the shipped window in D16, vault decisions log 2026-10-22); its loop bound and shim KV readback are fixed at the build's window, and the sliding layers' cores skip blocks before L - 1024 (mlir-air 44e8d8f7 fused_decode.py SLIDING_WINDOW, FULL_LAYERS (5, 11, 17, 23, 29), _core_rounds; kernels/attn_qk.cc attn_window_lo); off 143.3 / 142.9 / 142.5 ms and on 139.06 / 139.06 / 139.10 ms per token at 2,048 / 16,384 / 30,208 (amd-npu cb210d53, decode NOTES).
 % DECISION: Gemma3-4B's flat gain is stated by what its build does (a fixed readback and loop, compute skipped outside the window), read from code and matched by the flat measured times; no split between the two effects is claimed, since separating them needs a run at a smaller window.
 % SOURCE: keys and values renamed with the original score buffer kept: 1.002x (16,384) and 1.003x (32,512), tokens and logits bit-identical (vault lab-decode-long-context (28); amd-npu d8f0bd4c, score 5e1017a5); all three renamed (the loop pass): 1.269x / 1.391x (lab-decode-long-context (22)).
-\CLS{EL}The decode gain grows with the context, as attention's share of each token does (Figure~\ref{fig:decode}).
+\CLS{EL}On all LLMs but Gemma3-4B, the gain grows with the context, as attention's share of each token does (Figure~\ref{fig:decode}).
 \CLS{XL}At 30{,}208 tokens, or 28{,}800 on Qwen3-4B, the loop pass lowers the time per token by \DecodeGainLo--\DecodeGainHi$\times$ across the five LLMs.
 \CLS{EL}Gemma3-4B's gain stays flat, because its decode design reads back a fixed 30{,}720-key window at every context and its sliding-window layers compute only over the last 1{,}024 keys.
 \CLS{EL}Renaming only the keys and values, as FLM's authors do by hand for Gemma3~\citep{du2026gemma3}, gains at most 0.3\% on Llama-3.2-1B, because the shared score buffer still closes the loop's critical cycle (Section~\ref{subsec:removal}).
@@ -105,7 +105,7 @@
 \CLS{X}The stream pass's checker refuses all 12 illegal rewrites in our controls, and every rewrite it shows illegal that we force onto the device fails there.
 \CLS{D}In a design of ours, a read moved above the wait that guards the write it reads returns stale data in all 10 runs, while its accepted twin stays bit-identical.
 % SOURCE: composer checks 26 / 26 tests, 13 of them rejection tests (amd-npu 8073b924 tests/test_composer_checks.py), each check red on a defeated input (4-opcord.tex SOURCE in the legality subsection; decisions log D24 N1; vault lab-split-sweep, amd-npu 8073b924); bit-identical logits for every composed prefill and append (4-opcord.tex SOURCE, setup defaults).
-\CLS{E}The composer's checks refuse all 13 inputs built to break them, and every composed prefill we run leaves the outputs bit-identical.
+\CLS{E}The composer's checks refuse all 13 inputs built to break them.
 
 \subsection{Analysis and Bound Exactness}
 \label{subsec:census}
@@ -123,7 +123,7 @@
 % SOURCE: decode bound against measured (pass-0 aie-cosched acf1801, passes/decode_bound.py; npu-gap decode batch amd-npu 5cf01779, paired-ratio medians): T_off / (T_off - P min(t_transfer, t_compute)); Llama-3.2-1B 1.0544 / 1.2818 / 1.3823 against 1.0560 / 1.2908 / 1.3970 at 2,048 / 16,384 / 30,208.
 % DECISION: stated on Llama-3.2-1B, whose reported decode build is the one the bound's probes ran on (RT); Qwen3-4B's 99-100% came from its RT builds while its reported decode runs masking mode, and the probe for the masking builds failed its positive control (npu-gap cw-batch, 2026-10-25 night: B_probe(8B) 2.7514 us against [2.686, 2.736]), so no bound is stated on them.
 \CLS{X}The bound holds against measurement in each form we check.
-\CLS{D}With every false dependence removed at once and only the work on the busiest resource counted, which on AIR's prefill is the busier column group's work plus the host's steps before the first layer, the bound holds the measured gain in 185 of 187 comparisons of the two orders on AIR's prefill.
+\CLS{D}On AIR's prefill, with every false dependence removed at once and only the work on the busiest resource counted, namely the busier column group's work plus the host's steps before the first layer, the bound holds the measured gain in 185 of 187 comparisons of the two orders.
 \CLS{P}On the other two, both at 32K tokens, the gain exceeds it by 0.2\% and 0.5\%, and the median gain reaches 83\% of the bound.
 \CLS{EL}In decode, the loop form holds the loop pass's gain on Llama-3.2-1B at 99--100\% of the bound at every context.
 
@@ -152,12 +152,12 @@
 
 \begin{table}[t]
     \centering
-    \caption{\CLS{DL}Percent of \emph{operator boundaries} at which each clause holds, by design class. \CLS{DL}A boundary pairs an operator with the next one the CP issues on another column group or, in a loop, two holders of a buffer whose turns the loop orders.}
+    \caption{\CLS{DL}Percent of \emph{operator boundaries} at which each clause holds, by design class. \CLS{DL}A boundary pairs an operator with the next one the CP issues on another column group or, in a loop, two holders of a buffer whose turns the loop orders. \CLS{PL}A speedup marked $\le$ is a bound on overlap where OPCORD does not rewrite.}
     \label{tab:census}
-    % VALUE: each design class read from its artifacts against the two clauses of the condition, grouped by how its work is packaged: only the classes where both clauses hold gain (AIR's prefill and decode, and a Llama-3.2-1B layer of ours fused with IRON's interface, marked as ours with a note); every other class is bounded at or near 1x
+    % VALUE: each design class read from its artifacts against the two clauses of the condition, grouped by how its work is packaged: only the classes where both clauses hold gain (AIR's prefill and decode, and a Llama-3.2-1B layer of ours fused with IRON's interface, marked as ours); every other class is bounded at or near 1x
     % SOURCE: clause shares on the adopted population (pass-0 aie-cosched 1eb8d3a, passes/results/2026-10-26-table1/table1-final.json, table1_final.py; population.md at 218702d): each operator paired with the next operator the CP issues on another column group, clause 2 a dependence path through device memory, host steps or host memory; in loops, every lock edge between two holders the loop orders (ORDER and NAME). AIR prefill (5 LLMs x headline N 1K-32K) 100 / (C-1)/C for C chunks, 87.5% at 1K to 99.6% at 32K, the same on every LLM (0% at one chunk); AIR decode 225 pairs (213 NAME) 100 / 92.0; IRON (ours) 17 pairs 100 / 52.9 (channel check on all 20 rung-2 builds, checks/layer-check-all.json); FLM flash 5,568 pairs 0 / 0; FLM decode 698 (680 within a step 0 / 0, 18 between steps 0 / 100) 0 / 2.6; FLM prefill per-operator and long-prompt 9,286 (1,232 at 14.2%, 8,054 at 16.4%) 0 / 16.1; IRON LLM 753 0 / 8.5.
     % SOURCE: AIR prefill bound against measured, 185 of 187 cells, and decode at 99-100% of the bound on Llama-3.2-1B (Section subsec:census's SOURCE lines); FLM flash prefill B 1.000, joint bound over every order 1.04-1.09, at most 1.13 with merges, merge replays 2.9-3.3% (terms4, terms5, replay stage 1); FLM per-operator prefill 99.6-100% of consecutive dispatches share a column (first clause fails; the bound follows from the rule in Section 3.3); FLM decode 1.000 inside dispatches, at most 1.009 between steps (e679463); IRON's 32 LLM streams at 1.000 (aie-cosched 1a87bc6).
-    % SOURCE: FLM prefill's <=1.00x is pending: the FLM per-operator merge replay decides it (step 2, section 5 item 1; review-buf-foundation.md, finding 4); the buffering carve-out qualifies the rule it follows from, and pass-0's buffer-only figure on such pairs (1.001-1.251) is not a proven bound.
+    % SOURCE: FLM prefill per-operator <=1.00x: compose_check refuses every interleave of the shipped streams for one physical reason, the two operators sharing their shim channels and shim BD ids (CHANNEL-ORDER and shim-BD reuse on all 34 five-LLM pairs and all 151 Gemma4 long-prompt pairs; pass-0 aie-cosched 4fbcf67, 19b4ee6, a0a3fa8), so no legal reorder exists. Earlier note: it was pending: the FLM per-operator merge replay decides it (step 2, section 5 item 1; review-buf-foundation.md, finding 4); the buffering carve-out qualifies the rule it follows from, and pass-0's buffer-only figure on such pairs (1.001-1.251) is not a proven bound.
     % SOURCE: IRON (ours) and the clause test: the SOURCE lines of the IRON paragraph above and of the clause test below. The row IRON non-LLM (3) (100 / 99.7 / <=1.00x, group "One dispatch, stages already overlapped") is an extra (step 2, section 3 row 18) and is left out here.
     \small
     \setlength{\tabcolsep}{4pt}
@@ -170,21 +170,15 @@
         \midrule
         \tabgroup{Several operators in one configuration} \\
         \quad AIR prefill & 100 & 87.5--99.6 & \PrefillGainLo--\PrefillGainHi$\times$ \\
-        \quad AIR decode\tnote{*} & 100 & 92.0 & \DecodeGainLo--\DecodeGainHi$\times$ \\
-        \quad IRON (ours)\tnote{\dag} & 100 & 52.9 & 1.21$\times$ \\
+        \quad AIR decode & 100 & 92.0 & \DecodeGainLo--\DecodeGainHi$\times$ \\
+        \quad IRON (ours) & 100 & 52.9 & 1.21$\times$ \\
         \quad FLM flash prefill & 0 & 0 & $\le$1.09$\times$ \\
         \quad FLM decode & 0 & 2.6 & $\le$1.01$\times$ \\
         \tabgroup{One operator per configuration} \\
-        \quad FLM per-operator & 0 & 16.1 & \E{$\le$1.00$\times$}\tnote{\ddag} \\
+        \quad FLM per-operator & 0 & 16.1 & $\le$1.00$\times$ \\
         \quad IRON LLM designs & 0 & 8.5 & $\le$1.00$\times$ \\
         \bottomrule
     \end{tabular*}
-    \begin{tablenotes}\footnotesize
-    \CLS{PL}\item Speedup is measured where OPCORD runs, at 1K--32K-token prompts in prefill and at the longest cached context in decode; $\le$ marks a bound on overlap where it does not rewrite (FLM's binaries are closed).
-    \CLS{EL}\item[*] Mostly in loops.
-    \CLS{PL}\item[\dag] A Llama-3.2-1B layer of ours, fused with IRON's interface.
-    \CLS{PL}\item[\ddag] Beyond what buffers on a shared route let through.
-    \end{tablenotes}
     \end{threeparttable}
 \end{table}
 

@@ -9,7 +9,7 @@
 % SOURCE: tile anatomy, DMA channels with task queues (pp. 24, 35, 59), and the stream switch with its ports (pp. 18-19) (AM027 v1.1).
 % DECISION: column groups are how today's LLM designs map their flows, not a hardware rule (author, 2026-10-24).
 \textbf{AI Engine Array.}
-\CLS{E}An AMD XDNA~2 NPU is a spatial dataflow array of AI Engine (AIE) tiles in 8 columns~\citep{linux-amdnpu}.
+\CLS{E}An AMD XDNA~2 NPU is a spatial dataflow array of AI Engine tiles in 8 columns~\citep{linux-amdnpu}.
 \CLS{E}Each column holds a shim tile that reaches DRAM, a memory tile, and 4 core tiles with local memory.
 \CLS{E}DMA engines move data by following chainable buffer descriptors (BDs), and locks hand each buffer from its producer to its consumer~\citep{amd_am027}.
 \CLS{E}Each DMA channel takes work from its own \emph{task queue}, and data travels between tiles on \emph{routes} through the tiles' stream switches, whose ports buffer data in flight.
@@ -51,12 +51,12 @@
 % SOURCE: mlir-air 44e8d8f7 programming_examples/llms/shared/fused_prefill/device.py:24-30, M = 128 rows per chunk as a module constant, TM = 32 per core tile, HR = M // TM = 4 core rows of the 6 x 4 herd; no build flag (npu-gap D4, 2026-10-25), so no chunk-size baseline exists without changing the design.
 \CLS{E}In each decoder layer, attention sits between the QKV projection and the remaining projections, all of which are GEMMs.
 \CLS{E}AIR's open fused prefill places every operator of a layer in one configuration, by default with the GEMMs on columns 1--6 and attention on columns 0 and 7, and we call this design the \emph{original program}.
-\CLS{E}We name its configuration by its \emph{split}, namely the number of columns attention takes, which is a build parameter, and each admitted value gives a \emph{supported configuration}.
+\CLS{E}We name its configuration by its \emph{split}, the number of columns attention takes, and call each value the build admits a \emph{supported configuration}.
 \CLS{E}An LLM with 8 KV heads admits $S_1$, $S_2$, and $S_4$, with attention on 1, 2, or 4 columns and $S_2$ the default.
 \CLS{E}The host runs each layer stage by stage over 128-token chunks, a size the design fixes, and finishes every chunk's QKV projection before any attention and every attention before the remaining projections.
 \CLS{E}Attention on one chunk reads the QKV projections of that chunk and earlier ones.
 \CLS{E}Between dispatches, the host's CPU post-processes the operators' outputs in steps such as normalization and residual addition.
-\CLS{EL}\emph{Decode} uses a separate design, AIR's fused decode, whose attention reads the whole context's KV cache.
+\CLS{EL}\emph{Decode} uses a separate design, AIR's fused decode, whose attention reads the KV cache.
 
 % VALUE: false and true dependences defined once, the false kinds (name, order) with their sources and the rewrite that removes each; the critical-path rule (cited), which Section 3's condition refines for this NPU
 % DECISION: the kinds are defined once, here, with their sources (author, 2026-10-26), and called classical; Kuck names anti and output dependences (p. 208) but no order class; renaming is Tomasulo's (p. 29, doubling); the order kind is NVIDIA's single-work-queue false dependence (Kepler GK110 whitepaper: "false intra-stream dependencies", "tailor the launch order"); "false dependence" is an established term that the paper uses and does not coin, and no claim is made about who originated the classes.

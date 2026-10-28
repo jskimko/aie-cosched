@@ -368,15 +368,15 @@ ATTN_LIGHT = "#F1E7D3"  # attention's lightest step (OKLCH L 0.93), for decode's
 
 
 def fig_rewrites():
-    """OPCORD's three rewrites, each before and after, with illustrative durations; a dotted arrow marks each false
-    dependence, which ends where work waits on work whose results it does not use.
+    """OPCORD's three rewrites, each before and after, with illustrative durations; in each "before" lane the waiting work
+    starts where the work it waits on ends, which is the false dependence.
     (a) Composer: two dispatches in turn (the GEMMs wait for attention's dispatch to finish), then one dispatch that
         issues both groups' work before any wait.
     (b) Stream pass: inside attention's stream, column 7's segment waits behind the CP's synchronization on column 0,
         then the columns' segments alternate so both run at once.
     (c) Loop pass: with one buffer per role, block i+1's transfer waits for block i's compute to release the buffer;
         with a two-slot ring it fills the other slot (compute is 0.71 of the transfer, as measured in decode)."""
-    fig, axes = plt.subplots(2, 3, figsize=(_m.WIDE, 1.3), sharex="col", gridspec_kw=dict(wspace=0.42, hspace=0.62))
+    fig, axes = plt.subplots(2, 3, figsize=(_m.WIDE, 1.05), sharex="col", gridspec_kw=dict(wspace=0.42, hspace=0.62))
 
     def lanes(ax, rows, labels, end, waits=()):
         for y, bars, color in rows:
@@ -384,11 +384,6 @@ def fig_rewrites():
                 ax.broken_barh([(t0, d)], (y - 0.32, 0.64), facecolors=color, edgecolor=INK, linewidth=0.4)
                 if text:
                     ax.text(t0 + d / 2, y, text, ha="center", va="center_baseline", fontsize=FS_NOTE)
-        for x, y0, y1 in waits:  # a solid arrow from y0 to y1: a false dependence
-            ax.plot([x, x], [y0, y1], color=INK, linewidth=0.6, zorder=10)
-            ax.add_patch(FancyArrowPatch((x, y1 + 0.05 * (y0 - y1)), (x, y1),
-                                         arrowstyle="-|>,head_length=1.2,head_width=0.65", color=INK, linewidth=0.6,
-                                         shrinkA=0, shrinkB=0, zorder=10))
         ax.axvline(end, color="black", linewidth=0.5, linestyle=(0, (4, 2)))
         ax.set_xlim(0, end * 1.04)  # the bars start at the axis
         ax.set_yticks([1, 0], labels)
@@ -447,7 +442,7 @@ def fig_intro():
     axa.set_ylim(0, H)
     axa.set_aspect("equal")
     axa.axis("off")
-    axa.text(0.02, H - 0.08, "(a) NPU", fontsize=FS_LABEL, va="center_baseline")
+    axa.text(0.02, H - 0.08, r"(a) XDNA~2 NPU", fontsize=FS_LABEL, va="center_baseline")
     t, g, x0, y0 = 0.15, 0.035, 0.42, 0.26
     th = t * 0.62
     xs = [x0 + c * (t + g) for c in range(8)]

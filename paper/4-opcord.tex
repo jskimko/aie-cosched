@@ -5,14 +5,14 @@
 \label{subsec:overview}
 
 % VALUE: the components in the core rule's order, a bridge in place of the overview figure: the analysis reads the CP's order as a dependence graph and bounds each false dependence before any rewrite is built; the composer and stream pass reorder issue and the loop pass renames buffers, each behind a checker, since OPCORD rewrites designs it did not compile; an event model prices every candidate per prompt length from probes, and a runtime runs the choice
-\CLS{X}OPCORD's analysis reads the CP's order, which the design's artifacts fix, as a dependence graph over every agent that touches state (Section~\ref{sec:order}) and bounds what removing each false dependence could recover before any rewrite is built (Section~\ref{subsec:removal}).
+\CLS{X}OPCORD's analysis reads the CP's order as a dependence graph over every agent that touches state (Section~\ref{sec:order}) and bounds what removing each false dependence could recover before any rewrite is built (Section~\ref{subsec:removal}).
 \CLS{S}Our composer and stream pass reorder issue, and our loop pass renames decode attention's buffers (Section~\ref{subsec:order}), each behind a checker that refuses any rewrite it cannot show legal (Section~\ref{subsec:legality}).
 \CLS{E}An event model prices every candidate per prompt length from \emph{probes}, which time each operator dispatched alone (Section~\ref{subsec:pricing}), and a runtime runs the choice.
 
 % VALUE: general benefit, by what each component needs from a stack: reading, bounding, legality and the stream pass work on any stack's streams, compiled or lifted; the loop forms and the loop pass need the lowered design; the composer, probes, event model, choice and runtime are built for attention/GEMM fused prefill, and the composer and runtime need an open host program; choosing the configuration needs the stack's own build of each split
 \CLS{S}The analysis, the bound, the legality conditions, and the stream pass with its checker work on any stack's instruction streams, compiled or recorded.
 % SOURCE: vault lab-cosched-passes (52): the loop pass is an opt-in aiecc flag, run in MLIR-AIE's compile right after the object-FIFO lowering; the rest of that compile rebuilds the configuration.
-\CLS{E}Their loop forms need the design's lowered MLIR-AIE form, and the loop pass is an opt-in pass in MLIR-AIE's compile.
+\CLS{E}Their loop forms need the design's lowered MLIR-AIE form, and the loop pass runs in MLIR-AIE's compile.
 \CLS{P}The composer, the probes, the event model, and the runtime are built for a fused prefill that pairs attention with GEMMs, the composer and the runtime also need an open host program, and the configuration is chosen only among the splits that the design's stack builds.
 
 \subsection{Dependence Analysis}
@@ -23,7 +23,7 @@
 % SOURCE: the mechanism table, attribution order, granularities, UNATTRIBUTED, and issue edges (vault lab-cosched-passes (30), item 2); the library AIECoschedDeps (mlir-aie f1725dae1f1, pinned); segments as in txn.segments (amd-npu a0ee2ed prefill-overlap/txn.py); one edge per (wait, gated op) pair (lab-cosched-passes (30), item 3).
 \CLS{E}The analysis represents a \emph{phase}, all the dispatches that the host issues for a prefill or a decode step, as operations on \emph{agents}: the CP, the DMA channels, the cores' loops, and the host, whose steps between dispatches access the buffers those dispatches bind.
 \CLS{E}Each operation reads and writes \emph{locations}, the resources that one operation holds exclusively, from memory bytes and BDs to locks, DMA channels, task-queue slots, and switch ports, so run-time arbitration on a shared port or lock is a conflict on a location.
-\CLS{E}A \emph{happens-before} edge from $a$ to $b$ means $b$ starts only after $a$ completes, and edges come from mechanisms such as synchronizations, BD chains, and locks, not from issue order.
+\CLS{E}An edge from $a$ to $b$ means $b$ starts only after $a$ completes, and edges come from mechanisms such as synchronizations, BD chains, and locks, not from issue order.
 \CLS{E}Within one operator's stream, a \emph{segment} is a run of synchronizations followed by the issues they gate.
 % VALUE: the validity assumption the legality rests on: a core touches a shared buffer only between the locks that guard it (Eraser's lockset discipline, cited; MLIR-AIE's object FIFOs guarantee it)
 % SOURCE: spine v18, "The system", the principle and the validity assumption (vault paper-cosched-spine-v18).
@@ -52,7 +52,7 @@
 % SOURCE: the bound and its typed resources (outline v9 section 2, C1; vault lab-bound-validation (1)); the buffering on a shared channel: pass-0 aie-cosched de43b4d (model) and eb7b29b, 8d03ffe (the clause test's 1.084x; passes/results/2026-10-26-buffering/README.md).
 \CLS{D}By Amdahl's law~\citep{amdahl1967validity} applied to an ordering, removing a false dependence $d$, or a set of them, can speed a phase up by at most $T / (T - O(d))$.
 \CLS{D}Here $T$ is the phase's time, the longest path through the graph once each resource adds the order in which it serves its work, or in a loop the maximum cycle mean~\citep{ghamarian2006throughput}, that of its critical cycle, and $O(d)$ is how long $d$ keeps work on disjoint resources from running at once.
-\CLS{E}Because true dependences stay edges and no rewrite can duplicate a core tile or a DMA channel, a false dependence that fails the no-true-dependence clause (Section~\ref{subsec:question}) does not free overlap and bounds at $1.00\times$, and one that fails only disjoint resources frees at most what the buffers on the shared route let through.
+\CLS{E}Because true dependences stay edges and no rewrite can duplicate a core tile or a DMA channel, a false dependence that fails the no-true-dependence clause (Section~\ref{subsec:question}) bounds at $1.00\times$, and one that fails only disjoint resources frees at most what the buffers on the shared route let through.
 
 \subsection{Order and Buffer Rewrites}
 \label{subsec:order}
@@ -90,7 +90,7 @@
 \CLS{E}OPCORD judges each of these rewrites as a whole, deciding its legality from the streams, their configuration, and the host's accesses.
 \CLS{D}A reorder keeps every instruction once, and each column's segments and each channel's pushes and waits in their order, and must not create a hazard on data and BDs, on a task queue, or on device state.
 \CLS{E}Two whole operators on different groups may interleave when each writes only its own group's shim BDs, task queues, locks, and runtime parameters, they address disjoint host buffers or disjoint byte ranges of one, and neither writes a buffer that the other reads or writes.
-\CLS{P}These conditions hold only where an operation's locations cover all the state it touches, so we do not claim they suffice for every design; every accepted rewrite we run also leaves the outputs bit-identical (Section~\ref{subsec:setup}).
+\CLS{P}These conditions hold only where an operation's locations cover all the state it touches, so we do not claim they suffice for every design.
 
 % VALUE: the checkers: the composer and both passes each carry one; a failed check leaves the composition, stream, or loop unchanged and names its reason, and nothing is dropped to pass
 % SOURCE: stream checker in C++ inside aie-cosched-schedule, route facts from the device IR (mlir-aie cosched-flag e20940fac7e); any finding refuses the whole rewrite and the IR is unchanged; outcomes DECIDED (shown illegal) against RESOURCE-UNPROVEN, RANGE-UNKNOWN, TOOL-FAILED, PASS-ERROR (not shown legal) (vault lab-cosched-passes (57) steps 3-5, and the checker's reason list).
@@ -129,5 +129,4 @@
 % SOURCE: opcord/plan/planner.py choose(model, L, N): candidates every split with a committed probe (S1, S2, S4), orders ship / shipar / comp, composer policies depth {1, 2, 4, 8} x GEMM cap {none, 4} x packing {1, 4}, each priced by event_model.predict, the minimum returned with the whole table; the hold as pipe {0, 1} (opcord-pipe 4a60cc4).
 % SOURCE: measure-when-close, implemented test-first in opcord (planner.CLOSE_BAND, close_candidates, decide; test_measure_close 10/10); bands same 5%, cross 15%, tie 0.5%, one warm and three kept runs per candidate (vault decisions log, "Spine v18 drafted; amendment-1 batch and measure-when-close approved").
 % SOURCE: planner.py:154 CLOSE_BAND same 0.05 / cross 0.15 by order family (_family), opcord-pin.
-\CLS{E}Before a prompt length runs, OPCORD prices every candidate and runs the one predicted fastest, except where another candidate is predicted within 5\% of it, or 15\% with the other order, and a measurement at planning time settles this near tie.
-\CLS{X}Because the configuration that minimizes TTFT moves with the balance and can differ between the orders (Section~\ref{subsec:question}), OPCORD chooses the order and the configuration together.
+\CLS{E}Before a prompt length runs, OPCORD prices every candidate order and configuration together and runs the one predicted to minimize TTFT, except where another candidate is predicted within 5\% of it, or 15\% with the other order, and a measurement at planning time settles this near tie.
