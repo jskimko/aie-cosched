@@ -20,8 +20,8 @@
 % SOURCE: no reordering across engines: XRT run list, /opt/xilinx/xrt/include/xrt/experimental/xrt_kernel.h:21 (XRT 2.25.0); the in-order and blocking behavior rests on the paired measurements of Section 3.1.
 \textbf{Command Processor.}
 \CLS{E}The host drives the array through \emph{dispatches}, and each is a command buffer whose \emph{instruction stream} the NPU's CP executes in order.
-\CLS{E}An \emph{issue} pushes a BD into a shim DMA channel's task queue and returns at once, whereas a \emph{synchronization} blocks the CP until a named transfer completes.
-\CLS{D}A synchronization on one column therefore delays every later issue, whichever column it targets, and no hardware or runtime scheduler on XDNA~2 reorders work across engines (Section~\ref{subsec:semantics}).
+\CLS{E}An \emph{issue} pushes a BD into a shim DMA channel's task queue and returns at once, whereas a \emph{synchronization}, or wait, blocks the CP until a named transfer completes.
+\CLS{D}A synchronization on one column therefore delays every later issue, whichever column it targets, and neither the host runtime nor the CP reorders work across engines (Section~\ref{subsec:semantics}).
 
 % VALUE: the host side: dispatches go through XRT and the driver to a hardware context, which holds one configuration and has one CP that runs them in submission order; each dispatch costs a fixed floor F
 % SOURCE: XRT empty dispatch (4 KB bypass), 93.0-98.5 us at every bracket of lab-prefill-device (3); 92-99 us in lab-prefill-overlap (3).
@@ -50,7 +50,7 @@
 % SOURCE: mlir-air a3e26261 fused_prefill/device.py: Attn(col=...) per group in Config.attn, GCOL0, GNC = 1, 6 as module constants; spec() splits kv_heads evenly, so 1, 2, or 4 attention columns with 8 KV heads (vault lab-split-sweep (1)); logits bit-identical to the default split in every configuration on both models (lab-split-sweep (2), (4), (5)).
 % SOURCE: mlir-air 44e8d8f7 programming_examples/llms/shared/fused_prefill/device.py:24-30, M = 128 rows per chunk as a module constant, TM = 32 per core tile, HR = M // TM = 4 core rows of the 6 x 4 herd; no build flag (npu-gap D4, 2026-10-25), so no chunk-size baseline exists without changing the design.
 \CLS{E}In each decoder layer, attention sits between the QKV projection and the remaining projections, all of which are GEMMs.
-\CLS{E}AIR's open fused prefill places every operator of a layer in one configuration, by default with the GEMMs on columns 1--6 and attention on columns 0 and 7, and we call this design with its host program the \emph{original program}.
+\CLS{E}AIR's open fused prefill places every operator of a layer in one configuration, by default with the GEMMs on columns 1--6 and attention on columns 0 and 7, and we call this design the \emph{original program}.
 \CLS{E}We name its configuration by its \emph{split}, namely the number of columns attention takes, which is a build parameter, and each admitted value gives a \emph{supported configuration}.
 \CLS{E}An LLM with 8 KV heads admits $S_1$, $S_2$, and $S_4$, with attention on 1, 2, or 4 columns and $S_2$ the default.
 \CLS{E}The host runs each layer stage by stage over 128-token chunks, a size the design fixes, and finishes every chunk's QKV projection before any attention and every attention before the remaining projections.

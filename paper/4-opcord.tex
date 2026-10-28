@@ -50,9 +50,9 @@
 
 % VALUE: the bound per false dependence: T/(T - O(d)) by Amdahl's law for an ordering (cited); T the longest path once each resource adds its service order, or the maximum cycle mean in a loop (cited); the condition in the bound (1.000x where no true dependence fails; what buffers on the shared route let through where only disjoint resources fails)
 % SOURCE: the bound and its typed resources (outline v9 section 2, C1; vault lab-bound-validation (1)); the buffering on a shared channel: pass-0 aie-cosched de43b4d (model) and eb7b29b, 8d03ffe (the clause test's 1.084x; passes/results/2026-10-26-buffering/README.md).
-\CLS{D}By Amdahl's law~\citep{amdahl1967validity} applied to an ordering, removing a false dependence $d$ can speed a phase up by at most $T / (T - O(d))$.
-\CLS{D}Here $T$ is the phase's time, the longest path through the graph once each resource adds the order in which it serves its work, or in a loop the maximum cycle mean~\citep{ghamarian2006throughput}, and $O(d)$ is how long $d$ alone keeps work on disjoint resources from running at once.
-\CLS{E}Because true dependences stay edges and no rewrite can duplicate a core tile or a DMA channel, a false dependence that fails the no-true-dependence clause (Section~\ref{subsec:question}) does not free overlap and bounds at $1.000\times$, and one that fails only disjoint resources frees at most what the buffers on the shared route let through.
+\CLS{D}By Amdahl's law~\citep{amdahl1967validity} applied to an ordering, removing a false dependence $d$, or a set of them, can speed a phase up by at most $T / (T - O(d))$.
+\CLS{D}Here $T$ is the phase's time, the longest path through the graph once each resource adds the order in which it serves its work, or in a loop the maximum cycle mean~\citep{ghamarian2006throughput}, that of its critical cycle, and $O(d)$ is how long $d$ keeps work on disjoint resources from running at once.
+\CLS{E}Because true dependences stay edges and no rewrite can duplicate a core tile or a DMA channel, a false dependence that fails the no-true-dependence clause (Section~\ref{subsec:question}) does not free overlap and bounds at $1.00\times$, and one that fails only disjoint resources frees at most what the buffers on the shared route let through.
 
 \subsection{Order and Buffer Rewrites}
 \label{subsec:order}
@@ -118,7 +118,7 @@
 \label{eq:overlap}
 \CLS{D}\tau_k = \max(a_k, g_k) + c_r + d_r \min(a_k, g_k),
 \end{equation}
-\CLS{D}where $a_k$ and $g_k$ are the attention and GEMM groups' times alone, each beyond the floor, $r$ says which is longer, and $c_r$ and $d_r$ are a fixed cost and the fraction of the shorter time that the overlap leaves unhidden.
+\CLS{D}where $a_k$ and $g_k$ are the attention and GEMM groups' times alone, each beyond the floor, $r$ says which is longer, and $c_r$ and $d_r$ are a fixed cost and a fitted coefficient on the shorter time.
 
 % VALUE: what makes the price move with the prompt and keeps it honest: probes on each supported configuration, each attention chunk probed at several cached-context lengths and priced at its position, so the candidate that pays changes with length; no constant comes from an LLM's end-to-end runs
 % SOURCE: frozen constants (opcord/model/constants/frozen.json; calibration hold 2026-10-22 22:20-22:43, amd-npu d94266bf, microbench device.json / host.json; frozen.json from npu-gap-0-c8 b15d9dca): F 94.507 us; transitions gemm->gemm 12.93, gemm->attn -6.65, attn->gemm 47.95, attn->attn 20.94 us; gamma 24.56 us; regimes GEMM-longer c 42.33 us, d 0.1160 (n 10), attention-longer c 21.43 us, d -0.0260 (n 5); issue attention 68.06, GEMM 7.36 us; post per model and operator (host.json, e.g. Llama-3.2-1B qkv 179.5, up 202.3, attention 76.1 us). The microbenchmarks run Llama-3.2-1B's layer-0 operators with real weights; tests/test_event_model.py forbids end-to-end sources in frozen.json.
