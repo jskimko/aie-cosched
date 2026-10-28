@@ -35,6 +35,7 @@ TEX = ROOT.parent / "paper" / "fig" / "numbers.tex"
 AMD_NPU = Path.home() / "git" / "amd-npu.git"
 FROZEN_PIN = "e4e3b209"  # choose() at the event model's final form (opcord 4c56faa) over the same cells
 AMD_NPU_PIN = "4ce61672"  # npu-gap-0 head, 2026-10-26 evening (a6abaf19 plus additions only); holds every result read below
+FLM_PIN = "6727cd0b"  # npu-gap-0, 2026-10-27: the FLM same-batch rerun (9197bf5c, 1K/4K/16K) and its 2K/8K extension
 COSCHED = Path.home() / "aie2p-gmk" / "aie-cosched-pass-0" / "aie-cosched"
 DECOMP = ("c4a8650", "passes/results/2026-10-25-gain-decompose/decompose.json")
 
@@ -331,6 +332,8 @@ def absolute(ab):
                 for a in ("orig", "comp"):
                     if a in j["median_ms"]:
                         vals[a] = j["median_ms"][a]
+            if N >= 1024:  # the prefill comparison from 1K comes from the same-protocol FLM batches below
+                continue
             rows.append({"llm": NAME[t], "key": t, "N": N, "flm_ms": flm, "orig_s2_ms": vals.get("orig"),
                          "opcord_ms": vals.get("comp"), "pick_split": picks.get((t, N))})
         for P in (2048, 16384):
@@ -338,6 +341,22 @@ def absolute(ab):
             pt = ab.json(R + f"run/{t}/dec-P{P}/ab.json")["points"][str(P)]["ms_tok"]
             rows.append({"llm": NAME[t], "key": t, "P": P, "flm_ms_tok": fl, "off_ms_tok": st.median(pt["baseline"]),
                          "on_ms_tok": st.median(pt["treatment"])})
+    return rows + flm_batches()
+
+
+def flm_batches():
+    """The FLM same-batch rerun (1K, 4K, 16K) and its 2K/8K extension, one protocol: FastFlowLM 1.0.8 by its server's
+    prefill timer against OPCORD's pick on AIR's designs, the pick being the paper's where the pin's differs."""
+    rows = []
+    for R in ("ab/results/flm-rerun-2026-10-26/", "ab/results/flm-2k8k-2026-10-27/"):
+        t = Tree(AMD_NPU, FLM_PIN, R)
+        for c in t.json(R + "read.json")["cells"]:
+            a = c["arms"]
+            op = a.get("paper_comp") or a["opcord"]
+            assert c["flm"]["ok"] and op["ok"], (R, c["model"], c["N"])
+            rows.append({"llm": NAME[c["model"]], "key": c["model"], "N": c["N"], "flm_ms": c["flm"]["ms"],
+                         "orig_s2_ms": a["orig_S2"]["ms"], "opcord_ms": op["ms"],
+                         "pick_split": c.get("paper_pick") or c["pick"], "batch": R.split("/")[-2]})
     return rows
 
 
@@ -373,7 +392,7 @@ def main():
     dc = json.loads(subprocess.run(["git", "-C", str(COSCHED), "show", f"{DECOMP[0]}:{DECOMP[1]}"],
                                    capture_output=True, check=True, text=True).stdout)
 
-    src = {"amd-npu": AMD_NPU_PIN, "aie-cosched (census workspace)": DECOMP[0]}
+    src = {"amd-npu": AMD_NPU_PIN, "amd-npu FLM batches": FLM_PIN, "aie-cosched (census workspace)": DECOMP[0]}
     (DATA / "prefill-cells.json").write_text(json.dumps({"source": src, "cells": cells}, indent=1))
     (DATA / "decode-cells.json").write_text(json.dumps({"source": src, "cells": dec}, indent=1))
     (DATA / "choice.json").write_text(json.dumps({"source": src, "cells": ch, "summary": chs}, indent=1))
