@@ -36,6 +36,7 @@ AMD_NPU = Path.home() / "git" / "amd-npu.git"
 FROZEN_PIN = "e4e3b209"  # choose() at the event model's final form (opcord 4c56faa) over the same cells
 AMD_NPU_PIN = "4ce61672"  # npu-gap-0 head, 2026-10-26 evening (a6abaf19 plus additions only); holds every result read below
 FLM_PIN = "6727cd0b"  # npu-gap-0, 2026-10-27: the FLM same-batch rerun (9197bf5c, 1K/4K/16K) and its 2K/8K extension
+PAIRED_PIN = "3acf6415"  # npu-gap-0, 2026-10-27: the two cross-split headline cells re-measured paired (dagger-pairs)
 COSCHED = Path.home() / "aie2p-gmk" / "aie-cosched-pass-0" / "aie-cosched"
 DECOMP = ("c4a8650", "passes/results/2026-10-25-gain-decompose/decompose.json")
 
@@ -360,6 +361,20 @@ def flm_batches():
     return rows
 
 
+def paired_cross(cells):
+    """The two headline cells whose baseline ran on another split in another process, re-measured paired: rounds
+    alternate the pick's split and the baseline's, and the ratio is paired by round (dagger-pairs, PAIRED_PIN)."""
+    R = "ab/results/dagger-pairs-2026-10-27/"
+    got = Tree(AMD_NPU, PAIRED_PIN, R).json(R + "read.json")["cells"]
+    for c in cells:
+        r = got.get(f"{c['key']}-{c['N']}")
+        if not r:
+            continue
+        assert r["baseline"] == "orig-" + c["baseline_split"], (c["key"], c["N"], r["baseline"])
+        lo, hi = r["opcord_ci"]
+        c.update(gain=r["opcord"], lo=lo, hi=hi, source=f"{R.split('results/')[1]}read.json, paired by round")
+
+
 def fig1(ab):
     j = ab.json("prefill-overlap/ml-timeline/fig1-2026-10-25/run/1b-N/ab-4096.json")
     k = kept(j)
@@ -382,6 +397,7 @@ def main():
     for extra in ("decode-rename/decode-dev-2026-10-24/run", "prefill-overlap/ml-timeline/fig1-2026-10-25/run"):
         ab.files.update(Tree(AMD_NPU, AMD_NPU_PIN, extra).files)
     cells, med = prefill(ab)
+    paired_cross(cells)
     ch, chs = choice(cells, med)
     frozen = Tree(AMD_NPU, FROZEN_PIN, "ab/results/choose-frozen-2026-10-26").lines(
         "ab/results/choose-frozen-2026-10-26/choose-frozen.jsonl")
@@ -392,7 +408,7 @@ def main():
     dc = json.loads(subprocess.run(["git", "-C", str(COSCHED), "show", f"{DECOMP[0]}:{DECOMP[1]}"],
                                    capture_output=True, check=True, text=True).stdout)
 
-    src = {"amd-npu": AMD_NPU_PIN, "amd-npu FLM batches": FLM_PIN, "aie-cosched (census workspace)": DECOMP[0]}
+    src = {"amd-npu": AMD_NPU_PIN, "amd-npu FLM batches": FLM_PIN, "amd-npu paired cross-split cells": PAIRED_PIN, "aie-cosched (census workspace)": DECOMP[0]}
     (DATA / "prefill-cells.json").write_text(json.dumps({"source": src, "cells": cells}, indent=1))
     (DATA / "decode-cells.json").write_text(json.dumps({"source": src, "cells": dec}, indent=1))
     (DATA / "choice.json").write_text(json.dumps({"source": src, "cells": ch, "summary": chs}, indent=1))

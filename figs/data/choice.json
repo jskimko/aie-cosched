@@ -2,6 +2,7 @@
  "source": {
   "amd-npu": "4ce61672",
   "amd-npu FLM batches": "6727cd0b",
+  "amd-npu paired cross-split cells": "3acf6415",
   "aie-cosched (census workspace)": "c4a8650"
  },
  "cells": [

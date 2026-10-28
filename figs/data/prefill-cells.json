@@ -2,6 +2,7 @@
  "source": {
   "amd-npu": "4ce61672",
   "amd-npu FLM batches": "6727cd0b",
+  "amd-npu paired cross-split cells": "3acf6415",
   "aie-cosched (census workspace)": "c4a8650"
  },
  "cells": [
@@ -1114,10 +1115,10 @@
     "orig@S2": 616.2127184943529,
     "stream@S2": 589.764276992355
    },
-   "gain": 1.2254668221662675,
-   "lo": null,
-   "hi": null,
-   "source": "s1-cells-lfm2-2026-10-24/a/ab-2048.json orig/comp, baseline S2 unpaired",
+   "gain": 1.229596940781445,
+   "lo": 1.22756844140776,
+   "hi": 1.2326298102837945,
+   "source": "dagger-pairs-2026-10-27/read.json, paired by round",
    "pick_ms": 502.8391689993441
   },
   {
@@ -1409,10 +1410,10 @@
     "orig@S2": 876.1975094967056,
     "stream@S2": 873.4401464971597
    },
-   "gain": 1.2006077722009325,
-   "lo": null,
-   "hi": null,
-   "source": "split-cells-gemma-2026-10-24/a-S1/ab-1024.json orig/comp, baseline S2 unpaired",
+   "gain": 1.1922528735293292,
+   "lo": 1.1894332329188542,
+   "hi": 1.1956086594920263,
+   "source": "dagger-pairs-2026-10-27/read.json, paired by round",
    "pick_ms": 729.7949670028174
   },
   {
